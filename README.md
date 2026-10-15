@@ -1,20 +1,34 @@
-# Rotaract Blood CRM (Phase 1: Foundation)
+# Rotaract Blood CRM (Sankari Rotaract Club)
 
-Login, 5 roles, dark blue layout, GitHub Pages deploy. Runs in preview mode without a database.
+Admin CRM + donor portal for blood donation camps. React + Vite + Tailwind on GitHub Pages, Supabase for login and data.
+
+## What is inside
+Login and 5 roles, donors, camps with QR registration, Excel import, camp-day check-in / screening / donation, WhatsApp message queues,
+donor portal with certificates, public landing page, blood stock, emergency requests, camp planning, reports and CSV export.
+
+## Database setup (Supabase SQL Editor)
+Run each file ONCE, in this order. Skip any you have already run.
+1. supabase/schema.sql
+2. supabase/phase2.sql
+3. supabase/phase3.sql
+4. supabase/phase4.sql
+5. supabase/phase5.sql
+6. supabase/phase6.sql
+7. supabase/phase8.sql
+
+Make yourself admin (after you have signed up):
+    update profiles set role='admin' where id=(select id from auth.users where email='YOUR-EMAIL');
 
 ## Run locally
     npm install
     npm run dev
+Copy `.env.example` to `.env` and fill in VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.
 
-## Connect the database (Supabase, free)
-1. Create a project at supabase.com. In SQL Editor, run `supabase/schema.sql`.
-2. Copy `.env.example` to `.env` and fill in Project URL and anon key (Project Settings > API).
-3. Sign up in the app, then run the last (commented) line of `schema.sql` with your email to become admin.
+## Deploy
+Push to `main`. GitHub Actions builds and publishes to GitHub Pages.
+Repo secrets needed: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (use the publishable / anon key, never the secret or service_role key).
 
-## Deploy to GitHub Pages
-1. Push this folder to a GitHub repo, branch `main`.
-2. Repo Settings > Pages > Source: **GitHub Actions**.
-3. Repo Settings > Secrets and variables > Actions: add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
-4. Push to `main`; the site goes live at `https://<user>.github.io/<repo>/`.
-
-Free GitHub Pages needs a public repo. Never commit `.env` or the Supabase service_role key.
+## Public links
+- Camp page: /#/home
+- Camp registration: /#/register/<camp id> (QR on the Camps page)
+- Certificate check: /#/verify/<code>
