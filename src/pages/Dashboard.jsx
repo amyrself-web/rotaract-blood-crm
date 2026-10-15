@@ -1,7 +1,7 @@
 import {Check} from 'lucide-react'
 import {useAuth} from '../context/Auth'
 import {hasSupabase} from '../lib/supabase'
-const PHASES=[['Foundation','Login, roles, theme, GitHub deploy',true],['Donors and camps','Registration, QR, slots, calendar',false],['Camp day','Check-in, screening, donation, live board',false],['Communication','WhatsApp links, reminders, birthday alerts, daily digest',false],['Donor portal','Donor login, certificates, public page',false],['Emergency and stock','Blood stock, expiry alerts, request board',false],['Advanced messaging','Bulk send queue, segments, inbox',false],['Insights and finance','Analytics, reports, sponsors, expenses',false]]
+const PHASES=[['Foundation','Login, roles, theme, GitHub deploy',true],['Donors and camps','Registration, QR, slots, calendar',true],['Camp day','Check-in, screening, donation, live board',true],['Communication','WhatsApp links, reminders, birthday alerts, daily digest',true],['Donor portal','Donor login, certificates, public page',true],['Emergency and stock','Blood stock, expiry alerts, request board',false],['Advanced messaging','Bulk send queue, segments, inbox',false],['Insights and finance','Analytics, reports, sponsors, expenses',false]]
 export default function Dashboard(){
   const {profile}=useAuth()
   return <div>
