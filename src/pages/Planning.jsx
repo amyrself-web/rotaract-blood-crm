@@ -15,7 +15,7 @@ export default function Planning(){
   useEffect(()=>{load()},[cid])
   const run=async p=>{setErr('');const {error}=await p;error?setErr(error.message):load()}
   const add=(t,row)=>{run(supabase.from(t).insert(Array.isArray(row)?row.map(x=>({...x,camp_id:cid})):{...row,camp_id:cid}));setF({})}
-  const upd=(t,id,p)=>run(supabase.from(t).update(p).eq('id',id)),del=(t,id)=>run(supabase.from(t).delete().eq('id',id))
+  const upd=(t,id,p)=>{setD(o=>({...o,[t]:o[t].map(x=>x.id===id?{...x,...p}:x)}));run(supabase.from(t).update(p).eq('id',id))},del=(t,id)=>run(supabase.from(t).delete().eq('id',id))
   const camp=camps.find(c=>c.id===cid),set=k=>e=>setF({...f,[k]:e.target.value}),v=k=>f[k]||''
   const spent=sum(d.expenses,'amount'),got=sum(d.sponsors.filter(s=>s.received),'amount')
   const Del=({t,id})=><button className="btn-ghost ml-auto" aria-label="Delete" onClick={()=>del(t,id)}><Trash2 size={15}/></button>

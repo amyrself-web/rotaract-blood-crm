@@ -26,7 +26,7 @@ create policy "staff manage donors" on donors for all using (has_role(array['adm
 create policy "medical read donors" on donors for select using (has_role(array['medical']::app_role[]));
 create policy "staff manage camps" on camps for all using (has_role(array['admin','coordinator']::app_role[])) with check (has_role(array['admin','coordinator']::app_role[]));
 create policy "team read camps" on camps for select using (has_role(array['medical','volunteer']::app_role[]));
-create policy "public read open camps" on camps for select to anon using (status='open');
+create policy "public read open camps" on camps for select to anon, authenticated using (status='open');
 create policy "staff manage registrations" on registrations for all using (has_role(array['admin','coordinator']::app_role[])) with check (has_role(array['admin','coordinator']::app_role[]));
 create policy "team read registrations" on registrations for select using (has_role(array['medical','volunteer']::app_role[]));
 -- Public registration form calls this; the only way anonymous visitors can write data

@@ -12,10 +12,10 @@ export default function Layout(){
         <span className="grid h-9 w-9 place-items-center rounded-lg bg-blood/15 text-blood"><Droplet size={18}/></span>
         <div><div className="font-semibold leading-tight text-white">Rotaract Blood CRM</div><div className="text-xs text-slate-400">Sankari</div></div>
       </div>
-      <nav className="space-y-1">{items.map(({to,label,icon:I,phase})=>
+      <nav className="space-y-1">{items.map(({to,label,icon:I})=>
         <NavLink key={to} to={to} end={to==='/'} onClick={()=>setOpen(false)}
           className={({isActive})=>`flex items-center gap-3 rounded-lg px-3 py-2 text-sm ${isActive?'bg-brand/15 text-white':'text-slate-400 hover:bg-ink-800 hover:text-white'}`}>
-          <I size={17}/><span className="flex-1">{label}</span>{phase>1&&<span className="text-xs text-slate-500">Phase {phase}</span>}
+          <I size={17}/><span className="flex-1">{label}</span>
         </NavLink>)}</nav>
     </aside>
     <div className="min-w-0 flex-1">
