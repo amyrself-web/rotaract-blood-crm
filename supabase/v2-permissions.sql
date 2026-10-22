@@ -301,3 +301,7 @@ revoke execute on function audit_row(), guard_profile(), sync_profile_email(), h
 revoke execute on function update_unit(uuid,text,blood_group,int,date,date,text), my_access() from public, anon;
 grant execute on function update_unit(uuid,text,blood_group,int,date,date,text), my_access(), perm(text) to authenticated;
 grant execute on function camp_slots(uuid) to anon, authenticated;
+
+-- hardening (advisor)
+alter function public.role_default_perms(app_role) set search_path = public;
+revoke execute on function public.slot_is_full(uuid,text) from public, anon, authenticated;
