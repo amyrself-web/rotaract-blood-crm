@@ -16,6 +16,9 @@ Run each file ONCE, in this order. Skip any you have already run.
 6. supabase/phase6.sql
 7. supabase/phase8.sql
 8. supabase/fix-01.sql (lets signed-in donors open registration links)
+9. supabase/fix-02-grants.sql (locks staff functions to signed-in users)
+
+Optional: supabase/sample-data.sql loads demo logins and sample data; supabase/sample-data-remove.sql removes them.
 
 Make yourself admin (after you have signed up):
     update profiles set role='admin' where id=(select id from auth.users where email='YOUR-EMAIL');
