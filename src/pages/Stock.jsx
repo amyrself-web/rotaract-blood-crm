@@ -3,6 +3,7 @@ import {Send} from 'lucide-react'
 import {supabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
 import {BLOOD,nextEligible,fmt,wa} from '../lib/util'
+import CountUp from '../components/CountUp'
 const ST=['collected','in_transit','testing','available','issued','discarded']
 const LB={collected:'Collected',in_transit:'In transit',testing:'Testing',available:'Available',issued:'Issued',discarded:'Discarded'}
 const ACTIVE=['collected','in_transit','testing','available']
@@ -51,7 +52,7 @@ export default function Stock(){
     {err&&<p className="mb-3 text-sm text-blood">{err}</p>}
     <div className="mb-4 flex flex-wrap gap-2">{TABS.map(([k,l])=><button key={k} onClick={()=>setTab(k)} className={`rounded-lg px-3 py-1.5 text-sm ${tab===k?'bg-brand text-white':'border border-ink-600 text-slate-300 hover:border-brand'}`}>{l}</button>)}</div>
     {tab==='overview'&&<><div className="card mb-5"><div className="grid grid-cols-4 gap-3 sm:grid-cols-8">{BLOOD.map(g=>{const a=avail(g),m=th[g]??5,low=a<m
-      return <div key={g} className={`rounded-lg border py-3 text-center ${low?'border-blood':'border-ink-600'}`}><div className="font-semibold text-blood">{g}</div><div className="text-2xl text-white">{a}</div>
+      return <div key={g} className={`tile py-3 text-center ${low?'!border-blood/70 bg-blood/5':''}`}><div className="font-semibold text-blood">{g}</div><div className="text-2xl tabular-nums text-white"><CountUp value={a}/></div>
         <div className="text-xs text-slate-400">{pipe(g)} on the way</div>{low&&<div className="text-xs text-blood">Low</div>}</div>})}</div>
       <p className="mt-3 text-xs text-slate-500">Large number is units available. Low means below the minimum set for that group.</p></div>
       <div className="card mb-5"><h2 className="mb-2 font-semibold text-white">Expiring within 7 days</h2>

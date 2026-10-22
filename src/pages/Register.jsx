@@ -10,8 +10,8 @@ export default function Register(){
   const submit=async e=>{e.preventDefault();setBusy(true);setMsg('')
     const {error}=await supabase.rpc('register_for_camp',{p_camp:campId,p_name:f.name,p_phone:normPhone(f.phone),p_group:f.group||null,p_dob:f.dob||null,p_area:f.area||null,p_slot:f.slot||null,p_consent:f.consent})
     setBusy(false);error?setMsg(error.message):setDone(true)}
-  const head=<div className="mb-5 text-center"><span className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-blood/15 text-blood"><Droplet/></span><h1 className="text-xl font-semibold text-white">Sankari Rotaract Club</h1><p className="text-sm text-slate-400">Blood donation camp registration</p></div>
-  return <div className="grid min-h-screen place-items-center bg-gradient-to-b from-ink-900 to-ink-950 p-5"><div className="w-full max-w-md">{head}
+  const head=<div className="mb-5 text-center"><span className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-blood/15 text-blood shadow-[0_0_30px_-6px_rgba(225,29,72,.7)]"><Droplet className="animate-drop"/></span><h1 className="text-xl font-semibold text-white">Sankari Rotaract Club</h1><p className="text-sm text-slate-400">Blood donation camp registration</p></div>
+  return <div className="relative grid min-h-screen place-items-center overflow-hidden p-5"><div aria-hidden className="pointer-events-none absolute left-1/2 top-1/3 h-72 w-72 -translate-x-1/2 rounded-full bg-blood/20 blur-3xl animate-glow"/><div className="relative w-full max-w-md animate-scaleIn">{head}
     {camp===undefined?<div className="card text-center text-slate-400">Loading…</div>
     :!camp||camp.status!=='open'?<div className="card text-center">Registration for this camp is not open. Please check with the club.</div>
     :done?<div className="card text-center"><h2 className="text-lg font-semibold text-white">You are registered</h2><p className="mt-2 text-slate-300">{camp.name}<br/>{fmt(camp.camp_date)}{f.slot&&` at ${f.slot}`}{camp.venue&&`, ${camp.venue}`}</p><p className="mt-3 text-sm text-slate-400">Please bring a photo ID. Thank you for donating blood.</p></div>

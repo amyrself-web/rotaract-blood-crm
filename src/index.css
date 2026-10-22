@@ -1,9 +1,21 @@
 @tailwind base;@tailwind components;@tailwind utilities;
-@layer base{body{@apply bg-ink-950 text-slate-200 antialiased}
-:focus-visible{@apply outline-2 outline-offset-2 outline-brand}}
+@layer base{
+body{@apply bg-ink-950 text-slate-200 antialiased;background-image:radial-gradient(900px 420px at 85% -10%,rgba(59,130,246,.10),transparent 60%),radial-gradient(700px 380px at -10% 110%,rgba(225,29,72,.06),transparent 60%);background-attachment:fixed}
+:focus-visible{@apply outline-2 outline-offset-2 outline-brand}
+::selection{background:rgba(59,130,246,.35)}
+*{scrollbar-width:thin;scrollbar-color:#27406B transparent}}
 @layer components{
-.card{@apply rounded-xl border border-ink-700 bg-ink-800 p-5}
-.h1{@apply text-2xl font-semibold text-white mb-5}
-.btn{@apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50}
-.btn-ghost{@apply rounded-lg p-2 text-slate-400 hover:bg-ink-700 hover:text-white}
-.input{@apply w-full rounded-lg border border-ink-600 bg-ink-900 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-brand}}
+.card{@apply rounded-xl border border-ink-700 bg-ink-800/90 p-5 shadow-[0_1px_0_rgba(255,255,255,.03)_inset,0_10px_30px_-18px_rgba(0,0,0,.6)] transition-colors duration-300 hover:border-ink-600}
+.h1{@apply text-2xl font-semibold tracking-tight text-white mb-5}
+.btn{@apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white shadow-[0_6px_20px_-8px_rgba(59,130,246,.7)] transition duration-200 hover:-translate-y-px hover:bg-blue-500 hover:shadow-[0_10px_24px_-8px_rgba(59,130,246,.8)] active:translate-y-0 active:scale-[.97] disabled:pointer-events-none disabled:opacity-50}
+.btn-ghost{@apply rounded-lg p-2 text-slate-400 transition duration-200 hover:bg-ink-700 hover:text-white active:scale-95}
+.input{@apply w-full rounded-lg border border-ink-600 bg-ink-900 px-3 py-2 text-sm text-white transition duration-200 placeholder:text-slate-500 hover:border-slate-500 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/25}
+.skeleton{@apply rounded-md bg-ink-700;background-image:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent);background-size:400px 100%;background-repeat:no-repeat;animation:shimmer 1.3s linear infinite}
+.tile{@apply rounded-lg border border-ink-600 bg-ink-900/40 transition duration-300 hover:-translate-y-0.5 hover:border-brand/50}}
+/* page entrance: each top-level block rises in, one after another */
+.page>div>*{animation:fadeUp .45s cubic-bezier(.2,.7,.2,1) both}
+.page>div>*:nth-child(2){animation-delay:.05s}.page>div>*:nth-child(3){animation-delay:.1s}.page>div>*:nth-child(4){animation-delay:.15s}
+.page>div>*:nth-child(5){animation-delay:.2s}.page>div>*:nth-child(n+6){animation-delay:.25s}
+form.card,.card>form{animation:scaleIn .3s cubic-bezier(.2,.7,.2,1) both}
+tbody tr{transition:background-color .2s}tbody tr:hover{background:rgba(59,130,246,.05)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-delay:0s!important;transition-duration:.001ms!important}}

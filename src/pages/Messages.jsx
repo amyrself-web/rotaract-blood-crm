@@ -3,6 +3,7 @@ import {Send,Check} from 'lucide-react'
 import {supabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
 import {BLOOD,nextEligible,fmt,wa} from '../lib/util'
+import CountUp from '../components/CountUp'
 const SIGN=' - Sankari Rotaract Club'
 const DEFAULTS={
   birthday:'Happy Birthday {name}! Wishing you good health and happiness.'+SIGN,
@@ -49,7 +50,7 @@ export default function Messages(){
   return <div><h1 className="h1">WhatsApp and alerts</h1>
     {err&&<p className="mb-3 text-sm text-blood">{err}</p>}
     <div className="card mb-5"><h2 className="mb-3 font-semibold text-white">Today, {fmt(today)}</h2>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">{[['Birthdays',bdays.length],['Camps today',camps.filter(c=>c.camp_date===today).length],['Eligible again',eligNow.length],['Consent pending',pending]].map(([l,n])=><div key={l}><div className="text-2xl font-semibold text-white">{n}</div><div className="text-xs text-slate-400">{l}</div></div>)}</div>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">{[['Birthdays',bdays.length],['Camps today',camps.filter(c=>c.camp_date===today).length],['Eligible again',eligNow.length],['Consent pending',pending]].map(([l,n])=><div key={l}><div className="text-2xl font-semibold tabular-nums text-white"><CountUp value={n}/></div><div className="text-xs text-slate-400">{l}</div></div>)}</div>
       <p className="mt-3 text-sm text-slate-400">{next?`Next camp: ${next.name}, ${fmt(next.camp_date)}.`:'No upcoming camp.'} Donors with consent pending are left out of every list until they agree to be contacted.</p></div>
     <div className="mb-4 flex flex-wrap gap-2">{TABS.map(([k,l])=><button key={k} onClick={()=>setTab(k)} className={`rounded-lg px-3 py-1.5 text-sm ${tab===k?'bg-brand text-white':'border border-ink-600 text-slate-300 hover:border-brand'}`}>{l}</button>)}</div>
     {tab==='templates'?<div className="space-y-4">{Object.keys(DEFAULTS).map(k=><div key={k} className="card"><div className="mb-2 text-sm font-semibold text-white">{NAMES[k]}</div>

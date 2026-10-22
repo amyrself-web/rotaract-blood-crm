@@ -3,6 +3,7 @@ import {UserPlus} from 'lucide-react'
 import {supabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
 import {BLOOD,normPhone,fmt} from '../lib/util'
+import CountUp from '../components/CountUp'
 const LABEL={registered:'Registered',checked_in:'Checked in',screened:'Cleared to donate',donated:'Donated',deferred:'Deferred',no_show:'No-show'}
 const TONE={registered:'text-slate-400',checked_in:'text-brand',screened:'text-brand',donated:'text-white font-semibold',deferred:'text-blood',no_show:'text-slate-500'}
 const Field=({label,children})=><label className="text-sm text-slate-400">{label}{children}</label>
@@ -69,9 +70,9 @@ export default function CampDay(){
         {role!=='medical'&&<button className="btn" onClick={()=>setAct({type:'walk'})}><UserPlus size={16}/>Walk-in</button>}</div></div>
     {err&&<p className="mb-3 text-sm text-blood">{err}</p>}
     <div className="card mb-5">
-      <div className="grid grid-cols-3 gap-4 text-center sm:grid-cols-6">{[['Registered',rows.length],['Arrived',arrived],['Cleared',by('screened')],['Donated',donated.length],['Deferred',by('deferred')],['Blood collected',litres+' L']].map(([l,n])=><div key={l}><div className="text-2xl font-semibold text-white">{n}</div><div className="text-xs text-slate-400">{l}</div></div>)}</div>
-      {camp?.target_donors&&<div className="mt-4"><div className="h-2 overflow-hidden rounded-full bg-ink-700"><div className="h-full bg-blood" style={{width:Math.min(100,donated.length/camp.target_donors*100)+'%'}}/></div><div className="mt-1 text-xs text-slate-400">{donated.length} of {camp.target_donors} target donors</div></div>}
-      <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-8">{BLOOD.map(b=><div key={b} className="rounded-lg border border-ink-600 py-2 text-center"><div className="font-semibold text-blood">{b}</div><div className="text-lg text-white">{donated.filter(r=>r.blood_group===b).length}</div></div>)}</div></div>
+      <div className="grid grid-cols-3 gap-4 text-center sm:grid-cols-6">{[['Registered',rows.length],['Arrived',arrived],['Cleared',by('screened')],['Donated',donated.length],['Deferred',by('deferred')],['Blood collected',litres+' L']].map(([l,n])=><div key={l}><div className="text-2xl font-semibold tabular-nums text-white"><CountUp value={n}/></div><div className="text-xs text-slate-400">{l}</div></div>)}</div>
+      {camp?.target_donors&&<div className="mt-4"><div className="h-2 overflow-hidden rounded-full bg-ink-700"><div className="h-full rounded-full bg-gradient-to-r from-rose-700 to-blood transition-all duration-700" style={{width:Math.min(100,donated.length/camp.target_donors*100)+'%'}}/></div><div className="mt-1 text-xs text-slate-400">{donated.length} of {camp.target_donors} target donors</div></div>}
+      <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-8">{BLOOD.map(b=><div key={b} className="tile py-2 text-center"><div className="font-semibold text-blood">{b}</div><div className="text-lg tabular-nums text-white"><CountUp value={donated.filter(r=>r.blood_group===b).length}/></div></div>)}</div></div>
     {act?.type==='walk'&&<Walk camp={cid} run={run} close={()=>setAct(null)}/>}
     {act?.type==='screen'&&<Screen row={act.row} run={run} close={()=>setAct(null)}/>}
     {act?.type==='donate'&&<Donate row={act.row} run={run} close={()=>setAct(null)}/>}

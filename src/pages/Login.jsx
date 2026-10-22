@@ -12,10 +12,10 @@ export default function Login(){
     const r=mode==='in'?await signIn(f.email,f.password):await signUp(f.email,f.password,f.name)
     setBusy(false)
     if(r.error)setMsg(r.error.message);else if(mode==='up')setMsg('Account created. Confirm your email, then sign in.')}
-  return <div className="grid min-h-screen place-items-center bg-gradient-to-b from-ink-900 to-ink-950 p-5">
-    <div className="w-full max-w-sm">
+  return <div className="relative grid min-h-screen place-items-center overflow-hidden p-5"><div aria-hidden className="pointer-events-none absolute left-1/2 top-1/3 h-72 w-72 -translate-x-1/2 rounded-full bg-blood/20 blur-3xl animate-glow"/>
+    <div className="relative w-full max-w-sm animate-scaleIn">
       <div className="mb-6 text-center">
-        <span className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-blood/15 text-blood"><Droplet/></span>
+        <span className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-blood/15 text-blood shadow-[0_0_30px_-6px_rgba(225,29,72,.7)]"><Droplet className="animate-drop"/></span>
         <h1 className="text-2xl font-semibold text-white">Rotaract Blood CRM</h1>
         <p className="mt-1 text-sm text-slate-400">Sankari Rotaract Club blood donation camp</p>
       </div>
