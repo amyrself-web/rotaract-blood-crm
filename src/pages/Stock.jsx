@@ -1,97 +1,140 @@
-import {useEffect,useState} from 'react'
-import {Send} from 'lucide-react'
+import {useEffect,useMemo,useState} from 'react'
+import {toast} from 'sonner'
+import {Send,Plus,Pencil,Trash2,Droplets,AlertTriangle,Truck} from 'lucide-react'
+import {motion} from 'framer-motion'
 import {supabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
-import {BLOOD,nextEligible,fmt,wa} from '../lib/util'
+import {BLOOD,fmt,wa} from '../lib/util'
 import CountUp from '../components/CountUp'
+import {PageHeader,Drawer,Field,Tabs,Badge,Empty,useConfirm,errText} from '../components/ui'
+
 const ST=['collected','in_transit','testing','available','issued','discarded']
 const LB={collected:'Collected',in_transit:'In transit',testing:'Testing',available:'Available',issued:'Issued',discarded:'Discarded'}
+const TONE={collected:'blue',in_transit:'amber',testing:'amber',available:'green',issued:'neutral',discarded:'red'}
 const ACTIVE=['collected','in_transit','testing','available']
-const TABS=[['overview','Overview'],['units','Units'],['handover','Handover'],['emergency','Emergency']]
 const EREQ={patient_ref:'',blood_group:'',units_needed:'1',hospital:'',contact_name:'',contact_phone:'',notes:''}
 async function all(){let out=[],from=0;for(;;){const {data,error}=await supabase.from('blood_units').select('*').order('id').range(from,from+999);if(error)throw error;out=out.concat(data);if(data.length<1000)return out;from+=1000}}
-function Req({r,units,setStatus}){
-  const [open,setOpen]=useState(false),[ds,setDs]=useState(null)
+
+function Req({r,units,onEdit,setStatus}){
+  const {settings}=useAuth(),[open,setOpen]=useState(false),[ds,setDs]=useState(null)
   const avail=units.filter(u=>u.blood_group===r.blood_group&&u.status==='available').length
   const show=async()=>{setOpen(!open);if(ds)return
     const {data}=await supabase.from('donors').select('id,full_name,phone,gender,last_donation,area').eq('blood_group',r.blood_group).eq('consent',true).limit(300)
-    setDs((data||[]).filter(d=>{const n=nextEligible(d.last_donation,d.gender);return !n||n<=new Date()}))}
-  const msg=`URGENT: ${r.units_needed} unit(s) of ${r.blood_group} blood needed at ${r.hospital}. Contact ${r.contact_name||''} ${r.contact_phone||''}. If you are eligible and can donate, please call or reply. - Sankari Rotaract Club`
-  return <div className="card"><div className="flex flex-wrap items-start justify-between gap-3"><div>
-    <div className="text-white"><span className="text-xl font-semibold text-blood">{r.blood_group}</span> x {r.units_needed} at {r.hospital}</div>
-    <div className="text-sm text-slate-400">{r.contact_name} {r.contact_phone} {r.patient_ref&&`· Ref ${r.patient_ref}`}</div>{r.notes&&<div className="text-sm text-slate-500">{r.notes}</div>}
-    <div className="mt-1 text-sm">{avail} unit(s) available in stock · {fmt(r.created_at)} · <span className="capitalize">{r.status}</span></div></div>
-    {r.status==='open'&&<div className="flex gap-2"><button className="btn" onClick={show}>{open?'Hide donors':'Find donors'}</button><button className="btn-ghost text-sm" onClick={()=>setStatus(r.id,'fulfilled')}>Fulfilled</button><button className="btn-ghost text-sm" onClick={()=>setStatus(r.id,'cancelled')}>Cancel</button></div>}</div>
-    {open&&<div className="mt-4 border-t border-ink-700 pt-3">{!ds?<span className="text-sm text-slate-400">Loading…</span>:<>
-      <p className="mb-2 text-sm text-slate-400">{ds.length} eligible {r.blood_group} donors who agreed to be contacted (exact blood group match only).</p>
-      {ds.slice(0,30).map(d=><div key={d.id} className="flex items-center justify-between py-1 text-sm"><span className="text-white">{d.full_name} <span className="text-slate-500">{d.area}</span></span>
-        <a className="btn px-3 py-1" target="_blank" rel="noreferrer" href={wa(d.phone,msg)}><Send size={14}/>WhatsApp</a></div>)}</>}</div>}</div>
+    setDs((data||[]).filter(d=>{if(!d.last_donation)return true;const n=new Date(d.last_donation);n.setDate(n.getDate()+(d.gender==='Female'?settings.gap_female:settings.gap_male));return n<=new Date()}))}
+  const msg=`URGENT: ${r.units_needed} unit(s) of ${r.blood_group} blood needed at ${r.hospital}. Contact ${r.contact_name||''} ${r.contact_phone||''}. If you are eligible and can donate, please call or reply. - ${settings.club_name}`
+  return <div className={`card ${r.status==='open'?'border-blood/40':''}`}><div className="flex flex-wrap items-start justify-between gap-3"><div className="flex gap-4">
+    <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-blood/12 font-display text-xl font-bold text-blood">{r.blood_group}</span><div>
+    <div className="font-medium text-white">{r.units_needed} unit{r.units_needed>1?'s':''} at {r.hospital}</div>
+    <div className="text-sm text-fog-muted">{[r.contact_name,r.contact_phone,r.patient_ref&&`Ref ${r.patient_ref}`].filter(Boolean).join(', ')}</div>{r.notes&&<div className="text-sm text-fog-faint">{r.notes}</div>}
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-sm"><Badge tone={r.status==='open'?'red':r.status==='fulfilled'?'green':'neutral'}><span className="capitalize">{r.status}</span></Badge><span className="text-fog-muted">{avail} unit(s) available in stock · {fmt(r.created_at)}</span></div></div></div>
+    <div className="flex gap-2">{r.status==='open'&&<><button className="btn" onClick={show}>{open?'Hide donors':'Find donors'}</button><button className="btn-quiet" onClick={()=>setStatus(r,'fulfilled')}>Fulfilled</button></>}
+      <button className="btn-ghost" aria-label="Edit request" onClick={()=>onEdit(r)}><Pencil size={15}/></button></div></div>
+    {open&&<motion.div initial={{height:0,opacity:0}} animate={{height:'auto',opacity:1}} className="overflow-hidden"><div className="mt-4 border-t border-ink-700 pt-3">{!ds?<div className="skeleton h-8"/>:<>
+      <p className="mb-2 text-sm text-fog-muted">{ds.length} eligible {r.blood_group} donors who agreed to be contacted (exact blood group match only).</p>
+      {ds.slice(0,30).map(d=><div key={d.id} className="flex items-center justify-between py-1.5 text-sm"><span className="text-white">{d.full_name} <span className="text-fog-faint">{d.area}</span></span>
+        <a className="btn-quiet px-3 py-1 text-xs" target="_blank" rel="noreferrer" href={wa(d.phone,msg)}><Send size={13}/>WhatsApp</a></div>)}</>}</div></motion.div>}</div>
 }
+
 export default function Stock(){
-  const {profile}=useAuth(),role=profile.role,medic=['admin','medical'].includes(role),admin=role==='admin',staff=['admin','coordinator'].includes(role)
-  const [units,setUnits]=useState([]),[th,setTh]=useState({}),[hand,setHand]=useState([]),[reqs,setReqs]=useState([]),[tab,setTab]=useState('overview'),[err,setErr]=useState('')
-  const [fg,setFg]=useState(''),[fs,setFs]=useState(''),[q,setQ]=useState(''),[add,setAdd]=useState(null),[sel,setSel]=useState(new Set()),[bank,setBank]=useState(''),[hn,setHn]=useState(''),[ef,setEf]=useState(null)
+  const {can}=useAuth(),confirm=useConfirm(),edit=can('stock_edit')
+  const tabs=[...(can('stock')?[['overview','Overview'],['units','Units'],['handover','Handover']]:[]),...(can('emergency')?[['emergency','Emergency']]:[])]
+  const [units,setUnits]=useState([]),[th,setTh]=useState({}),[hand,setHand]=useState([]),[reqs,setReqs]=useState([]),[tab,setTab]=useState(tabs[0]?.[0]),[loaded,setLoaded]=useState(false)
+  const [fg,setFg]=useState(''),[fs,setFs]=useState(''),[q,setQ]=useState(''),[unit,setUnit]=useState(null),[sel,setSel]=useState(new Set()),[bank,setBank]=useState(''),[hn,setHn]=useState(''),[ef,setEf]=useState(null)
   const load=async()=>{try{setUnits(await all())
     const t=await supabase.from('stock_thresholds').select('*');setTh(Object.fromEntries((t.data||[]).map(x=>[x.blood_group,x.min_units])))
     const h=await supabase.from('handovers').select('*, blood_units(count)').order('handed_on',{ascending:false}).limit(20);setHand(h.data||[])
-    const r=await supabase.from('emergency_requests').select('*').order('created_at',{ascending:false}).limit(50);setReqs(r.data||[])}catch(e){setErr(e.message)}}
+    const r=await supabase.from('emergency_requests').select('*').order('created_at',{ascending:false}).limit(50);setReqs(r.data||[])}catch(e){toast.error(errText(e))}finally{setLoaded(true)}}
   useEffect(()=>{load()},[])
-  const rpc=async(fn,args)=>{setErr('');const {error}=await supabase.rpc(fn,args);if(error)return setErr(error.message);load();return true}
+  const rpc=async(fn,args,msg)=>{const {error}=await supabase.rpc(fn,args);if(error){toast.error(error.message);return false}if(msg)toast.success(msg);load();return true}
   const today=new Date().toLocaleDateString('en-CA'),soon=new Date(Date.now()+7*864e5).toLocaleDateString('en-CA')
   const avail=g=>units.filter(u=>u.blood_group===g&&u.status==='available').length
   const pipe=g=>units.filter(u=>u.blood_group===g&&['collected','in_transit','testing'].includes(u.status)).length
+  const total=units.filter(u=>u.status==='available').length
   const expiring=units.filter(u=>ACTIVE.includes(u.status)&&u.expiry_date&&u.expiry_date<=soon).sort((a,b)=>a.expiry_date.localeCompare(b.expiry_date))
-  const changeStatus=(u,s)=>{let note=null;if(['issued','discarded'].includes(s)){note=window.prompt(s==='issued'?'Issued to (patient or hospital):':'Reason for discarding:');if(!note)return}rpc('set_unit_status',{p_unit:u.id,p_status:s,p_note:note})}
-  const list=units.filter(u=>(!fg||u.blood_group===fg)&&(!fs||u.status===fs)&&(!q||u.bag_number.toLowerCase().includes(q.toLowerCase()))).sort((a,b)=>b.collected_on.localeCompare(a.collected_on))
+  const list=useMemo(()=>units.filter(u=>(!fg||u.blood_group===fg)&&(!fs||u.status===fs)&&(!q||u.bag_number.toLowerCase().includes(q.toLowerCase()))).sort((a,b)=>b.collected_on.localeCompare(a.collected_on)),[units,fg,fs,q])
   const collected=units.filter(u=>u.status==='collected')
-  const saveReq=async e=>{e.preventDefault();const row=Object.fromEntries(Object.entries({...ef,units_needed:Number(ef.units_needed)}).map(([k,v])=>[k,v===''?null:v]))
-    const {error}=await supabase.from('emergency_requests').insert(row);error?setErr(error.message):(setEf(null),load())}
-  const reqStatus=async(id,status)=>{const {error}=await supabase.from('emergency_requests').update({status}).eq('id',id);error?setErr(error.message):load()}
-  const doHandover=async()=>{if(await rpc('handover_units',{p_units:[...sel],p_bank:bank,p_notes:hn||null})){setSel(new Set());setBank('');setHn('')}}
-  return <div><h1 className="h1">Blood stock</h1>
-    {err&&<p className="mb-3 text-sm text-blood">{err}</p>}
-    <div className="mb-4 flex flex-wrap gap-2">{TABS.map(([k,l])=><button key={k} onClick={()=>setTab(k)} className={`rounded-lg px-3 py-1.5 text-sm ${tab===k?'bg-brand text-white':'border border-ink-600 text-slate-300 hover:border-brand'}`}>{l}</button>)}</div>
+  const quickStatus=(u,s)=>{if(['issued','discarded'].includes(s))return setUnit({...u,_status:s,_note:''});rpc('set_unit_status',{p_unit:u.id,p_status:s,p_note:null},`${u.bag_number}: ${LB[s]}`)}
+  const saveUnit=async()=>{const u=unit
+    if(u._new){if(await rpc('add_unit',{p_bag:u.bag_number,p_group:u.blood_group||null,p_vol:Number(u.volume_ml),p_collected:u.collected_on||null,p_status:u._status},'Unit added'))setUnit(null);return}
+    if(['issued','discarded'].includes(u._status)&&u._status!==u.status&&!u._note.trim())return toast.error(u._status==='issued'?'Say who it was issued to':'Give a reason for discarding')
+    if(!await rpc('update_unit',{p_unit:u.id,p_bag:u.bag_number,p_group:u.blood_group||null,p_vol:Number(u.volume_ml),p_collected:u.collected_on,p_expiry:u.expiry_date||null,p_note:u.note||''}))return
+    if(u._status!==u.status&&!await rpc('set_unit_status',{p_unit:u.id,p_status:u._status,p_note:u._note||null}))return
+    toast.success('Unit updated');setUnit(null)}
+  const delUnit=async()=>{if(!await confirm({title:`Delete unit ${unit.bag_number}?`,body:'Only units added by hand can be deleted. Units from a donation should be marked discarded.',action:'Delete unit'}))return
+    const {data,error}=await supabase.from('blood_units').delete().eq('id',unit.id).select('id')
+    if(error)return toast.error(error.message);if(!data?.length)return toast.error('Units from a recorded donation cannot be deleted. Mark them discarded instead.')
+    toast.success('Unit deleted');setUnit(null);load()}
+  const saveReq=async e=>{e.preventDefault();const {id,created_at,created_by,...rest}=ef;const row=Object.fromEntries(Object.entries({...rest,units_needed:Number(ef.units_needed)}).map(([k,v])=>[k,v===''?null:v]))
+    const {error}=id?await supabase.from('emergency_requests').update(row).eq('id',id):await supabase.from('emergency_requests').insert(row)
+    if(error)return toast.error(error.message);toast.success(id?'Request updated':'Request created');setEf(null);load()}
+  const delReq=async()=>{if(!await confirm({title:'Delete this request?',action:'Delete'}))return;const {error}=await supabase.from('emergency_requests').delete().eq('id',ef.id);if(error)return toast.error(error.message);toast.success('Request deleted');setEf(null);load()}
+  const reqStatus=async(r,status)=>{const {error}=await supabase.from('emergency_requests').update({status}).eq('id',r.id);if(error)return toast.error(error.message);toast.success('Marked '+status);load()}
+  const doHandover=async()=>{if(await rpc('handover_units',{p_units:[...sel],p_bank:bank,p_notes:hn||null},`${sel.size} unit(s) handed over to ${bank}`)){setSel(new Set());setBank('');setHn('')}}
+  const su=k=>e=>setUnit({...unit,[k]:e.target.value}),se=k=>e=>setEf({...ef,[k]:e.target.value})
+  return <div>
+    <PageHeader title="Blood stock" description={can('stock')?`${total} unit${total===1?'':'s'} ready to issue, ${expiring.length} expiring within a week`:'Emergency blood requests'}
+      actions={<>{tab==='units'&&edit&&<button className="btn" onClick={()=>setUnit({_new:true,bag_number:'',blood_group:'',volume_ml:'350',collected_on:today,_status:'available'})}><Plus size={16}/>Add opening stock</button>}
+        {tab==='emergency'&&<button className="btn" onClick={()=>setEf({...EREQ})}><AlertTriangle size={16}/>New emergency request</button>}</>}/>
+    <Tabs id="stock-tabs" value={tab} onChange={setTab} tabs={tabs}/>
     {tab==='overview'&&<><div className="card mb-5"><div className="grid grid-cols-4 gap-3 sm:grid-cols-8">{BLOOD.map(g=>{const a=avail(g),m=th[g]??5,low=a<m
-      return <div key={g} className={`tile py-3 text-center ${low?'!border-blood/70 bg-blood/5':''}`}><div className="font-semibold text-blood">{g}</div><div className="text-2xl tabular-nums text-white"><CountUp value={a}/></div>
-        <div className="text-xs text-slate-400">{pipe(g)} on the way</div>{low&&<div className="text-xs text-blood">Low</div>}</div>})}</div>
-      <p className="mt-3 text-xs text-slate-500">Large number is units available. Low means below the minimum set for that group.</p></div>
-      <div className="card mb-5"><h2 className="mb-2 font-semibold text-white">Expiring within 7 days</h2>
-        {expiring.map(u=><div key={u.id} className="flex justify-between border-t border-ink-700 py-1 text-sm first:border-0"><span>{u.bag_number} <span className="font-semibold text-blood">{u.blood_group||'?'}</span> · {LB[u.status]}</span><span className={u.expiry_date<today?'text-blood':'text-slate-300'}>{u.expiry_date<today?'Expired ':''}{fmt(u.expiry_date)}</span></div>)}
-        {!expiring.length&&<p className="text-sm text-slate-500">Nothing is about to expire.</p>}</div>
-      <div className="card"><h2 className="mb-2 font-semibold text-white">Minimum units per group</h2><div className="grid grid-cols-4 gap-3 sm:grid-cols-8">{BLOOD.map(g=><label key={g} className="text-center text-xs text-slate-400">{g}
-        <input className="input mt-1 text-center" type="number" min="0" disabled={!admin} defaultValue={th[g]??5} key={g+(th[g]??5)} onBlur={async e=>{const {error}=await supabase.from('stock_thresholds').upsert({blood_group:g,min_units:Number(e.target.value)});error?setErr(error.message):setTh({...th,[g]:Number(e.target.value)})}}/></label>)}</div>
-        <p className="mt-2 text-xs text-slate-500">Only the admin can change these. Whole blood expiry is set to 35 days from collection; confirm this with your partner blood bank.</p></div></>}
-    {tab==='units'&&<>{medic&&<div className="mb-3">{add?<form className="card grid gap-3 sm:grid-cols-4" onSubmit={async e=>{e.preventDefault();if(await rpc('add_unit',{p_bag:add.bag,p_group:add.group||null,p_vol:Number(add.vol),p_collected:add.date||null,p_status:add.status}))setAdd(null)}}>
-        <input className="input" placeholder="Bag number" required value={add.bag} onChange={e=>setAdd({...add,bag:e.target.value})}/>
-        <select className="input" value={add.group} onChange={e=>setAdd({...add,group:e.target.value})}><option value="">Group unknown</option>{BLOOD.map(b=><option key={b}>{b}</option>)}</select>
-        <input className="input" type="number" value={add.vol} onChange={e=>setAdd({...add,vol:e.target.value})}/>
-        <input className="input" type="date" value={add.date} onChange={e=>setAdd({...add,date:e.target.value})}/>
-        <select className="input" value={add.status} onChange={e=>setAdd({...add,status:e.target.value})}>{ST.map(s=><option key={s} value={s}>{LB[s]}</option>)}</select>
-        <div className="flex gap-2 sm:col-span-3"><button className="btn">Add unit</button><button type="button" className="btn-ghost text-sm" onClick={()=>setAdd(null)}>Cancel</button></div></form>
-        :<button className="btn" onClick={()=>setAdd({bag:'',group:'',vol:'350',date:today,status:'available'})}>Add opening stock</button>}</div>}
-      <div className="mb-3 flex flex-wrap gap-2"><input className="input w-48" placeholder="Search bag number" value={q} onChange={e=>setQ(e.target.value)}/>
+      return <div key={g} className={`tile relative overflow-hidden px-2 py-4 text-center ${low?'!border-blood/60':''}`}>
+        {low&&<span className="absolute inset-x-0 top-0 h-0.5 bg-blood"/>}<div className="font-display text-sm font-bold text-blood">{g}</div>
+        <div className="mt-1 font-display text-3xl font-semibold tabular-nums text-white"><CountUp value={a}/></div>
+        <div className="mt-1 text-[11px] text-fog-faint">{pipe(g)} on the way</div>{low&&<div className="mt-1 text-[11px] font-semibold text-blood">Low</div>}</div>})}</div>
+      <p className="mt-3 text-xs text-fog-faint">Big number is units ready to issue. Low means below the minimum set in Settings.</p></div>
+      <div className="card"><h2 className="mb-3 font-semibold text-white">Expiring within 7 days</h2>
+        {expiring.map(u=><button key={u.id} onClick={()=>edit&&setUnit({...u,_status:u.status,_note:''})} className="flex w-full items-center justify-between border-t border-ink-700 py-2 text-left text-sm first:border-0">
+          <span className="flex items-center gap-3"><span className="font-medium text-white">{u.bag_number}</span><span className="font-display font-bold text-blood">{u.blood_group||'?'}</span><Badge tone={TONE[u.status]}>{LB[u.status]}</Badge></span>
+          <span className={u.expiry_date<today?'font-semibold text-blood':'text-fog-muted'}>{u.expiry_date<today?'Expired ':''}{fmt(u.expiry_date)}</span></button>)}
+        {!expiring.length&&<p className="text-sm text-fog-faint">Nothing is about to expire.</p>}</div></>}
+    {tab==='units'&&<div className="card overflow-hidden p-0">
+      <div className="grid gap-2 border-b border-ink-700 p-3 sm:grid-cols-[1fr_auto_auto]"><input className="input" placeholder="Search bag number" value={q} onChange={e=>setQ(e.target.value)}/>
         <select className="input w-auto" value={fg} onChange={e=>setFg(e.target.value)}><option value="">All groups</option>{BLOOD.map(b=><option key={b}>{b}</option>)}</select>
         <select className="input w-auto" value={fs} onChange={e=>setFs(e.target.value)}><option value="">All steps</option>{ST.map(s=><option key={s} value={s}>{LB[s]}</option>)}</select></div>
-      <div className="card overflow-x-auto p-0"><table className="w-full text-sm"><thead className="text-left text-slate-400"><tr><th className="p-3 font-medium">Bag</th><th className="font-medium">Group</th><th className="font-medium">Collected</th><th className="font-medium">Expires</th><th className="font-medium">Step</th></tr></thead>
-        <tbody>{list.slice(0,200).map(u=><tr key={u.id} className="border-t border-ink-700"><td className="p-3 text-white">{u.bag_number}{u.note&&<div className="text-xs text-slate-500">{u.note}</div>}</td><td className="font-semibold text-blood">{u.blood_group||'?'}</td><td>{fmt(u.collected_on)}</td><td className={ACTIVE.includes(u.status)&&u.expiry_date<today?'text-blood':''}>{fmt(u.expiry_date)}</td>
-          <td>{medic?<select className="input w-auto py-1" value={u.status} onChange={e=>changeStatus(u,e.target.value)}>{ST.map(s=><option key={s} value={s}>{LB[s]}</option>)}</select>:LB[u.status]}</td></tr>)}
-          {!list.length&&<tr><td colSpan="5" className="p-6 text-center text-slate-500">No units yet. Units appear here automatically when a donation is recorded.</td></tr>}</tbody></table></div></>}
-    {tab==='handover'&&<><div className="card mb-5"><h2 className="mb-1 font-semibold text-white">Hand over collected units to the blood bank</h2><p className="mb-3 text-sm text-slate-400">Tick the bags you are handing over. They move to In transit.</p>
-      <div className="mb-3 max-h-64 overflow-y-auto">{collected.map(u=><label key={u.id} className="flex items-center gap-3 border-t border-ink-700 py-1.5 text-sm first:border-0"><input type="checkbox" checked={sel.has(u.id)} onChange={e=>{const s=new Set(sel);e.target.checked?s.add(u.id):s.delete(u.id);setSel(s)}}/>{u.bag_number}<span className="font-semibold text-blood">{u.blood_group||'?'}</span><span className="text-slate-500">{fmt(u.collected_on)}</span></label>)}
-        {!collected.length&&<p className="text-sm text-slate-500">No collected units waiting.</p>}</div>
-      <div className="flex flex-wrap gap-2"><input className="input w-56" placeholder="Blood bank name" value={bank} onChange={e=>setBank(e.target.value)}/><input className="input w-56" placeholder="Notes (optional)" value={hn} onChange={e=>setHn(e.target.value)}/>
-        <button className="btn" disabled={!sel.size||!bank} onClick={doHandover}>Hand over {sel.size||''} units</button></div></div>
-      <div className="card"><h2 className="mb-2 font-semibold text-white">Recent handovers</h2>{hand.map(h=><div key={h.id} className="flex justify-between border-t border-ink-700 py-1.5 text-sm first:border-0"><span>{h.bank_name}{h.notes&&<span className="text-slate-500"> · {h.notes}</span>}</span><span className="text-slate-300">{h.blood_units?.[0]?.count??0} units · {fmt(h.handed_on)}</span></div>)}{!hand.length&&<p className="text-sm text-slate-500">No handovers yet.</p>}</div></>}
-    {tab==='emergency'&&<div className="space-y-3">{staff&&(ef?<form className="card grid gap-3 sm:grid-cols-2" onSubmit={saveReq}>
-        <select className="input" required value={ef.blood_group} onChange={e=>setEf({...ef,blood_group:e.target.value})}><option value="">Blood group needed</option>{BLOOD.map(b=><option key={b}>{b}</option>)}</select>
-        <input className="input" type="number" min="1" placeholder="Units" value={ef.units_needed} onChange={e=>setEf({...ef,units_needed:e.target.value})}/>
-        <input className="input" placeholder="Hospital" required value={ef.hospital} onChange={e=>setEf({...ef,hospital:e.target.value})}/>
-        <input className="input" placeholder="Patient reference (optional)" value={ef.patient_ref} onChange={e=>setEf({...ef,patient_ref:e.target.value})}/>
-        <input className="input" placeholder="Contact name" value={ef.contact_name} onChange={e=>setEf({...ef,contact_name:e.target.value})}/>
-        <input className="input" placeholder="Contact phone" value={ef.contact_phone} onChange={e=>setEf({...ef,contact_phone:e.target.value})}/>
-        <input className="input sm:col-span-2" placeholder="Notes" value={ef.notes} onChange={e=>setEf({...ef,notes:e.target.value})}/>
-        <div className="flex gap-2 sm:col-span-2"><button className="btn">Create request</button><button type="button" className="btn-ghost text-sm" onClick={()=>setEf(null)}>Cancel</button></div></form>
-      :<button className="btn" onClick={()=>setEf(EREQ)}>New emergency request</button>)}
-      {reqs.map(r=><Req key={r.id} r={r} units={units} setStatus={reqStatus}/>)}{!reqs.length&&<div className="card text-center text-slate-500">No emergency requests.</div>}</div>}
+      <div className="overflow-x-auto"><table className="table"><thead><tr><th>Bag</th><th>Group</th><th>Collected</th><th>Expires</th><th>Step</th><th/></tr></thead>
+        <tbody>{list.slice(0,200).map(u=><tr key={u.id}><td><div className="font-medium text-white">{u.bag_number}</div>{u.note&&<div className="text-xs text-fog-faint">{u.note}</div>}</td>
+          <td className="font-display font-bold text-blood">{u.blood_group||'?'}</td><td className="text-fog-muted">{fmt(u.collected_on)}</td>
+          <td className={ACTIVE.includes(u.status)&&u.expiry_date<today?'font-semibold text-blood':'text-fog-muted'}>{fmt(u.expiry_date)}</td>
+          <td>{edit?<select aria-label={`Step for ${u.bag_number}`} className="input w-auto py-1.5 text-xs" value={u.status} onChange={e=>quickStatus(u,e.target.value)}>{ST.map(s=><option key={s} value={s}>{LB[s]}</option>)}</select>:<Badge tone={TONE[u.status]}>{LB[u.status]}</Badge>}</td>
+          <td className="text-right">{edit&&<button className="btn-ghost" aria-label={`Edit ${u.bag_number}`} onClick={()=>setUnit({...u,_status:u.status,_note:''})}><Pencil size={15}/></button>}</td></tr>)}</tbody></table>
+        {loaded&&!list.length&&<Empty icon={Droplets} title="No units yet">Units appear here automatically when a donation is recorded.</Empty>}</div></div>}
+    {tab==='handover'&&<div className="grid gap-5 lg:grid-cols-[1.2fr_1fr]"><div className="card"><h2 className="font-semibold text-white">Hand over collected units to the blood bank</h2><p className="mb-4 text-sm text-fog-muted">Tick the bags you are handing over. They move to In transit.</p>
+      <div className="mb-4 max-h-72 overflow-y-auto rounded-xl border border-ink-700">{collected.map(u=><label key={u.id} className="flex cursor-pointer items-center gap-3 border-b border-ink-700 px-3 py-2 text-sm last:border-0 hover:bg-ink-750">
+          <input type="checkbox" checked={sel.has(u.id)} onChange={e=>{const s=new Set(sel);e.target.checked?s.add(u.id):s.delete(u.id);setSel(s)}}/>{u.bag_number}<span className="font-display font-bold text-blood">{u.blood_group||'?'}</span><span className="ml-auto text-fog-faint">{fmt(u.collected_on)}</span></label>)}
+        {!collected.length&&<p className="p-4 text-sm text-fog-faint">No collected units waiting.</p>}</div>
+      <div className="flex flex-wrap gap-2"><input className="input flex-1" placeholder="Blood bank name" value={bank} onChange={e=>setBank(e.target.value)}/><input className="input flex-1" placeholder="Notes (optional)" value={hn} onChange={e=>setHn(e.target.value)}/>
+        <button className="btn" disabled={!sel.size||!bank} onClick={doHandover}><Truck size={15}/>Hand over {sel.size||''} units</button></div></div>
+      <div className="card h-fit"><h2 className="mb-3 font-semibold text-white">Recent handovers</h2>{hand.map(h=><div key={h.id} className="flex justify-between border-t border-ink-700 py-2 text-sm first:border-0"><span className="text-white">{h.bank_name}{h.notes&&<span className="text-fog-faint"> · {h.notes}</span>}</span><span className="text-fog-muted">{h.blood_units?.[0]?.count??0} units · {fmt(h.handed_on)}</span></div>)}{!hand.length&&<p className="text-sm text-fog-faint">No handovers yet.</p>}</div></div>}
+    {tab==='emergency'&&<div className="space-y-3">{reqs.map(r=><Req key={r.id} r={r} units={units} setStatus={reqStatus} onEdit={x=>setEf(Object.fromEntries(Object.entries(x).map(([k,v])=>[k,v??''])))}/>)}
+      {loaded&&!reqs.length&&<div className="card"><Empty icon={AlertTriangle} title="No emergency requests">Create one when a hospital asks for blood. It finds matching donors for you.</Empty></div>}</div>}
+
+    <Drawer open={!!unit} onClose={()=>setUnit(null)} title={unit?._new?'Add opening stock':`Unit ${unit?.bag_number}`} description={unit?.donation_reg?'From a recorded donation':unit?._new?'For units already in the blood bank.':'Added by hand'}
+      footer={unit&&<>{!unit._new&&!unit.donation_reg&&<button className="btn-quiet mr-auto text-blood" onClick={delUnit}><Trash2 size={15}/>Delete</button>}
+        <button className="btn-quiet" onClick={()=>setUnit(null)}>Cancel</button><button className="btn" form="unit-form">{unit._new?'Add unit':'Save changes'}</button></>}>
+      {unit&&<form id="unit-form" onSubmit={e=>{e.preventDefault();saveUnit()}} className="grid gap-4 sm:grid-cols-2">
+        <Field label="Bag number"><input className="input" placeholder="Bag number" required value={unit.bag_number} onChange={su('bag_number')}/></Field>
+        <Field label="Blood group"><select className="input" value={unit.blood_group||''} onChange={su('blood_group')}><option value="">Not known</option>{BLOOD.map(b=><option key={b}>{b}</option>)}</select></Field>
+        <Field label="Volume (ml)"><input className="input" type="number" value={unit.volume_ml||''} onChange={su('volume_ml')}/></Field>
+        <Field label="Collected on"><input className="input" type="date" value={unit.collected_on||''} onChange={su('collected_on')}/></Field>
+        {!unit._new&&<Field label="Expires on"><input className="input" type="date" value={unit.expiry_date||''} onChange={su('expiry_date')}/></Field>}
+        <Field label="Step"><select className="input" value={unit._status} onChange={su('_status')}>{ST.map(s=><option key={s} value={s}>{LB[s]}</option>)}</select></Field>
+        {!unit._new&&['issued','discarded'].includes(unit._status)&&unit._status!==unit.status&&<Field label={unit._status==='issued'?'Issued to':'Reason for discarding'} className="sm:col-span-2"><input className="input" autoFocus value={unit._note} onChange={su('_note')}/></Field>}
+        {!unit._new&&<Field label="Note" className="sm:col-span-2"><input className="input" value={unit.note||''} onChange={su('note')}/></Field>}
+      </form>}
+    </Drawer>
+    <Drawer open={!!ef} onClose={()=>setEf(null)} title={ef?.id?'Edit emergency request':'New emergency request'}
+      footer={ef&&<>{ef.id&&<button className="btn-quiet mr-auto text-blood" onClick={delReq}><Trash2 size={15}/>Delete</button>}<button className="btn-quiet" onClick={()=>setEf(null)}>Cancel</button><button className="btn" form="req-form">{ef.id?'Save changes':'Create request'}</button></>}>
+      {ef&&<form id="req-form" onSubmit={saveReq} className="grid gap-4 sm:grid-cols-2">
+        <Field label="Blood group needed"><select className="input" required value={ef.blood_group} onChange={se('blood_group')}><option value="">Choose</option>{BLOOD.map(b=><option key={b}>{b}</option>)}</select></Field>
+        <Field label="Units"><input className="input" type="number" min="1" value={ef.units_needed} onChange={se('units_needed')}/></Field>
+        <Field label="Hospital" className="sm:col-span-2"><input className="input" placeholder="Hospital" required value={ef.hospital} onChange={se('hospital')}/></Field>
+        <Field label="Contact name"><input className="input" value={ef.contact_name} onChange={se('contact_name')}/></Field>
+        <Field label="Contact phone"><input className="input" value={ef.contact_phone} onChange={se('contact_phone')}/></Field>
+        <Field label="Patient reference"><input className="input" value={ef.patient_ref} onChange={se('patient_ref')}/></Field>
+        {ef.id&&<div><span className="label">Status</span><div className="flex gap-1">{['open','fulfilled','cancelled'].map(s=><button type="button" key={s} onClick={()=>setEf({...ef,status:s})}
+          className={`flex-1 rounded-lg border px-2 py-2 text-xs font-semibold capitalize ${ef.status===s?'border-brand bg-brand/15 text-white':'border-ink-600 text-fog-muted'}`}>{s}</button>)}</div></div>}
+        <Field label="Notes" className="sm:col-span-2"><textarea className="input" rows="3" value={ef.notes} onChange={se('notes')}/></Field>
+      </form>}
+    </Drawer>
   </div>
 }

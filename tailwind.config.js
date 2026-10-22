@@ -1,16 +1,14 @@
 export default {content:['./index.html','./src/**/*.{js,jsx}'],theme:{extend:{
-colors:{ink:{950:'#0B1220',900:'#0E182B',800:'#12203A',700:'#1B2D4F',600:'#27406B'},brand:'#3B82F6',blood:'#E11D48'},
-fontFamily:{sans:['"Plus Jakarta Sans"','system-ui','sans-serif']},
-keyframes:{
-  fadeUp:{'0%':{opacity:'0',transform:'translateY(10px)'},'100%':{opacity:'1',transform:'none'}},
-  fadeIn:{'0%':{opacity:'0'},'100%':{opacity:'1'}},
-  scaleIn:{'0%':{opacity:'0',transform:'scale(.96)'},'100%':{opacity:'1',transform:'none'}},
-  slideIn:{'0%':{opacity:'0',transform:'translateX(-12px)'},'100%':{opacity:'1',transform:'none'}},
-  shimmer:{'0%':{backgroundPosition:'-400px 0'},'100%':{backgroundPosition:'400px 0'}},
-  drop:{'0%,100%':{transform:'translateY(0)'},'50%':{transform:'translateY(-3px)'}},
-  glow:{'0%,100%':{opacity:'.35'},'50%':{opacity:'.6'}},
-  grow:{'0%':{transform:'scaleX(0)'},'100%':{transform:'scaleX(1)'}},
-  growY:{'0%':{transform:'scaleY(0)'},'100%':{transform:'scaleY(1)'}}},
-animation:{fadeUp:'fadeUp .45s cubic-bezier(.2,.7,.2,1) both',fadeIn:'fadeIn .3s ease both',scaleIn:'scaleIn .35s cubic-bezier(.2,.7,.2,1) both',
-  slideIn:'slideIn .35s cubic-bezier(.2,.7,.2,1) both',shimmer:'shimmer 1.3s linear infinite',drop:'drop 2.4s ease-in-out infinite',glow:'glow 6s ease-in-out infinite',
-  grow:'grow .8s cubic-bezier(.2,.7,.2,1) both',growY:'growY .7s cubic-bezier(.2,.7,.2,1) both'}}},plugins:[]}
+colors:{
+  ink:{950:'#070D1A',900:'#0B1324',800:'#0E1729',750:'#121D33',700:'#1A2843',600:'#2B3D63',500:'#3E527C'},
+  brand:{DEFAULT:'#4C8DFF',deep:'#2C5FD6',soft:'#9DC0FF'},
+  blood:{DEFAULT:'#F0435A',deep:'#B4233A'},
+  fog:{DEFAULT:'#E7EDF8',muted:'#8D9DBA',faint:'#5D6E8F'},
+  ok:'#34D399',warn:'#FBBF24'},
+fontFamily:{sans:['Manrope','system-ui','sans-serif'],display:['Sora','Manrope','system-ui','sans-serif']},
+borderRadius:{panel:'14px',shell:'20px'},
+boxShadow:{panel:'0 1px 0 rgba(255,255,255,.04) inset, 0 20px 40px -24px rgba(0,0,0,.7)',glow:'0 0 0 1px rgba(76,141,255,.35), 0 8px 30px -10px rgba(76,141,255,.55)'},
+keyframes:{shimmer:{'0%':{backgroundPosition:'-400px 0'},'100%':{backgroundPosition:'400px 0'}},
+  beat:{'0%,100%':{transform:'scale(1)'},'14%':{transform:'scale(1.18)'},'28%':{transform:'scale(1)'},'42%':{transform:'scale(1.12)'},'70%':{transform:'scale(1)'}},
+  grow:{'0%':{transform:'scaleX(0)'},'100%':{transform:'scaleX(1)'}},growY:{'0%':{transform:'scaleY(0)'},'100%':{transform:'scaleY(1)'}}},
+animation:{shimmer:'shimmer 1.3s linear infinite',beat:'beat 2.4s ease-in-out infinite',grow:'grow .8s cubic-bezier(.2,.7,.2,1) both',growY:'growY .7s cubic-bezier(.2,.7,.2,1) both'}}},plugins:[]}

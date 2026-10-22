@@ -1,49 +1,108 @@
-import {useEffect,useState} from 'react'
-import {Plus,QrCode,MessageCircle} from 'lucide-react'
+import {useEffect,useMemo,useState} from 'react'
+import {toast} from 'sonner'
+import {Plus,QrCode,MessageCircle,Users,Pencil,Trash2,Copy,Download,MapPin,Clock,Tent,UserPlus} from 'lucide-react'
 import QRCode from 'qrcode'
 import {supabase} from '../lib/supabase'
-import {fmt,wa} from '../lib/util'
-const STATUS=['planned','open','live','completed','closed']
-const empty={name:'',camp_date:'',start_time:'09:00',end_time:'16:00',venue:'',target_donors:''}
+import {useAuth} from '../context/Auth'
+import {fmt,wa,slots} from '../lib/util'
+import {PageHeader,Drawer,Field,Badge,Empty,Tabs,useConfirm,errText} from '../components/ui'
+
+const STATUS=[['planned','Planned'],['open','Registration open'],['live','Live today'],['completed','Completed'],['closed','Closed']]
+const TONE={planned:'neutral',open:'blue',live:'red',completed:'green',closed:'neutral'}
+const REG=['registered','checked_in','screened','donated','deferred','no_show']
 const link=id=>`${location.origin}${location.pathname}#/register/${id}`
+
+function Registrants({camp,onChanged}){
+  const {settings}=useAuth(),confirm=useConfirm(),[rows,setRows]=useState(null),[q,setQ]=useState(''),[add,setAdd]=useState(''),[found,setFound]=useState([])
+  const load=()=>supabase.from('registrations').select('id,slot,status,donor_id,donors(full_name,phone,blood_group,consent)').eq('camp_id',camp.id).order('slot').then(({data,error})=>error?toast.error(error.message):setRows(data))
+  useEffect(()=>{load()},[camp.id])
+  useEffect(()=>{if(add.trim().length<2)return setFound([]);const t=setTimeout(async()=>{const s=add.replace(/[%,()]/g,'')
+    const {data}=await supabase.from('donors').select('id,full_name,phone,blood_group').or(`full_name.ilike.%${s}%,phone.ilike.%${s}%`).limit(6);setFound(data||[])},200);return()=>clearTimeout(t)},[add])
+  const upd=async(id,patch)=>{const {error}=await supabase.from('registrations').update(patch).eq('id',id);if(error)return toast.error(error.message);load();onChanged()}
+  const del=async r=>{if(!await confirm({title:`Remove ${r.donors.full_name} from this camp?`,body:'Their screening and donation record for this camp are removed too.',action:'Remove'}))return
+    const {error}=await supabase.from('registrations').delete().eq('id',r.id);if(error)return toast.error(error.message);toast.success('Removed from camp');load();onChanged()}
+  const enrol=async d=>{const {error}=await supabase.from('registrations').insert({camp_id:camp.id,donor_id:d.id});if(error)return toast.error(error.code==='23505'?'Already registered for this camp':error.message)
+    toast.success(`${d.full_name} added`);setAdd('');setFound([]);load();onChanged()}
+  const list=(rows||[]).filter(r=>!q||`${r.donors.full_name} ${r.donors.phone}`.toLowerCase().includes(q.toLowerCase()))
+  const s=slots(camp.start_time,camp.end_time)
+  return <div className="space-y-4">
+    <div className="relative"><Field label="Add a donor to this camp"><input className="input" placeholder="Type a name or mobile" value={add} onChange={e=>setAdd(e.target.value)}/></Field>
+      {found.length>0&&<div className="absolute z-10 mt-1 w-full rounded-xl border border-ink-600 bg-ink-800 p-1 shadow-2xl">{found.map(d=><button key={d.id} onClick={()=>enrol(d)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-ink-700">
+        <UserPlus size={14} className="text-brand"/><span className="flex-1 text-white">{d.full_name}</span><span className="text-fog-faint">{d.blood_group} {d.phone}</span></button>)}</div>}</div>
+    <input className="input" placeholder={`Search ${rows?.length??''} registrants`} value={q} onChange={e=>setQ(e.target.value)}/>
+    <div className="divide-y divide-ink-700 rounded-xl border border-ink-700">{list.map(r=><div key={r.id} className="flex flex-wrap items-center gap-2 p-3">
+      <div className="min-w-[140px] flex-1"><div className="text-sm font-medium text-white">{r.donors.full_name} <span className="font-display text-blood">{r.donors.blood_group}</span></div><div className="text-xs text-fog-faint">{r.donors.phone}</div></div>
+      <select className="input w-auto py-1.5 text-xs" value={r.slot||''} onChange={e=>upd(r.id,{slot:e.target.value||null})}><option value="">Any time</option>{s.map(x=><option key={x}>{x}</option>)}</select>
+      <select className="input w-auto py-1.5 text-xs" value={r.status} onChange={e=>upd(r.id,{status:e.target.value})} disabled={['donated','screened','deferred'].includes(r.status)} title="Screening and donation steps are set on Camp day">
+        {REG.map(x=><option key={x} value={x} disabled={['screened','donated','deferred'].includes(x)}>{x.replace('_',' ')}</option>)}</select>
+      {r.donors.consent&&<a className="btn-ghost" target="_blank" rel="noreferrer" title="Send reminder on WhatsApp" href={wa(r.donors.phone,`Hello ${r.donors.full_name}, reminder: ${camp.name} on ${fmt(camp.camp_date)}${r.slot?' at '+r.slot:''}${camp.venue?', '+camp.venue:''}. Thank you for donating blood. ${settings.club_name}`)}><MessageCircle size={15}/></a>}
+      <button className="btn-ghost hover:text-blood" title="Remove from camp" onClick={()=>del(r)}><Trash2 size={15}/></button></div>)}
+      {rows&&!list.length&&<div className="p-6 text-center text-sm text-fog-faint">No registrants yet.</div>}</div>
+  </div>
+}
+
 export default function Camps(){
-  const [rows,setRows]=useState([]),[form,setForm]=useState(null),[err,setErr]=useState(''),[qr,setQr]=useState(null),[regs,setRegs]=useState(null)
-  const load=()=>supabase.from('camps').select('*, registrations(count)').order('camp_date',{ascending:false}).then(({data,error})=>error?setErr(error.message):setRows(data))
+  const {settings}=useAuth(),confirm=useConfirm()
+  const [rows,setRows]=useState(null),[form,setForm]=useState(null),[view,setView]=useState(null),[tab,setTab]=useState('share'),[qr,setQr]=useState(''),[filter,setFilter]=useState('active'),[busy,setBusy]=useState(false)
+  const load=()=>supabase.from('camps').select('*, registrations(count)').order('camp_date',{ascending:false}).then(({data,error})=>error?toast.error(error.message):setRows(data))
   useEffect(()=>{load()},[])
+  const blank={name:'',camp_date:'',start_time:'09:00',end_time:'15:00',venue:'',target_donors:'',slot_capacity:settings.default_slot_capacity??'',budget:'',status:'planned'}
   const set=k=>e=>setForm({...form,[k]:e.target.value})
-  const save=async e=>{e.preventDefault();setErr('')
-    const {error}=await supabase.from('camps').insert({...form,target_donors:form.target_donors||null})
-    if(error)return setErr(error.message);setForm(null);load()}
-  const setStatus=async(id,status)=>{const {error}=await supabase.from('camps').update({status}).eq('id',id);error?setErr(error.message):load()}
-  const showQr=async c=>setQr({c,url:link(c.id),img:await QRCode.toDataURL(link(c.id),{width:260,margin:1,color:{dark:'#0B1220',light:'#ffffff'}})})
-  const showRegs=async c=>{const {data,error}=await supabase.from('registrations').select('slot,status,donors(full_name,phone,blood_group,consent)').eq('camp_id',c.id).order('slot');error?setErr(error.message):setRegs({c,rows:data})}
+  const save=async e=>{e.preventDefault();setBusy(true);const {id,registrations,created_at,...rest}=form
+    const row=Object.fromEntries(Object.entries(rest).map(([k,v])=>[k,v===''?null:v]))
+    const {error}=id?await supabase.from('camps').update(row).eq('id',id):await supabase.from('camps').insert(row)
+    setBusy(false);if(error)return toast.error(errText(error));toast.success(id?'Camp updated':'Camp created');setForm(null);load()}
+  const remove=async()=>{if(!await confirm({title:`Delete ${form.name}?`,body:'All registrations, screenings, donations, tasks, volunteers, sponsors and expenses for this camp are deleted. Blood units stay in stock.',action:'Delete camp'}))return
+    const {error}=await supabase.from('camps').delete().eq('id',form.id);if(error)return toast.error(error.message);toast.success('Camp deleted');setForm(null);load()}
+  const setStatus=async(c,status)=>{const {error}=await supabase.from('camps').update({status}).eq('id',c.id);if(error)return toast.error(error.message);toast.success(`${c.name}: ${STATUS.find(s=>s[0]===status)[1]}`);load()}
+  const open=async(c,t)=>{setView(c);setTab(t);setQr(await QRCode.toDataURL(link(c.id),{width:320,margin:1,color:{dark:'#070D1A',light:'#ffffff'}}))}
+  const list=useMemo(()=>(rows||[]).filter(c=>filter==='all'||(filter==='active'?!['completed','closed'].includes(c.status):['completed','closed'].includes(c.status))),[rows,filter])
   return <div>
-    <div className="mb-5 flex items-center justify-between"><h1 className="h1 mb-0">Camps</h1><button className="btn" onClick={()=>setForm(empty)}><Plus size={16}/>New camp</button></div>
-    {err&&<p className="mb-3 text-sm text-blood">{err}</p>}
-    {form&&<form onSubmit={save} className="card mb-5 grid gap-3 sm:grid-cols-2">
-      <input className="input sm:col-span-2" placeholder="Camp name" required value={form.name} onChange={set('name')}/>
-      <label className="text-sm text-slate-400">Date<input type="date" required className="input mt-1" value={form.camp_date} onChange={set('camp_date')}/></label>
-      <input className="input self-end" placeholder="Venue" value={form.venue} onChange={set('venue')}/>
-      <label className="text-sm text-slate-400">Start<input type="time" className="input mt-1" value={form.start_time} onChange={set('start_time')}/></label>
-      <label className="text-sm text-slate-400">End<input type="time" className="input mt-1" value={form.end_time} onChange={set('end_time')}/></label>
-      <input className="input" type="number" min="1" placeholder="Target donors" value={form.target_donors} onChange={set('target_donors')}/>
-      <div className="flex gap-2"><button className="btn">Create camp</button><button type="button" className="btn-ghost" onClick={()=>setForm(null)}>Cancel</button></div>
-    </form>}
-    {qr&&<div className="card mb-5 flex flex-wrap items-center gap-5"><img src={qr.img} alt="Registration QR code" className="h-40 w-40 rounded-lg"/>
-      <div className="min-w-0"><div className="font-semibold text-white">{qr.c.name}</div><p className="mt-1 text-sm text-slate-400">Print this QR on the poster. Donors scan it to register.</p>
-        <p className="mt-2 break-all text-xs text-slate-500">{qr.url}</p>
-        <div className="mt-3 flex gap-2"><button className="btn" onClick={()=>navigator.clipboard.writeText(qr.url)}>Copy link</button><a className="btn-ghost" download={`${qr.c.name}-qr.png`} href={qr.img}>Download QR</a><button className="btn-ghost" onClick={()=>setQr(null)}>Close</button></div></div></div>}
-    {regs&&<div className="card mb-5"><div className="mb-3 flex items-center justify-between"><h2 className="font-semibold text-white">{regs.c.name}: {regs.rows.length} registered</h2><button className="btn-ghost text-sm" onClick={()=>setRegs(null)}>Close</button></div>
-      <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-slate-400"><tr><th className="py-1 font-medium">Name</th><th className="font-medium">Group</th><th className="font-medium">Slot</th><th className="font-medium">Status</th><th/></tr></thead>
-        <tbody>{regs.rows.map((r,i)=><tr key={i} className="border-t border-ink-700"><td className="py-2"><div className="text-white">{r.donors.full_name}</div><div className="text-xs text-slate-500">{r.donors.phone}</div></td><td className="font-semibold text-blood">{r.donors.blood_group||'-'}</td><td>{r.slot||'-'}</td><td className="capitalize">{r.status.replace('_',' ')}</td>
-          <td className="text-right">{r.donors.consent&&<a className="btn-ghost inline-block" target="_blank" rel="noreferrer" title="Send reminder on WhatsApp" href={wa(r.donors.phone,`Hello ${r.donors.full_name}, reminder: ${regs.c.name} on ${fmt(regs.c.camp_date)}${r.slot?' at '+r.slot:''}${regs.c.venue?', '+regs.c.venue:''}. Thank you for donating blood. Sankari Rotaract Club`)}><MessageCircle size={16}/></a>}</td></tr>)}
-          {!regs.rows.length&&<tr><td colSpan="5" className="py-4 text-center text-slate-500">No registrations yet.</td></tr>}</tbody></table></div></div>}
-    <div className="space-y-3">{rows.map(c=><div key={c.id} className="card flex flex-wrap items-center justify-between gap-3">
-      <div><div className="font-semibold text-white">{c.name}</div><div className="text-sm text-slate-400">{fmt(c.camp_date)} · {c.venue||'Venue not set'}</div>
-        <div className="mt-1 text-sm">{c.registrations?.[0]?.count??0} registered{c.target_donors?` of ${c.target_donors} target`:''}</div></div>
-      <div className="flex items-center gap-2">
-        <button className="btn-ghost text-sm" onClick={()=>showRegs(c)}>Registrants</button>
-        <select className="input w-auto py-1 capitalize" value={c.status} onChange={e=>setStatus(c.id,e.target.value)}>{STATUS.map(s=><option key={s}>{s}</option>)}</select>
-        {c.status==='open'?<button className="btn" onClick={()=>showQr(c)}><QrCode size={16}/>QR and link</button>:<span className="text-xs text-slate-500">Set to open to share</span>}</div></div>)}
-      {!rows.length&&<div className="card text-center text-slate-500">No camps yet. Create your first camp.</div>}</div></div>
+    <PageHeader title="Camps" description="Plan camps, open registration and share the QR link."
+      actions={<button className="btn" onClick={()=>setForm(blank)}><Plus size={16}/>New camp</button>}/>
+    <Tabs id="camp-filter" value={filter} onChange={setFilter} tabs={[['active','Upcoming and live'],['past','Past'],['all','All']]}/>
+    {rows===null?<div className="grid gap-4 md:grid-cols-2">{[0,1].map(i=><div key={i} className="card"><div className="skeleton h-24"/></div>)}</div>
+    :!list.length?<div className="card"><Empty icon={Tent} title="No camps here" action={<button className="btn" onClick={()=>setForm(blank)}><Plus size={16}/>New camp</button>}>Create a camp, then set it to Registration open to share the QR.</Empty></div>
+    :<div className="grid gap-4 md:grid-cols-2">{list.map(c=>{const n=c.registrations?.[0]?.count??0
+      return <article key={c.id} className="card flex flex-col">
+        <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="truncate font-display text-lg font-semibold text-white">{c.name}</h2>
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-fog-muted"><span className="flex items-center gap-1.5"><Clock size={14}/>{fmt(c.camp_date)}{c.start_time&&`, ${c.start_time.slice(0,5)}`}</span>
+            <span className="flex items-center gap-1.5"><MapPin size={14}/>{c.venue||'Venue not set'}</span></div></div>
+          <Badge tone={TONE[c.status]}>{STATUS.find(s=>s[0]===c.status)?.[1]}</Badge></div>
+        <div className="mt-4 flex items-baseline gap-2"><span className="font-display text-3xl font-semibold text-white">{n}</span><span className="text-sm text-fog-muted">registered{c.target_donors?` of ${c.target_donors}`:''}</span>
+          {c.slot_capacity&&<span className="ml-auto text-xs text-fog-faint">{c.slot_capacity} per slot</span>}</div>
+        {c.target_donors&&<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink-700"><div className="h-full origin-left animate-grow rounded-full bg-gradient-to-r from-brand-deep to-brand" style={{width:Math.min(100,n/c.target_donors*100)+'%'}}/></div>}
+        <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-ink-700 pt-4">
+          <select aria-label="Camp status" className="input w-auto py-1.5 text-xs" value={c.status} onChange={e=>setStatus(c,e.target.value)}>{STATUS.map(([k,l])=><option key={k} value={k}>{l}</option>)}</select>
+          <button className="btn-quiet py-1.5 text-xs" onClick={()=>open(c,'people')}><Users size={14}/>Registrants</button>
+          {c.status==='open'&&<button className="btn-quiet py-1.5 text-xs" onClick={()=>open(c,'share')}><QrCode size={14}/>QR and link</button>}
+          <button className="btn-ghost ml-auto" title="Edit camp" onClick={()=>setForm({...blank,...Object.fromEntries(Object.entries(c).map(([k,v])=>[k,v??'']))})}><Pencil size={15}/></button></div>
+      </article>})}</div>}
+
+    <Drawer open={!!form} onClose={()=>setForm(null)} title={form?.id?'Edit camp':'New camp'}
+      footer={form&&<>{form.id&&<button className="btn-quiet mr-auto text-blood" onClick={remove}><Trash2 size={15}/>Delete</button>}
+        <button className="btn-quiet" onClick={()=>setForm(null)}>Cancel</button><button className="btn" form="camp-form" disabled={busy}>{busy?'Saving…':form.id?'Save changes':'Create camp'}</button></>}>
+      {form&&<form id="camp-form" onSubmit={save} className="grid gap-4 sm:grid-cols-2">
+        <Field label="Camp name" className="sm:col-span-2"><input className="input" required value={form.name} onChange={set('name')}/></Field>
+        <Field label="Date"><input type="date" required className="input" value={form.camp_date} onChange={set('camp_date')}/></Field>
+        <Field label="Status"><select className="input" value={form.status} onChange={set('status')}>{STATUS.map(([k,l])=><option key={k} value={k}>{l}</option>)}</select></Field>
+        <Field label="Starts"><input type="time" className="input" value={form.start_time} onChange={set('start_time')}/></Field>
+        <Field label="Ends"><input type="time" className="input" value={form.end_time} onChange={set('end_time')}/></Field>
+        <Field label="Venue" className="sm:col-span-2"><input className="input" value={form.venue} onChange={set('venue')}/></Field>
+        <Field label="Target donors"><input className="input" type="number" min="1" value={form.target_donors} onChange={set('target_donors')}/></Field>
+        <Field label="Donors per time slot" hint="Empty means no limit."><input className="input" type="number" min="1" value={form.slot_capacity} onChange={set('slot_capacity')}/></Field>
+        <Field label="Budget (Rs.)"><input className="input" type="number" min="0" value={form.budget} onChange={set('budget')}/></Field>
+      </form>}
+    </Drawer>
+
+    <Drawer open={!!view} onClose={()=>{setView(null);load()}} width="max-w-2xl" title={view?.name} description={view&&`${fmt(view.camp_date)}${view.venue?`, ${view.venue}`:''}`}>
+      {view&&<><Tabs id="camp-view" value={tab} onChange={setTab} tabs={[['people','Registrants'],...(view.status==='open'?[['share','QR and link']]:[])]}/>
+        {tab==='people'?<Registrants camp={view} onChanged={()=>{}}/>
+        :<div className="flex flex-col items-center gap-4 text-center"><img src={qr} alt={`QR code to register for ${view.name}`} className="h-64 w-64 rounded-2xl bg-white p-3"/>
+          <p className="max-w-sm text-sm text-fog-muted">Print this on the poster or share it on WhatsApp. Donors scan it to register.</p>
+          <code className="max-w-full break-all rounded-lg bg-ink-800 px-3 py-2 text-xs text-fog-muted">{link(view.id)}</code>
+          <div className="flex gap-2"><button className="btn" onClick={()=>{navigator.clipboard.writeText(link(view.id));toast.success('Link copied')}}><Copy size={15}/>Copy link</button>
+            <a className="btn-quiet" download={`${view.name}-qr.png`} href={qr}><Download size={15}/>Download QR</a></div></div>}</>}
+    </Drawer>
+  </div>
 }

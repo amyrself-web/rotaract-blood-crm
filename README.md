@@ -17,6 +17,9 @@ Run each file ONCE, in this order. Skip any you have already run.
 7. supabase/phase8.sql
 8. supabase/fix-01.sql (lets signed-in donors open registration links)
 9. supabase/fix-02-grants.sql (locks staff functions to signed-in users)
+10. supabase/v2-permissions.sql (sub-roles, per-user permissions, settings, audit log, slot limits)
+
+User control service: deploy supabase/functions/admin-users (create users, reset passwords, delete).
 
 Optional: supabase/sample-data.sql loads demo logins and sample data; supabase/sample-data-remove.sql removes them.
 
