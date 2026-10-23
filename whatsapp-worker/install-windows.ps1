@@ -95,7 +95,8 @@ if($Engine -eq 'openwa'){
   Push-Location $OwaDir
   foreach($step in @('install --no-audit --no-fund','run dashboard:install','run build:all')){
     Say "  npm $step"
-    & $Npm @($step -split ' ') 2>&1 | Tee-Object -Append -FilePath (Join-Path $OwaDir 'build.log')
+    # through cmd so npm's warnings on stderr do not stop PowerShell (Windows PowerShell 5.1 treats them as errors)
+    cmd.exe /s /c "`"`"$Npm`" $step >> build.log 2>&1`""
     if($LASTEXITCODE -ne 0){Pop-Location
       Say "OpenWA build failed at 'npm $step'. The full output is in $OwaDir\build.log" Red
       Say "Quick way out: .\install-windows.ps1 -Uninstall ; then .\install-windows.ps1   (built-in engine, no build needed)" Yellow; exit 1}}
