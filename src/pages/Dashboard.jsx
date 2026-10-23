@@ -7,6 +7,18 @@ import {BLOOD,fmt} from '../lib/util'
 import CountUp from '../components/CountUp'
 import {useLive,PageHeader} from '../components/ui'
 import {useBrand} from '../context/Brand'
+import {Trophy} from 'lucide-react'
+
+function TopDonors(){
+  const [rows,setRows]=useState(null)
+  useEffect(()=>{supabase.rpc('donor_leaderboard',{p_limit:8}).then(({data})=>setRows(data||[]))},[])
+  if(!rows?.length)return null
+  const max=rows[0].total
+  return <section className="card mt-5"><h2 className="mb-4 flex items-center gap-2 font-semibold text-fg"><Trophy size={17} className="text-warn"/>Top donors</h2>
+    <ol className="grid gap-x-6 gap-y-2.5 sm:grid-cols-2">{rows.map((d,i)=><li key={d.id} className="flex items-center gap-3"><span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold ${i===0?'bg-warn text-white':i<3?'bg-brand/20 text-brand':'bg-ink-700 text-fog-muted'}`}>{i+1}</span>
+      <div className="min-w-0 flex-1"><div className="flex justify-between gap-2 text-sm"><span className="truncate text-fg">{d.name} <span className="font-display text-xs font-semibold text-blood">{d.blood_group}</span></span><b className="tabular-nums text-fg">{d.total}</b></div>
+        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-ink-700"><div className="h-full rounded-full bg-gradient-to-r from-blood to-warn" style={{width:`${d.total/max*100}%`}}/></div></div></li>)}</ol></section>
+}
 
 const count=async(t,f)=>{let q=supabase.from(t).select('*',{count:'exact',head:true});if(f)q=f(q);const {count:n,error}=await q;return error?null:n}
 
@@ -108,5 +120,6 @@ export default function Dashboard(){
         {(can('campday')||can('screening'))&&<Action to="/camp-day" icon={ClipboardCheck} label="Camp day check-in"/>}
         {stockRole&&<Action to="/stock" icon={Droplets} label="Blood stock and emergencies"/>}
       </div></section>
+    {can('donors')&&<TopDonors/>}
   </div>
 }

@@ -1,3 +1,4 @@
+import {t as tr,useLang} from '../lib/i18n'
 import {useEffect,useMemo,useRef,useState} from 'react'
 import {Link,NavLink,Outlet,useLocation,useNavigate} from 'react-router-dom'
 import {motion} from 'framer-motion'
@@ -8,6 +9,7 @@ import {ROLE_LABEL} from '../lib/access'
 import {spring,usePresence,HeroCtx} from './ui'
 import {BrandMark,ThemeToggle} from './Brand'
 import {useNotifications,Palette,Popover,UiSwitch} from './Layout'
+import LangToggle from './LangToggle'
 
 // Modern layout: navy header band with a top menu, the page title inside the band,
 // content on a sheet that rises over it, and a bottom tab bar on phones.
@@ -27,7 +29,7 @@ function GroupMenu({group,active,open,setOpen}){
   return <div className="relative" onMouseEnter={enter} onMouseLeave={leave}>
     <button className="navpill" aria-expanded={open} aria-haspopup="menu" onClick={()=>setOpen(open?null:group.group)}>
       {active&&<motion.span layoutId="mnav" transition={spring} className="absolute inset-0 rounded-full bg-white/[.13] ring-1 ring-white/15"/>}
-      <span className={`relative ${active?'text-white':''}`}>{group.group}</span>
+      <span className={`relative ${active?'text-white':''}`}>{tr(group.group)}</span>
       <ChevronDown size={14} className={`relative transition-transform duration-200 ${open?'rotate-180':''}`}/></button>
     {open&&<motion.div role="menu" initial={{opacity:0,y:-6,scale:.98}} animate={{opacity:1,y:0,scale:1}} transition={{duration:.16}}
       className="unhero text-fog absolute left-1/2 top-full z-40 mt-3 w-[500px] -translate-x-1/2 rounded-shell border border-ink-600 bg-ink-900 p-2 shadow-2xl">
@@ -35,7 +37,7 @@ function GroupMenu({group,active,open,setOpen}){
         <NavLink key={to} to={to} end={to==='/'} role="menuitem" onClick={()=>setOpen(null)}
           className={({isActive})=>`group flex items-start gap-3 rounded-xl p-2.5 transition-colors ${isActive?'bg-brand/10':'hover:bg-ink-750'}`}>
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-brand/20 to-brand/5 text-brand ring-1 ring-brand/20 transition-transform group-hover:scale-105"><I size={17}/></span>
-          <span className="min-w-0"><span className="block text-sm font-semibold text-fg">{label}</span><span className="block truncate text-xs text-fog-faint">{desc}</span></span>
+          <span className="min-w-0"><span className="block text-sm font-semibold text-fg">{tr(label)}</span><span className="block truncate text-xs text-fog-faint">{desc}</span></span>
         </NavLink>)}</div></motion.div>}
   </div>
 }
@@ -50,18 +52,19 @@ function MoreSheet({open,onClose,groups}){
       initial={{y:'100%'}} animate={{y:open?0:'100%'}} transition={spring}>
       <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-ink-600 md:hidden"/>
       <div className="mb-2 flex items-center justify-between"><div className="font-display text-lg font-semibold text-fg">All pages</div><button className="btn-ghost" aria-label="Close" onClick={onClose}><X size={18}/></button></div>
-      {groups.map(g=><div key={g.group} className="mt-4"><div className="mb-2 text-xs font-semibold uppercase tracking-wider text-fog-faint">{g.group}</div>
+      {groups.map(g=><div key={g.group} className="mt-4"><div className="mb-2 text-xs font-semibold uppercase tracking-wider text-fog-faint">{tr(g.group)}</div>
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">{g.items.map(({to,label,icon:I})=>
           <NavLink key={to} to={to} end={to==='/'} onClick={onClose} className={({isActive})=>`flex flex-col items-center gap-1.5 rounded-2xl border px-2 py-3 text-center text-xs font-medium transition ${isActive?'border-brand/40 bg-brand/10 text-fg':'border-ink-700 bg-ink-800 text-fog-muted hover:text-fg'}`}>
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-brand/20 to-brand/5 text-brand"><I size={19}/></span><span className="leading-tight">{label}</span></NavLink>)}</div></div>)}
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-brand/20 to-brand/5 text-brand"><I size={19}/></span><span className="leading-tight">{tr(label)}</span></NavLink>)}</div></div>)}
       <div className="mt-6 grid gap-1 border-t border-ink-700 pt-3">
         <button onClick={()=>{nav('/profile');onClose()}} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-fog hover:bg-ink-750"><UserRound size={15}/>My profile</button>
-        <UiSwitch onDone={onClose}/>
+        <UiSwitch onDone={onClose}/><div className="mt-3"><LangToggle/></div>
         <button onClick={signOut} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-fog hover:bg-ink-750"><LogOut size={15}/>Sign out</button></div>
     </motion.div></div>
 }
 
 export default function ModernLayout(){
+  useLang()
   const {profile,signOut,can}=useAuth(),loc=useLocation(),nav=useNavigate()
   const [slot,setSlot]=useState(null),[pal,setPal]=useState(false),[bell,setBell]=useState(false),[me,setMe]=useState(false),[menu,setMenu]=useState(null),[more,setMore]=useState(false)
   const notes=useNotifications()
@@ -83,7 +86,7 @@ export default function ModernLayout(){
         {flat.length>1&&<nav aria-label="Main" className="ml-4 hidden items-center gap-0.5 rounded-full bg-white/[.06] p-1 ring-1 ring-white/10 lg:flex">
           {overview?.items.map(({to,label})=><NavLink key={to} to={to} end={to==='/'} className="navpill">{({isActive})=><>
             {isActive&&<motion.span layoutId="mnav" transition={spring} className="absolute inset-0 rounded-full bg-white/[.13] ring-1 ring-white/15"/>}
-            <span className={`relative ${isActive?'text-white':''}`}>{label}</span></>}</NavLink>)}
+            <span className={`relative ${isActive?'text-white':''}`}>{tr(label)}</span></>}</NavLink>)}
           {rest.map(g=><GroupMenu key={g.group} group={g} active={cur?.group===g.group} open={menu===g.group} setOpen={setMenu}/>)}
         </nav>}
         <div className="flex-1"/>
@@ -104,13 +107,13 @@ export default function ModernLayout(){
           <Popover open={me} onClose={()=>setMe(false)} className="w-60">
             <div className="border-b border-ink-700 px-2 pb-2 pt-1"><div className="truncate text-sm font-medium text-fg">{profile.full_name||'User'}</div><div className="truncate text-xs text-fog-faint">{profile.email}</div></div>
             <button onClick={()=>{nav('/profile');setMe(false)}} className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-fog hover:bg-ink-750"><UserRound size={15}/>My profile</button>
-            <UiSwitch onDone={()=>setMe(false)}/>
+            <UiSwitch onDone={()=>setMe(false)}/><div className="px-3 py-2"><LangToggle/></div>
             <button onClick={signOut} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-fog hover:bg-ink-750"><LogOut size={15}/>Sign out</button></Popover></div>
         {flat.length>1&&<button className="btn-ghost hidden md:inline-flex lg:hidden" aria-label="All pages" onClick={()=>setMore(true)}><LayoutGrid size={18}/></button>}
       </header>
       <div className="relative z-10 mx-auto max-w-[1240px] px-4 pb-14 pt-4 md:px-8 md:pb-16 md:pt-7">
         <div ref={setSlot} className="peer"/>
-        <div className="hidden peer-empty:block">{group&&<div className="mb-1 text-xs font-semibold uppercase tracking-[.14em] text-brand-soft">{group}</div>}
+        <div className="hidden peer-empty:block">{group&&<div className="mb-1 text-xs font-semibold uppercase tracking-[.14em] text-brand-soft">{tr(group)}</div>}
           <h1 className="font-display text-[28px] font-semibold leading-tight text-fg md:text-[34px]">{title}</h1></div>
       </div>
     </div>
@@ -126,7 +129,7 @@ export default function ModernLayout(){
       {tabs.map(({to,label,icon:I})=><NavLink key={to} to={to} end={to==='/'} className="relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium">{({isActive})=><>
         {isActive&&<motion.span layoutId="tabdot" transition={spring} className="absolute inset-x-4 top-0 h-[3px] rounded-b-full bg-gradient-to-r from-blood to-brand"/>}
         <motion.span animate={{scale:isActive?1.12:1,y:isActive?-1:0}} transition={spring} className={isActive?'text-brand':'text-fog-faint'}><I size={21}/></motion.span>
-        <span className={isActive?'text-fg':'text-fog-faint'}>{SHORT[to]||label}</span></>}</NavLink>)}
+        <span className={isActive?'text-fg':'text-fog-faint'}>{tr(SHORT[to]||label)}</span></>}</NavLink>)}
       <button onClick={()=>setMore(true)} className="flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-fog-faint"><LayoutGrid size={21}/>More</button>
     </div></nav>}
 

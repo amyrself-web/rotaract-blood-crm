@@ -13,6 +13,7 @@ import {useBrand} from '../context/Brand'
 import {memberIdCards} from '../lib/cards'
 import {PhotoPicker} from '../components/PhotoPicker'
 import MyClubExtra from '../components/MyClubExtra'
+import {useLang} from '../lib/i18n'
 
 const ST={present:['Present','green'],late:['Late','blue'],leave:['On leave','amber'],absent:['Absent','red']}
 const t5=t=>t?String(t).slice(0,5):''
@@ -51,7 +52,7 @@ export function CheckInCard({meeting,onDone}){
 export default function MyClub(){
   const {profile,refresh}=useAuth()
   const {brand}=useBrand(),[card,setCard]=useState(null),[dl,setDl]=useState(false)
-  const [d,setD]=useState(undefined),[open,setOpen]=useState(null),[leave,setLeave]=useState(null),[edit,setEdit]=useState(null),[busy,setBusy]=useState(false)
+  const {t}=useLang();const [d,setD]=useState(undefined),[open,setOpen]=useState(null),[leave,setLeave]=useState(null),[edit,setEdit]=useState(null),[busy,setBusy]=useState(false)
   const load=()=>supabase.rpc('my_club').then(({data,error})=>error?toast.error(error.message):setD(data))
   useEffect(()=>{load()},[]);useLive(['meetings','meeting_attendance','meeting_actions','member_dues','members'],load)
   if(d===undefined)return <div className="space-y-4">{[0,1,2].map(i=><div key={i} className="skeleton h-28"/>)}</div>
@@ -78,47 +79,47 @@ export default function MyClub(){
             {x.chief_guest&&<p className="text-fog-muted">Chief guest: <span className="text-fg">{x.chief_guest}</span></p>}{x.link&&<a className="text-brand hover:underline" href={x.link} target="_blank" rel="noreferrer">Join online</a>}
             {x.my==='leave'?<p className="text-warn">Leave applied: {x.note}. Changed your mind? Just check in on the day.</p>
               :!x.my&&(leave?.id===x.id?<form onSubmit={applyLeave} className="flex flex-wrap gap-2"><input className="input flex-1" autoFocus required minLength={3} placeholder="Reason for leave" aria-label="Reason for leave" value={leave.reason} onChange={e=>setLeave({...leave,reason:e.target.value})}/><button className="btn">Send</button><button type="button" className="btn-quiet" onClick={()=>setLeave(null)}>Cancel</button></form>
-              :<button className="btn-quiet" onClick={()=>setLeave({id:x.id,reason:''})}>Apply for leave</button>)}</>
+              :<button className="btn-quiet" onClick={()=>setLeave({id:x.id,reason:''})}>{t('Apply for leave')}</button>)}</>
           :<><div><div className="label">Minutes</div><p className="whitespace-pre-line text-fog">{x.minutes||'Minutes not shared yet.'}</p></div>{x.decisions&&<div><div className="label">Decisions</div><p className="whitespace-pre-line text-fog">{x.decisions}</p></div>}</>}
         </div></motion.div>}</AnimatePresence></li>}
 
   return <div>
-    <PageHeader eyebrow={`${code('M',m.member_no,3)} · ${m.position}`} title={`Hello, ${m.full_name.split(' ')[0]}`} description={`${m.membership_type} member since ${fmt(m.joined_on)}`}
-      actions={<><button className="btn-quiet" onClick={openCard}><IdCard size={15}/>My ID card</button><button className="btn-quiet" onClick={()=>setEdit({phone:m.phone||'',email:m.email||'',dob:m.dob||'',gender:m.gender||'',blood_group:m.blood_group||'',address:m.address||'',area:m.area||'',occupation:m.occupation||'',organisation:m.organisation||'',emergency_contact:m.emergency_contact||''})}><Pencil size={15}/>Edit my details</button></>}/>
+    <PageHeader eyebrow={`${code('M',m.member_no,3)} · ${m.position}`} title={`${t('Hello')}, ${m.full_name.split(' ')[0]}`} description={`${m.membership_type} member since ${fmt(m.joined_on)}`}
+      actions={<><button className="btn-quiet" onClick={openCard}><IdCard size={15}/>{t('My ID card')}</button><button className="btn-quiet" onClick={()=>setEdit({phone:m.phone||'',email:m.email||'',dob:m.dob||'',gender:m.gender||'',blood_group:m.blood_group||'',address:m.address||'',area:m.area||'',occupation:m.occupation||'',organisation:m.organisation||'',emergency_contact:m.emergency_contact||''})}><Pencil size={15}/>{t('Edit my details')}</button></>}/>
     <div className="mb-5 space-y-3">{todays.map(x=><CheckInCard key={x.id} meeting={x} onDone={load}/>)}</div>
     <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <div className="card py-4"><div className={`text-2xl font-semibold ${pct==null?'text-fg':pct>=75?'text-ok':pct>=50?'text-warn':'text-blood'}`}>{pct==null?'-':<><CountUp value={pct}/>%</>}</div><div className="text-xs text-fog-muted">My attendance this year</div><div className="mt-1 text-[11px] text-fog-faint">{a.present} of {a.held} meetings{a.leave?` · ${a.leave} leave`:''}</div></div>
-      <div className="card py-4"><div className="text-2xl font-semibold text-fg"><CountUp value={openActs.length}/></div><div className="text-xs text-fog-muted">My open action items</div></div>
-      <div className="card py-4"><div className={`text-2xl font-semibold ${paidYear?'text-ok':'text-fg'}`}>{paidYear?rs(paidYear):'Not paid'}</div><div className="text-xs text-fog-muted">Dues this year</div></div>
-      <div className="card py-4"><div className="text-2xl font-semibold text-blood">{d.donations==null?'-':<CountUp value={d.donations}/>}</div><div className="text-xs text-fog-muted">My blood donations</div>{m.donor_no&&<div className="mt-1 text-[11px] text-fog-faint">Donor {code('D',m.donor_no)}</div>}</div></div>
+      <div className="card py-4"><div className={`text-2xl font-semibold ${pct==null?'text-fg':pct>=75?'text-ok':pct>=50?'text-warn':'text-blood'}`}>{pct==null?'-':<><CountUp value={pct}/>%</>}</div><div className="text-xs text-fog-muted">{t('My attendance this year')}</div><div className="mt-1 text-[11px] text-fog-faint">{a.present} of {a.held} meetings{a.leave?` · ${a.leave} leave`:''}</div></div>
+      <div className="card py-4"><div className="text-2xl font-semibold text-fg"><CountUp value={openActs.length}/></div><div className="text-xs text-fog-muted">{t('My open action items')}</div></div>
+      <div className="card py-4"><div className={`text-2xl font-semibold ${paidYear?'text-ok':'text-fg'}`}>{paidYear?rs(paidYear):'Not paid'}</div><div className="text-xs text-fog-muted">{t('Dues this year')}</div></div>
+      <div className="card py-4"><div className="text-2xl font-semibold text-blood">{d.donations==null?'-':<CountUp value={d.donations}/>}</div><div className="text-xs text-fog-muted">{t('My blood donations')}</div>{m.donor_no&&<div className="mt-1 text-[11px] text-fog-faint">Donor {code('D',m.donor_no)}</div>}</div></div>
     {!todays.length&&<details className="card mb-5 p-0"><summary className="flex cursor-pointer list-none items-center gap-3 p-4 text-sm font-medium text-fg"><QrCode size={18} className="text-brand"/>Have a check-in code? Mark attendance here<ChevronDown size={16} className="ml-auto text-fog-faint"/></summary><div className="border-t border-ink-700 p-4"><CheckInCard onDone={load}/></div></details>}
 
     <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
       <div className="space-y-5">
         <MyClubExtra/>
-        <section className="card"><h2 className="mb-3 flex items-center gap-2 font-semibold text-fg"><CalendarDays size={17} className="text-brand"/>Upcoming meetings</h2>
+        <section className="card"><h2 className="mb-3 flex items-center gap-2 font-semibold text-fg"><CalendarDays size={17} className="text-brand"/>{t('Upcoming meetings')}</h2>
           {later.length?<ul className="space-y-2">{later.map(x=><Meet key={x.id} x={x} up/>)}</ul>:<p className="text-sm text-fog-faint">No meetings scheduled yet.</p>}</section>
-        <section className="card"><h2 className="mb-3 font-semibold text-fg">Recent meetings and minutes</h2>
+        <section className="card"><h2 className="mb-3 font-semibold text-fg">{t('Recent meetings and minutes')}</h2>
           {d.recent.length?<ul className="space-y-2">{d.recent.map(x=><Meet key={x.id} x={x}/>)}</ul>:<p className="text-sm text-fog-faint">No meetings held yet.</p>}</section></div>
       <div className="space-y-5">
-        <section className="card"><h2 className="mb-3 font-semibold text-fg">My action items</h2>
+        <section className="card"><h2 className="mb-3 font-semibold text-fg">{t('My action items')}</h2>
           {d.actions.length?<ul className="space-y-1">{d.actions.map(x=><li key={x.id}><button onClick={()=>act(x)} className="flex w-full items-start gap-3 rounded-lg p-2 text-left hover:bg-ink-750">
             <span className={`mt-0.5 ${x.done?'text-ok':'text-fog-faint'}`}>{x.done?<CheckCircle2 size={19}/>:<Circle size={19}/>}</span>
             <span className="min-w-0 flex-1"><span className={`block text-sm ${x.done?'text-fog-faint line-through':'text-fg'}`}>{x.task}</span><span className="block text-xs text-fog-faint">{code('MT',x.meeting_no,3)} {x.meeting}{x.due?` · due ${fmt(x.due)}`:''}</span></span>
             {!x.done&&x.due&&x.due<today&&<Badge tone="red">Overdue</Badge>}</button></li>)}</ul>:<p className="text-sm text-fog-faint">Nothing assigned to you.</p>}</section>
-        <section className="card"><h2 className="mb-3 flex items-center gap-2 font-semibold text-fg"><Wallet size={17} className="text-brand"/>My dues</h2>
+        <section className="card"><h2 className="mb-3 flex items-center gap-2 font-semibold text-fg"><Wallet size={17} className="text-brand"/>{t('My dues')}</h2>
           {d.dues.length?<ul className="divide-y divide-ink-700 text-sm">{d.dues.map(x=><li key={x.receipt_no} className="flex items-center gap-3 py-2"><span className="code">{code('RC',x.receipt_no,4)}</span><span className="flex-1 text-fg">{x.period}<span className="block text-xs text-fog-faint">{fmt(x.paid_on)} · {x.mode}</span></span><span className="font-semibold tabular-nums text-fg">{rs(x.amount)}</span></li>)}</ul>
           :<p className="text-sm text-fog-faint">No payments recorded yet. Pay the treasurer and they will add it here.</p>}</section>
-        {d.camps.length>0&&<section className="card"><h2 className="mb-3 flex items-center gap-2 font-semibold text-fg"><Tent size={17} className="text-blood"/>Blood camps coming up</h2>
+        {d.camps.length>0&&<section className="card"><h2 className="mb-3 flex items-center gap-2 font-semibold text-fg"><Tent size={17} className="text-blood"/>{t('Blood camps coming up')}</h2>
           <ul className="space-y-2 text-sm">{d.camps.map(c=><li key={c.id} className="flex items-center gap-3"><Droplet size={15} className="shrink-0 text-blood"/><span className="flex-1 text-fg">{c.name}<span className="block text-xs text-fog-faint">{fmt(c.date)}{c.venue?` · ${c.venue}`:''}</span></span>
             {c.status==='open'&&<Link className="btn-quiet px-3 py-1 text-xs" to={`/register/${c.id}`}>Register</Link>}</li>)}</ul></section>}
-        <section className="card"><h2 className="mb-3 font-semibold text-fg">Club team</h2><ul className="space-y-2 text-sm">{d.team.filter(x=>x.position!=='Member').map((x,i)=><li key={i} className="flex items-center gap-3">
+        <section className="card"><h2 className="mb-3 font-semibold text-fg">{t('Club team')}</h2><ul className="space-y-2 text-sm">{d.team.filter(x=>x.position!=='Member').map((x,i)=><li key={i} className="flex items-center gap-3">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand/10 text-xs font-semibold text-brand">{x.name.split(' ').map(s=>s[0]).slice(0,2).join('')}</span>
           <span className="min-w-0 flex-1"><span className="block truncate text-fg">{x.name}</span><span className="block truncate text-xs text-fog-faint">{x.position}</span></span>
           {x.phone&&<a className="btn-ghost" href={`tel:${x.phone}`} aria-label={`Call ${x.name}`}><Phone size={15}/></a>}</li>)}</ul>
           <p className="mt-3 text-xs text-fog-faint">{d.team.length} active members in the club.</p></section></div></div>
 
-    <Drawer open={!!card} onClose={()=>setCard(null)} title="My ID card" description="Add your photo, then download the card. Show it at club events; the QR code proves you are a member."
+    <Drawer open={!!card} onClose={()=>setCard(null)} title={t('My ID card')} description="Add your photo, then download the card. Show it at club events; the QR code proves you are a member."
       footer={card&&<><button className="btn-quiet" onClick={()=>setCard(null)}>Close</button><button className="btn" disabled={dl} onClick={getCard}><Download size={15}/>{dl?'Preparing…':'Download ID card'}</button></>}>
       {card&&<div className="space-y-4"><PhotoPicker self member={card} onSaved={u=>setCard({...card,photo_url:u||null})}/>
         <p className="text-sm text-fog-muted">The card shows your name, member ID {code('M',card.member_no,3)}, position, blood group and photo. It is valid till 30 June of this Rotary year; download it again after that.</p></div>}

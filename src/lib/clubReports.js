@@ -135,3 +135,22 @@ export async function districtPdf(brand,month){
     {type:'boxes',boxes:[{title:'EYE AND BODY DONATION',rows:[['New pledges',r.afterlife.pledges],['Eye donations',r.afterlife.eye],['Body donations',r.afterlife.body]]}]},
     {type:'signatures',items:[[brand.signatory2_name,brand.signatory2_title||'Secretary'],[brand.signatory_name,brand.signatory_title||'President']]}]})
 }
+
+// letters to sponsors on the letterhead: asking for support before the camp, and thanking them after
+export async function sponsorLetter(kind,s,camp,brand){
+  const date=camp?.camp_date?fmt(camp.camp_date):'',club=brand.club_name||'our club',amt=Number(s.amount)?rs(s.amount):''
+  const ask=[`Dear ${s.name},`,
+    `${club} is organising a voluntary blood donation camp${camp?`, ${camp.name}, on ${date}${camp.venue?` at ${camp.venue}`:''}`:''}. Every unit of blood collected can save up to three lives, and our camps supply the government blood bank that serves patients in our area.`,
+    `We request your support${amt?` of ${amt}`:''} towards refreshments for donors, certificates, banners and camp arrangements. Your organisation will be thanked on our banners and in our social media posts, and you will receive a receipt and a report of the camp.`,
+    `We would be grateful for your kind support. Please contact us for any details.`,`With warm regards,`]
+  const thank=[`Dear ${s.name},`,
+    `On behalf of ${club}, we thank you for your generous support${amt?` of ${amt}`:''} for ${camp?`${camp.name} held on ${date}${camp.venue?` at ${camp.venue}`:''}`:'our blood donation camp'}.`,
+    `Because of sponsors like you, the camp ran smoothly and every donor was looked after well. The blood collected will reach patients in need in our area.`,
+    `We look forward to your continued support for our service projects.`,`With gratitude,`]
+  const no=pad('SP',s.sponsor_no,4)
+  return buildPdf({title:kind==='thank'?'Letter of thanks':'Request for support',heading:kind==='thank'?'Thank you for your support':'Request for sponsorship',subtitle:camp?`${camp.name} · ${date}`:'',docNo:`${no}-${kind==='thank'?'T':'R'}`,brand,
+    footer:kind==='thank'?'Letter of thanks':'Sponsorship request',filename:`${kind==='thank'?'thank-you':'request'}-${slug(s.name)}.pdf`,
+    blocks:[{type:'boxes',boxes:[{title:'TO',rows:[['Name',s.name],...(amt?[['Amount',amt]]:[])]},{title:'CAMP',rows:[['Camp',camp?.name||'-'],['Date',date||'-'],['Venue',camp?.venue||'-']]}]},
+      ...(kind==='thank'?thank:ask).map(text=>({type:'text',text})),
+      {type:'signatures',items:[[brand.signatory_name,brand.signatory_title||'President'],[brand.signatory2_name,brand.signatory2_title||'Secretary']]}]})
+}

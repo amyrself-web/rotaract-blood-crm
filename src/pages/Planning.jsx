@@ -6,6 +6,9 @@ import {useAuth} from '../context/Auth'
 import {normPhone,fmt,wa} from '../lib/util'
 import {PageHeader,Drawer,Field,Tabs,Badge,Empty,useLive,undoToast,code} from '../components/ui'
 import {Materials,Passes} from '../components/CampKit'
+import {useBrand} from '../context/Brand'
+import {sponsorLetter} from '../lib/clubReports'
+import {Mail} from 'lucide-react'
 
 const DESKS=['Registration','Screening','Donation','Refreshment','Certificate','Crowd control']
 const CATS=['Refreshments','Printing','Banners','Transport','Sound system','Certificates','Other']
@@ -33,7 +36,7 @@ function Editor({item,close,save,remove}){
 }
 
 export default function Planning(){
-  const {settings}=useAuth(),today=new Date().toLocaleDateString('en-CA')
+  const {settings}=useAuth(),{brand}=useBrand(),today=new Date().toLocaleDateString('en-CA')
   const [camps,setCamps]=useState(null),[cid,setCid]=useState(''),[tab,setTab]=useState('tasks'),[d,setD]=useState({tasks:[],camp_volunteers:[],sponsors:[],expenses:[]}),[f,setF]=useState({}),[edit,setEdit]=useState(null)
   useEffect(()=>{supabase.from('camps').select('*').is('deleted_at',null).order('camp_date',{ascending:false}).then(({data})=>{setCamps(data||[]);if(data?.length)setCid((data.filter(c=>c.camp_date>=today).pop()||data[0]).id)})},[])
   const load=async()=>{if(!cid)return;const o={};for(const t of ['tasks','camp_volunteers','sponsors','expenses']){const r=await supabase.from(t).select('*').eq('camp_id',cid).order({tasks:'created_at',camp_volunteers:'volunteer_no',sponsors:'sponsor_no',expenses:'expense_no'}[t]);if(r.error)return toast.error(r.error.message);o[t]=r.data}setD(o)}
@@ -85,7 +88,9 @@ export default function Planning(){
       <div className="card"><h2 className="mb-3 font-semibold text-fg">Sponsors</h2><form className="mb-3 flex flex-wrap gap-2" onSubmit={e=>{e.preventDefault();add('sponsors',{name:f.sname,amount:Number(f.samt||0)})}}>
           <input className="input flex-1" placeholder="Sponsor name" required value={v('sname')} onChange={set('sname')}/><input className="input w-28" type="number" min="0" placeholder="Amount" required min="1" value={v('samt')} onChange={set('samt')}/><button className="btn">Add</button></form>
         {d.sponsors.map(s=><div key={s.id} className="flex items-center gap-3 border-t border-ink-700 py-2.5 text-sm"><input type="checkbox" title="Received" checked={s.received} onChange={e=>upd('sponsors',s.id,{received:e.target.checked})}/><span className="code">{code('SP',s.sponsor_no)}</span><span className="text-fg">{s.name}</span>
-          <span className="text-fog-muted">{inr(s.amount)}{s.received?' received':' pledged'}</span><EditBtn t="sponsors" row={s}/></div>)}</div>
+          <span className="text-fog-muted">{inr(s.amount)}{s.received?' received':' pledged'}</span>
+          <span className="ml-auto flex gap-1"><button className="btn-ghost px-2 text-xs" title="Letter asking for support" onClick={()=>sponsorLetter('ask',s,camp,brand).catch(e=>toast.error(e.message))}><Mail size={14}/>Request</button>
+          <button className="btn-ghost px-2 text-xs" title="Thank-you letter" onClick={()=>sponsorLetter('thank',s,camp,brand).catch(e=>toast.error(e.message))}><Mail size={14}/>Thanks</button></span><EditBtn t="sponsors" row={s}/></div>)}</div>
       <div className="card"><h2 className="mb-3 font-semibold text-fg">Expenses</h2><form className="mb-3 flex flex-wrap gap-2" onSubmit={e=>{e.preventDefault();add('expenses',{category:f.cat||'Other',description:f.desc||null,amount:Number(f.eamt||0)})}}>
           <select className="input w-auto" aria-label="Category" value={v('cat')} onChange={set('cat')}>{CATS.map(x=><option key={x}>{x}</option>)}</select><input className="input flex-1" placeholder="Details" required value={v('desc')} onChange={set('desc')}/>
           <input className="input w-28" type="number" min="0" required placeholder="Amount" value={v('eamt')} onChange={set('eamt')}/><button className="btn">Add</button></form>
