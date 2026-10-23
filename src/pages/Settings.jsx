@@ -34,9 +34,9 @@ export default function SettingsPage(){
     const {data,error}=await supabase.from('settings').update(row).eq('id',1).select().single()
     if(!error){const t=await supabase.from('stock_thresholds').upsert(BLOOD.map(g=>({blood_group:g,min_units:Number(th[g]??5)})));if(t.error){setBusy(false);return toast.error(t.error.message)}}
     setBusy(false);if(error)return toast.error(error.message);setSettings({...settings,...data});await refreshBrand();toast.success('Settings saved')}
-  return <form onSubmit={save} className="max-w-4xl">
+  return <form id="settings-form" onSubmit={save} className="max-w-4xl">
     <PageHeader title="Settings" description="Brand, look and the rules the CRM uses. Confirm medical values with your partner blood bank."
-      actions={<button className="btn" disabled={busy||missing}>{busy?'Saving…':'Save settings'}</button>}/>
+      actions={<button className="btn" form="settings-form" disabled={busy||missing}>{busy?'Saving…':'Save settings'}</button>}/>
     {missing&&<div className="card mb-5 border-warn/40 text-sm text-warn">Settings are not set up in the database yet. Run supabase/v2-permissions.sql and v3 first.</div>}
     <div className="grid gap-5 md:grid-cols-2">
       <section className="card space-y-4 md:col-span-2"><h2 className="font-semibold text-fg">Brand</h2>

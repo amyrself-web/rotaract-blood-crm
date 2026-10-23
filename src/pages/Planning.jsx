@@ -35,7 +35,7 @@ export default function Planning(){
   const {settings}=useAuth(),today=new Date().toLocaleDateString('en-CA')
   const [camps,setCamps]=useState(null),[cid,setCid]=useState(''),[tab,setTab]=useState('tasks'),[d,setD]=useState({tasks:[],camp_volunteers:[],sponsors:[],expenses:[]}),[f,setF]=useState({}),[edit,setEdit]=useState(null)
   useEffect(()=>{supabase.from('camps').select('*').is('deleted_at',null).order('camp_date',{ascending:false}).then(({data})=>{setCamps(data||[]);if(data?.length)setCid((data.filter(c=>c.camp_date>=today).pop()||data[0]).id)})},[])
-  const load=async()=>{if(!cid)return;const o={};for(const t of ['tasks','camp_volunteers','sponsors','expenses']){const r=await supabase.from(t).select('*').eq('camp_id',cid).order('created_at');if(r.error)return toast.error(r.error.message);o[t]=r.data}setD(o)}
+  const load=async()=>{if(!cid)return;const o={};for(const t of ['tasks','camp_volunteers','sponsors','expenses']){const r=await supabase.from(t).select('*').eq('camp_id',cid).order({tasks:'created_at',camp_volunteers:'volunteer_no',sponsors:'sponsor_no',expenses:'expense_no'}[t]);if(r.error)return toast.error(r.error.message);o[t]=r.data}setD(o)}
   useEffect(()=>{load()},[cid])
   useLive(['tasks','camp_volunteers','sponsors','expenses'],load)
   const run=async(p,msg)=>{const {error}=await p;if(error){toast.error(error.message);return false}if(msg)toast.success(msg);load();return true}

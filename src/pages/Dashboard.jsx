@@ -5,7 +5,8 @@ import {supabase,hasSupabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
 import {BLOOD,fmt} from '../lib/util'
 import CountUp from '../components/CountUp'
-import {useLive} from '../components/ui'
+import {useLive,PageHeader} from '../components/ui'
+import {useBrand} from '../context/Brand'
 
 const count=async(t,f)=>{let q=supabase.from(t).select('*',{count:'exact',head:true});if(f)q=f(q);const {count:n,error}=await q;return error?null:n}
 
@@ -23,7 +24,7 @@ function Action({to,icon:I,label}){
 }
 
 export default function Dashboard(){
-  const {profile,can}=useAuth(),role=profile.role,staff=can('donors')||can('camps'),stockRole=can('stock')
+  const {profile,can}=useAuth(),{brand}=useBrand(),role=profile.role,staff=can('donors')||can('camps'),stockRole=can('stock')
   const [k,setK]=useState({}),[camp,setCamp]=useState(undefined),[stock,setStock]=useState(null),[reqs,setReqs]=useState(null),[now,setNow]=useState(Date.now())
   const today=new Date().toLocaleDateString('en-CA')
   const [tick,setTick]=useState(0)
@@ -33,7 +34,7 @@ export default function Dashboard(){
       const c=await supabase.from('camps').select('*, registrations(count)').gte('camp_date',today).not('status','in','(closed,completed)').order('camp_date').limit(1)
       setCamp(c.data?.[0]||null)
       if(staff||can('screening')){
-        const [donors,consent,donations,camps]=await Promise.all([count('donors'),count('donors',q=>q.eq('consent',true)),count('donations'),count('camps')])
+        const [donors,consent,donations,camps]=await Promise.all([count('donors',q=>q.is('deleted_at',null)),count('donors',q=>q.eq('consent',true).is('deleted_at',null)),count('donations'),count('camps',q=>q.is('deleted_at',null))])
         setK({donors,consent,donations,camps})}
       if(stockRole){
         const u=await supabase.from('blood_units').select('blood_group').eq('status','available')
@@ -49,8 +50,7 @@ export default function Dashboard(){
   const total=stock?Object.values(stock).reduce((a,b)=>a+b,0):0,max=stock?Math.max(1,...Object.values(stock)):1
 
   return <div>
-    <div className="mb-6"><h1 className="h1 mb-1">{greet}, {profile.full_name||'friend'}</h1>
-      <p className="text-sm text-fog-muted">{new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'})} · Sankari Rotaract Club</p></div>
+    <PageHeader eyebrow={new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'})} title={`${greet}, ${profile.full_name||'friend'}`} description={`${brand.club_name} · here is what needs attention today`}/>
 
     {!hasSupabase&&<div className="card mb-5 border-brand/40 text-sm text-fog">Preview mode: no database connected. Add your Supabase keys to turn on real sign-in (see README).</div>}
 

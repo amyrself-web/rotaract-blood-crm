@@ -19,5 +19,8 @@ export function BrandProvider({children}){
     let own=null;try{own=localStorage.getItem('theme')}catch{}
     if(!own&&brand.default_theme){setModeState(brand.default_theme);if(brand.default_theme==='light')document.documentElement.dataset.theme='light';else delete document.documentElement.dataset.theme}},[brand])
   const setMode=m=>{setModeState(m);if(m==='light')document.documentElement.dataset.theme='light';else delete document.documentElement.dataset.theme;try{localStorage.setItem('theme',m)}catch{}}
-  return <Ctx.Provider value={{brand,setBrand,refreshBrand,mode,setMode}}>{children}</Ctx.Provider>
+  // Interface style after sign-in: 'modern' (top menu, header band, bottom tabs on phones) or 'classic' (side menu)
+  const [ui,setUiState]=useState(()=>{try{return localStorage.getItem('ui')||'modern'}catch{return 'modern'}})
+  const setUi=u=>{setUiState(u);try{localStorage.setItem('ui',u)}catch{}}
+  return <Ctx.Provider value={{brand,setBrand,refreshBrand,mode,setMode,ui,setUi}}>{children}</Ctx.Provider>
 }

@@ -1,8 +1,8 @@
 import {toast} from 'sonner'
-import {useLive,code,adultMax,adultMin,useConfirm} from '../components/ui'
+import {useLive,code,adultMax,adultMin,useConfirm,PageHeader} from '../components/ui'
 import {celebrate} from '../lib/fx'
 import {useEffect,useState} from 'react'
-import {UserPlus,Undo2} from 'lucide-react'
+import {UserPlus,Undo2,Search} from 'lucide-react'
 import {supabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
 import {BLOOD,normPhone,fmt} from '../lib/util'
@@ -71,11 +71,17 @@ export default function CampDay(){
   const donated=rows.filter(r=>r.status==='donated'),litres=(donated.reduce((a,r)=>a+(r.volume_ml||0),0)/1000).toFixed(1)
   const arrived=rows.filter(r=>!['registered','no_show'].includes(r.status)).length
   const list=rows.filter(r=>(!f||r.status===f)&&(!q||(r.full_name+' '+r.phone+' '+code('T',r.token_no,3)).toLowerCase().includes(q.toLowerCase())))
+  const actions=r=><>
+    {['registered','no_show'].includes(r.status)&&<button className="btn px-3 py-1.5" onClick={()=>run('set_reg_status',{p_reg:r.reg_id,p_status:'checked_in'})}>Check in</button>}
+    {r.status==='registered'&&<button className="btn-ghost hidden text-xs sm:inline-flex" onClick={()=>run('set_reg_status',{p_reg:r.reg_id,p_status:'no_show'})}>No-show</button>}
+    {can('campday')&&r.status==='checked_in'&&<button className="btn-ghost text-xs" title="Undo check-in" aria-label="Undo check-in" onClick={()=>run('set_reg_status',{p_reg:r.reg_id,p_status:'registered'})}><Undo2 size={14}/></button>}
+    {medic&&r.status==='checked_in'&&<button className="btn px-3 py-1.5" onClick={()=>setAct({type:'screen',row:r})}>Screen</button>}
+    {medic&&r.status==='screened'&&<button className="btn px-3 py-1.5" onClick={()=>setAct({type:'donate',row:r})}>Record<span className="hidden sm:inline">&nbsp;donation</span></button>}
+    {medic&&['screened','deferred','donated'].includes(r.status)&&<button className="btn-ghost text-xs" title="Entered by mistake? Take this donor back one step" aria-label="Take back one step" onClick={()=>takeBack(r)}><Undo2 size={14}/></button>}</>
   if(!camps.length)return <div className="card text-center text-fog-muted">No open or live camp. Set a camp to Open or Live on the Camps page.</div>
   return <div>
-    <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><h1 className="h1 mb-0">Camp day</h1>
-      <div className="flex gap-2"><select className="input w-auto" value={cid} onChange={e=>setCid(e.target.value)}>{camps.map(c=><option key={c.id} value={c.id}>{c.name} ({fmt(c.camp_date)}, {c.status})</option>)}</select>
-        {can('campday')&&<button className="btn" onClick={()=>setAct({type:'walk'})}><UserPlus size={16}/>Walk-in</button>}</div></div>
+    <PageHeader eyebrow="Camp work" title="Camp day" description={camp?`${camp.name} · ${camp.venue||''}`:''} actions={<><select className="input w-auto min-w-0 max-w-full truncate sm:max-w-sm" aria-label="Camp" value={cid} onChange={e=>setCid(e.target.value)}>{camps.map(c=><option key={c.id} value={c.id}>{c.name} ({fmt(c.camp_date)}, {c.status})</option>)}</select>
+        {can('campday')&&<button className="btn" onClick={()=>setAct({type:'walk'})}><UserPlus size={16}/>Walk-in</button>}</>}/>
     {err&&<div role="alert" className="mb-4 rounded-xl border border-blood/40 bg-blood/10 px-4 py-3 text-sm text-[#FF8796]">{err}</div>}
     <div className="card mb-5">
       <div className="grid grid-cols-3 gap-4 text-center sm:grid-cols-6">{[['Registered',rows.length],['Arrived',arrived],['Cleared',by('screened')],['Donated',donated.length],['Deferred',by('deferred')],['Blood collected',litres+' L']].map(([l,n])=><div key={l}><div className="text-2xl font-semibold tabular-nums text-fg"><CountUp value={n}/></div><div className="text-xs text-fog-muted">{l}</div></div>)}</div>
@@ -84,18 +90,25 @@ export default function CampDay(){
     {act?.type==='walk'&&<Walk camp={cid} run={run} close={()=>setAct(null)}/>}
     {act?.type==='screen'&&<Screen row={act.row} run={run} close={()=>setAct(null)}/>}
     {act?.type==='donate'&&<Donate row={act.row} run={run} close={()=>setAct(null)}/>}
-    <div className="mb-3 flex gap-2"><input className="input" placeholder="Search name, phone or token" value={q} onChange={e=>setQ(e.target.value)}/>
-      <select className="input w-44" value={f} onChange={e=>setF(e.target.value)}><option value="">All steps</option>{Object.entries(LABEL).map(([k,l])=><option key={k} value={k}>{l}</option>)}</select></div>
-    <div className="card overflow-x-auto p-0"><table className="w-full text-sm"><thead className="text-left text-fog-muted"><tr><th className="p-3 font-medium">Token</th><th className="font-medium">Donor</th><th className="font-medium">Group</th><th className="font-medium">Slot</th><th className="font-medium">Step</th><th/></tr></thead>
-      <tbody>{list.map(r=><tr key={r.reg_id} className="border-t border-ink-700">
-        <td className="p-3"><span className="code">{code('T',r.token_no,3)}</span></td><td className="py-3"><div className="text-fg">{r.full_name}</div><div className="text-xs text-fog-faint">{code('D',r.donor_no)} · {r.phone}</div></td>
-        <td className="font-semibold text-blood">{r.blood_group||'-'}</td><td>{r.slot||'-'}</td><td className={TONE[r.status]}>{LABEL[r.status]}{r.bag_number&&<span className="text-xs text-fog-faint"> · {r.bag_number}{r.cert_no?` · ${code('CRT',r.cert_no,6)}`:''}</span>}</td>
-        <td className="space-x-2 pr-3 text-right">
-          {['registered','no_show'].includes(r.status)&&<button className="btn px-3 py-1" onClick={()=>run('set_reg_status',{p_reg:r.reg_id,p_status:'checked_in'})}>Check in</button>}
-          {r.status==='registered'&&<button className="btn-ghost text-xs" onClick={()=>run('set_reg_status',{p_reg:r.reg_id,p_status:'no_show'})}>No-show</button>}
-          {can('campday')&&r.status==='checked_in'&&<button className="btn-ghost text-xs" title="Undo check-in" onClick={()=>run('set_reg_status',{p_reg:r.reg_id,p_status:'registered'})}>Undo</button>}
-          {medic&&r.status==='checked_in'&&<button className="btn px-3 py-1" onClick={()=>setAct({type:'screen',row:r})}>Screen</button>}
-          {medic&&r.status==='screened'&&<button className="btn px-3 py-1" onClick={()=>setAct({type:'donate',row:r})}>Record donation</button>}
-          {medic&&['screened','deferred','donated'].includes(r.status)&&<button className="btn-ghost text-xs" title="Entered by mistake? Take this donor back one step" onClick={()=>takeBack(r)}><Undo2 size={14}/></button>}</td></tr>)}
-        {!list.length&&<tr><td colSpan="6" className="p-6 text-center text-fog-faint">No donors here yet.</td></tr>}</tbody></table></div></div>
+    <div className="mb-3 grid grid-cols-[1fr_auto] gap-2"><div className="relative"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-fog-faint"/><input className="input pl-9" aria-label="Search" placeholder="Search name, phone or token" value={q} onChange={e=>setQ(e.target.value)}/></div>
+      <select className="input w-36 sm:w-44" aria-label="Step" value={f} onChange={e=>setF(e.target.value)}><option value="">All steps</option>{Object.entries(LABEL).map(([k,l])=><option key={k} value={k}>{l}</option>)}</select></div>
+    <div className="card overflow-hidden p-0">
+      <div className="hidden overflow-x-auto md:block"><table className="table table-fixed">
+        <colgroup><col className="w-[88px]"/><col/><col className="w-[76px]"/><col className="w-[72px]"/><col className="w-[24%]"/><col className="w-[230px]"/></colgroup>
+        <thead><tr><th>Token</th><th>Donor</th><th>Group</th><th>Slot</th><th>Step</th><th className="text-right">Action</th></tr></thead>
+        <tbody>{list.map(r=><tr key={r.reg_id}>
+          <td><span className="code whitespace-nowrap">{code('T',r.token_no,3)}</span></td>
+          <td className="truncate"><div className="truncate font-medium text-fg">{r.full_name}</div><div className="truncate text-xs text-fog-faint">{code('D',r.donor_no)} · {r.phone}</div></td>
+          <td><span className="inline-grid h-8 min-w-[2.5rem] place-items-center rounded-lg bg-blood/10 px-1.5 font-display text-sm font-semibold text-blood">{r.blood_group||'-'}</span></td>
+          <td className="tabular-nums text-fog-muted">{r.slot||'-'}</td>
+          <td className="truncate"><span className={`font-medium ${TONE[r.status]}`}>{LABEL[r.status]}</span>{r.bag_number&&<div className="truncate text-xs text-fog-faint">{r.bag_number}{r.cert_no?` · ${code('CRT',r.cert_no,6)}`:''}</div>}</td>
+          <td><div className="flex items-center justify-end gap-1.5">{actions(r)}</div></td></tr>)}
+        {!list.length&&<tr><td colSpan="6" className="p-6 text-center text-fog-faint">No donors here yet.</td></tr>}</tbody></table></div>
+      <ul className="divide-y divide-ink-700/80 md:hidden">{list.map(r=><li key={r.reg_id} className="flex items-center gap-3 px-4 py-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-blood/10 font-display text-sm font-semibold text-blood">{r.blood_group||'-'}</span>
+          <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="code whitespace-nowrap">{code('T',r.token_no,3)}</span><span className="truncate font-medium text-fg">{r.full_name}</span></div>
+            <div className="mt-0.5 truncate text-xs"><span className={`font-medium ${TONE[r.status]}`}>{LABEL[r.status]}</span><span className="text-fog-faint">{r.slot?` · ${r.slot}`:''}{r.bag_number?` · ${r.bag_number}`:''}</span></div></div>
+          <div className="flex shrink-0 items-center gap-1">{actions(r)}</div></li>)}
+        {!list.length&&<li className="p-6 text-center text-sm text-fog-faint">No donors here yet.</li>}</ul>
+    </div></div>
 }

@@ -1,13 +1,15 @@
 import {useEffect,useMemo,useRef,useState} from 'react'
 import {NavLink,Outlet,useLocation,useNavigate} from 'react-router-dom'
 import {motion} from 'framer-motion'
-import {Droplet,LogOut,Menu,Search,Bell,ChevronsLeft,UserRound,X,AlertTriangle,Cake,Clock,ListChecks} from 'lucide-react'
+import {Droplet,LogOut,Menu,Search,Bell,ChevronsLeft,UserRound,X,AlertTriangle,Cake,Clock,ListChecks,LayoutTemplate} from 'lucide-react'
 import {useAuth} from '../context/Auth'
 import {NAV,ALL_NAV,allowed} from '../nav'
 import {supabase} from '../lib/supabase'
 import {ROLE_LABEL} from '../lib/access'
 import {spring,usePresence,useLive} from './ui'
 import {BrandMark,ThemeToggle} from './Brand'
+import {useBrand} from '../context/Brand'
+import ModernLayout from './ModernLayout'
 
 function Sidebar({collapsed,setCollapsed,mobile,closeMobile}){
   const {can}=useAuth()
@@ -28,7 +30,7 @@ function Sidebar({collapsed,setCollapsed,mobile,closeMobile}){
   </div>
 }
 
-function useNotifications(){
+export function useNotifications(){
   const {can}=useAuth(),[items,setItems]=useState([]),[tick,setTick]=useState(0)
   useLive(['emergency_requests','blood_units','tasks','donors'],()=>setTick(x=>x+1))
   useEffect(()=>{let live=true;(async()=>{
@@ -46,7 +48,7 @@ function useNotifications(){
   return items
 }
 
-function Palette({open,setOpen}){
+export function Palette({open,setOpen}){
   const {can}=useAuth(),nav=useNavigate(),[q,setQ]=useState(''),[i,setI]=useState(0),[donors,setDonors]=useState([]),ref=useRef()
   const pages=ALL_NAV.filter(n=>allowed(n,can)).filter(n=>n.label.toLowerCase().includes(q.toLowerCase())).map(n=>({label:n.label,hint:'Page',icon:n.icon,go:()=>nav(n.to)}))
   useEffect(()=>{if(!open){setQ('');setDonors([]);return}setTimeout(()=>ref.current?.focus(),30)},[open])
@@ -72,15 +74,18 @@ function Palette({open,setOpen}){
     </motion.div></div>
 }
 
-function Popover({open,onClose,children,className=''}){
+export function Popover({open,onClose,children,className=''}){
   useEffect(()=>{if(!open)return;const k=e=>e.key==='Escape'&&onClose();window.addEventListener('keydown',k);return()=>window.removeEventListener('keydown',k)},[open,onClose])
   const mounted=usePresence(open,160);if(!mounted)return null
   return <>{open&&<div className="fixed inset-0 z-30" onClick={onClose}/>}
-    <motion.div className={`absolute right-0 top-full z-40 mt-2 rounded-panel border border-ink-600 bg-ink-900 p-2 shadow-2xl ${open?'':'pointer-events-none'} ${className}`}
+    <motion.div className={`unhero text-fog absolute right-0 top-full z-40 mt-2 rounded-panel border border-ink-600 bg-ink-900 p-2 shadow-2xl ${open?'':'pointer-events-none'} ${className}`}
       initial={{opacity:0,y:-6,scale:.98}} animate={open?{opacity:1,y:0,scale:1}:{opacity:0,y:-4,scale:.98}} transition={{duration:.15}}>{children}</motion.div></>
 }
 
-export default function Layout(){
+export function UiSwitch({onDone}){const {ui,setUi}=useBrand()
+  return <button onClick={()=>{setUi(ui==='modern'?'classic':'modern');onDone?.()}} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-fog hover:bg-ink-750"><LayoutTemplate size={15}/>{ui==='modern'?'Use classic side menu':'Use modern layout'}</button>}
+export default function Layout(){const {ui}=useBrand();return ui==='modern'?<ModernLayout/>:<ClassicLayout/>}
+function ClassicLayout(){
   const {profile,signOut}=useAuth(),loc=useLocation(),nav=useNavigate()
   const [collapsed,setCollapsed]=useState(()=>{try{return localStorage.getItem('nav-collapsed')==='1'}catch{return false}})
   const [mobile,setMobile]=useState(false),[pal,setPal]=useState(false),[bell,setBell]=useState(false),[me,setMe]=useState(false)
@@ -121,6 +126,7 @@ export default function Layout(){
           <Popover open={me} onClose={()=>setMe(false)} className="w-56">
             <div className="border-b border-ink-700 px-2 pb-2 pt-1"><div className="truncate text-sm font-medium text-fg">{profile.full_name||'User'}</div><div className="truncate text-xs text-fog-faint">{profile.email}</div></div>
             <button onClick={()=>{nav('/profile');setMe(false)}} className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-fog hover:bg-ink-750"><UserRound size={15}/>My profile</button>
+            <UiSwitch onDone={()=>setMe(false)}/>
             <button onClick={signOut} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-fog hover:bg-ink-750"><LogOut size={15}/>Sign out</button></Popover></div>
       </header>
       <main className="mx-auto max-w-[1240px] px-4 py-6 md:px-8 md:py-8">

@@ -43,8 +43,8 @@ export default function Stock(){
   const [fg,setFg]=useState(''),[fs,setFs]=useState(''),[q,setQ]=useState(''),[unit,setUnit]=useState(null),[sel,setSel]=useState(new Set()),[bank,setBank]=useState(''),[hn,setHn]=useState(''),[ef,setEf]=useState(null)
   const load=async()=>{try{setUnits(await all())
     const t=await supabase.from('stock_thresholds').select('*');setTh(Object.fromEntries((t.data||[]).map(x=>[x.blood_group,x.min_units])))
-    const h=await supabase.from('handovers').select('*, blood_units(count)').order('handed_on',{ascending:false}).limit(20);setHand(h.data||[])
-    const r=await supabase.from('emergency_requests').select('*').is('deleted_at',null).order('created_at',{ascending:false}).limit(50);setReqs(r.data||[])}catch(e){toast.error(errText(e))}finally{setLoaded(true)}}
+    const h=await supabase.from('handovers').select('*, blood_units(count)').order('handover_no',{ascending:false}).limit(20);setHand(h.data||[])
+    const r=await supabase.from('emergency_requests').select('*').is('deleted_at',null).order('req_no',{ascending:false}).limit(50);setReqs(r.data||[])}catch(e){toast.error(errText(e))}finally{setLoaded(true)}}
   useEffect(()=>{load()},[])
   useLive(['blood_units','handovers','emergency_requests','stock_thresholds'],load)
   const rpc=async(fn,args,msg)=>{const {error}=await supabase.rpc(fn,args);if(error){toast.error(error.message);return false}if(msg)toast.success(msg);load();return true}

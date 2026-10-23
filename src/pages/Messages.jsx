@@ -4,7 +4,7 @@ import {supabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
 import {BLOOD,nextEligible,fmt,wa} from '../lib/util'
 import CountUp from '../components/CountUp'
-import {useLive} from '../components/ui'
+import {useLive,PageHeader} from '../components/ui'
 const SIGN=' - Sankari Rotaract Club'
 const DEFAULTS={
   birthday:'Happy Birthday {name}! Wishing you good health and happiness.'+SIGN,
@@ -50,7 +50,7 @@ export default function Messages(){
   const saveTpl=async k=>{const {error}=await supabase.from('message_templates').upsert({kind:k,body:draft[k],updated_at:new Date().toISOString()});error?setErr(error.message):(setTpl({...tpl,[k]:draft[k]}),setDraft({...draft,[k]:undefined}))}
   const next=camps.filter(c=>c.camp_date>=today&&!['closed','completed'].includes(c.status)).sort((a,b)=>a.camp_date.localeCompare(b.camp_date))[0]
   const pending=donors.filter(d=>!d.consent).length
-  return <div><h1 className="h1">WhatsApp and alerts</h1>
+  return <div><PageHeader eyebrow="People" title="WhatsApp and alerts" description="Camp invites, birthday wishes and eligibility reminders"/>
     {err&&<p className="mb-3 text-sm text-blood">{err}</p>}
     <div className="card mb-5"><h2 className="mb-3 font-semibold text-fg">Today, {fmt(today)}</h2>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">{[['Birthdays',bdays.length],['Camps today',camps.filter(c=>c.camp_date===today).length],['Eligible again',eligNow.length],['Consent pending',pending]].map(([l,n])=><div key={l}><div className="text-2xl font-semibold tabular-nums text-fg"><CountUp value={n}/></div><div className="text-xs text-fog-muted">{l}</div></div>)}</div>

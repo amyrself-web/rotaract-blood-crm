@@ -4,7 +4,7 @@ import {supabase} from '../lib/supabase'
 import {normPhone,nextEligible,fmt,slots} from '../lib/util'
 import {makeCertificate,certNo} from '../lib/certificate'
 import {useBrand} from '../context/Brand'
-import {code,useLive} from '../components/ui'
+import {code,useLive,PageHeader} from '../components/ui'
 import CountUp from '../components/CountUp'
 const badge=n=>n>=10?'Life saver':n>=5?'Regular donor':n>=2?'Repeat donor':n===1?'First donation done':'Ready to donate'
 export default function Portal(){
@@ -15,7 +15,7 @@ export default function Portal(){
   useLive(['registrations','donations','camps'],load)
   const call=async(fn,args)=>{setErr('');const {error}=await supabase.rpc(fn,args);error?setErr(error.message):load()}
   if(!p)return <div className="text-fog-muted">{err||'Loading…'}</div>
-  if(!p.donor)return <div className="mx-auto max-w-md"><h1 className="h1">Find your donor record</h1>
+  if(!p.donor)return <div className="mx-auto max-w-md"><PageHeader title="Find your donor record" description="Link your account to your donations"/>
     <form className="card space-y-3" onSubmit={e=>{e.preventDefault();call('claim_donor',{p_phone:normPhone(f.phone),p_dob:f.dob,p_consent:f.consent})}}>
       <p className="text-sm text-fog-muted">Enter the mobile number and date of birth you gave when you registered at a camp. New here? Register at the next camp first.</p>
       <input className="input" placeholder="Mobile number" required value={f.phone} onChange={e=>setF({...f,phone:e.target.value})}/>
@@ -23,7 +23,7 @@ export default function Portal(){
       <label className="flex gap-2 text-sm text-fog"><input type="checkbox" required checked={f.consent} onChange={e=>setF({...f,consent:e.target.checked})}/>I agree to be contacted about camps and blood donation drives.</label>
       {err&&<p className="text-sm text-blood">{err}</p>}<button className="btn w-full">Link my record</button></form></div>
   const d=p.donor,n=p.history.length,ne=nextEligible(d.last_donation,d.gender),regIds=new Set(p.upcoming.map(u=>u.camp_id)),gave=new Set(p.history.map(h=>h.camp+'|'+h.date))
-  return <div><h1 className="h1">Hello, {d.name}</h1>
+  return <div><PageHeader eyebrow={d.donor_no?code('D',d.donor_no):undefined} title={`Hello, ${d.name}`} description="Thank you for being a blood donor"/>
     {err&&<p className="mb-3 text-sm text-blood">{err}</p>}
     <div className="card mb-5 grid grid-cols-2 gap-4 text-center sm:grid-cols-4">
       {[['Blood group',d.blood_group||'-'],['Donations',n],['Status',badge(n)],['Next donation',!ne||ne<=new Date()?'You can donate now':'From '+fmt(ne)]].map(([l,v])=><div key={l}><div className="text-lg font-semibold text-fg"><CountUp value={v}/></div><div className="text-xs text-fog-muted">{l}</div></div>)}</div>

@@ -5,7 +5,7 @@ import {fmt} from '../lib/util'
 import {reportPdf,receiptPdf} from '../lib/report'
 import {useBrand} from '../context/Brand'
 import {useAuth} from '../context/Auth'
-import {useLive} from '../components/ui'
+import {useLive,PageHeader} from '../components/ui'
 import {toast} from 'sonner'
 import {FileText,Receipt} from 'lucide-react'
 import CountUp from '../components/CountUp'
@@ -22,7 +22,7 @@ export default function Reports(){
   const donors=async()=>{let out=[],from=0;for(;;){const {data,error}=await supabase.from('donors').select('donor_no,full_name,phone,email,blood_group,gender,dob,area,last_donation,consent,source').is('deleted_at',null).order('donor_no').range(from,from+999);if(error)return setErr(error.message);out=out.concat(data);if(data.length<1000)break;from+=1000}dl('donors.csv',out)}
   const regs=async()=>{const {data,error}=await supabase.rpc('camp_board',{p_camp:cid});error?setErr(error.message):dl('camp-registrants.csv',data.map(({reg_id,...x})=>x))}
   const tiles=r&&[['Registered',r.registered],['Arrived',r.arrived],['Donated',r.donated],['Deferred',r.deferred],['No-show',r.no_show],['First-time',r.first_time],['Blood collected',(r.volume_ml/1000).toFixed(1)+' L'],['Volunteers',`${r.volunteers_present}/${r.volunteers}`]]
-  return <div><h1 className="h1">Reports</h1>{err&&<p className="mb-3 text-sm text-blood">{err}</p>}
+  return <div><PageHeader eyebrow="Admin" title="Reports" description="Camp report as A4 PDF, 80 mm receipt, and CSV exports"/>{err&&<p className="mb-3 text-sm text-blood">{err}</p>}
     <div className="mb-4 flex flex-wrap gap-2"><select className="input w-auto" value={cid} onChange={e=>setCid(e.target.value)}>{camps.map(c=><option key={c.id} value={c.id}>{c.name} ({fmt(c.camp_date)})</option>)}</select>
       {r&&<><button className="btn" disabled={!!busy} onClick={()=>make('a4',()=>reportPdf(r,fmt,brand,profile.full_name))}><FileText size={16}/>{busy==='a4'?'Preparing…':'Download report (PDF)'}</button>
         <button className="btn-quiet" disabled={!!busy} onClick={()=>make('rc',()=>receiptPdf(r,fmt,brand))}><Receipt size={16}/>Print receipt (80 mm)</button></>}</div>

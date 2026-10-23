@@ -38,7 +38,7 @@ const blank={full_name:'',email:'',phone:'',role:'volunteer',designation:'',pass
 export default function UsersPage(){
   const {user,profile,refresh}=useAuth(),confirm=useConfirm(),isAdmin=profile.role==='admin'
   const [rows,setRows]=useState(null),[q,setQ]=useState(''),[rf,setRf]=useState(''),[edit,setEdit]=useState(null),[tab,setTab]=useState('profile'),[busy,setBusy]=useState(false),[pw,setPw]=useState('')
-  const load=()=>supabase.from('profiles').select('*').order('created_at').then(({data,error})=>error?toast.error(error.message):setRows(data))
+  const load=()=>supabase.from('profiles').select('*').order('member_no').then(({data,error})=>error?toast.error(error.message):setRows(data))
   useEffect(()=>{load()},[])
   useLive(['profiles'],load)
   const list=useMemo(()=>(rows||[]).filter(r=>(!rf||r.role===rf)&&(!q||`${r.full_name} ${r.email} ${r.phone} ${r.designation}`.toLowerCase().includes(q.toLowerCase()))),[rows,q,rf])

@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useState} from 'react'
 import {useSearchParams} from 'react-router-dom'
 import {toast} from 'sonner'
-import {MessageCircle,Plus,Search,Users,Trash2,Download} from 'lucide-react'
+import {MessageCircle,Plus,Search,Users,Trash2,Download,ArrowUpDown,ArrowUp,ArrowDown,ChevronRight} from 'lucide-react'
 import Papa from 'papaparse'
 import {supabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
@@ -10,19 +10,25 @@ import {PageHeader,Drawer,Field,Badge,Empty,useConfirm,errText,useLive,undoToast
 
 const empty={full_name:'',phone:'',email:'',blood_group:'',gender:'',dob:'',area:'',last_donation:'',consent:false}
 const PAGE=25
-async function all(){let out=[],from=0;for(;;){const {data,error}=await supabase.from('donors').select('*').is('deleted_at',null).order('created_at',{ascending:false}).range(from,from+999);if(error)throw error;out=out.concat(data);if(data.length<1000)return out;from+=1000}}
+async function all(){let out=[],from=0;for(;;){const {data,error}=await supabase.from('donors').select('*').is('deleted_at',null).order('donor_no').range(from,from+999);if(error)throw error;out=out.concat(data);if(data.length<1000)return out;from+=1000}}
 
 export default function Donors(){
   const {settings,can,user}=useAuth(),confirm=useConfirm(),[sp]=useSearchParams()
-  const [rows,setRows]=useState(null),[q,setQ]=useState(sp.get('q')||''),[g,setG]=useState(''),[elig,setElig]=useState(''),[consent,setConsent]=useState(''),[page,setPage]=useState(0),[form,setForm]=useState(null),[busy,setBusy]=useState(false)
+  const [rows,setRows]=useState(null),[q,setQ]=useState(sp.get('q')||''),[g,setG]=useState(''),[elig,setElig]=useState(''),[consent,setConsent]=useState(''),[page,setPage]=useState(0),[form,setForm]=useState(null),[busy,setBusy]=useState(false),[sort,setSort]=useState(()=>{try{return JSON.parse(localStorage.getItem('donor-sort'))||['no',1]}catch{return ['no',1]}})
   const load=()=>all().then(setRows).catch(e=>toast.error(errText(e)))
   useEffect(()=>{load()},[])
   useLive(['donors'],load)
-  useEffect(()=>setPage(0),[q,g,elig,consent])
+  useEffect(()=>setPage(0),[q,g,elig,consent,sort])
+  useEffect(()=>{try{localStorage.setItem('donor-sort',JSON.stringify(sort))}catch{}},[sort])
   const next=r=>{if(!r.last_donation)return null;const d=new Date(r.last_donation);d.setDate(d.getDate()+(r.gender==='Female'?settings.gap_female:settings.gap_male));return d}
   const ok=r=>{const n=next(r);return !n||n<=new Date()}
   const list=useMemo(()=>(rows||[]).filter(r=>(!g||r.blood_group===g)&&(!elig||(elig==='yes'?ok(r):!ok(r)))&&(!consent||String(r.consent)===consent)
-    &&(!q||`${code('D',r.donor_no)} ${r.full_name} ${r.phone} ${r.area||''} ${r.email||''}`.toLowerCase().includes(q.toLowerCase()))),[rows,q,g,elig,consent,settings])
+    &&(!q||`${code('D',r.donor_no)} ${r.full_name} ${r.phone} ${r.area||''} ${r.email||''}`.toLowerCase().includes(q.toLowerCase())))
+    .sort((a,b)=>{const [k,d]=sort,v=x=>k==='no'?x.donor_no:k==='name'?x.full_name.toLowerCase():k==='group'?BLOOD.indexOf(x.blood_group??'')>>>0:k==='area'?(x.area||'~').toLowerCase():k==='last'?(x.last_donation||''):k==='next'?(next(x)?.getTime()||0):0
+      const A=v(a),B=v(b);return (A<B?-1:A>B?1:a.donor_no-b.donor_no)*d}),[rows,q,g,elig,consent,settings,sort])
+  const Th=({k,children,className=''})=>{const on=sort[0]===k,I=on?(sort[1]>0?ArrowUp:ArrowDown):ArrowUpDown
+    return <th className={className} aria-sort={on?(sort[1]>0?'ascending':'descending'):'none'}><button onClick={()=>setSort(on?[k,-sort[1]]:[k,1])} className={`inline-flex items-center gap-1 transition-colors hover:text-fg ${on?'text-fg':''}`}>{children}<I size={12} className={on?'':'opacity-40'}/></button></th>}
+  const edit=r=>setForm({...empty,...Object.fromEntries(Object.entries(r).map(([k,v])=>[k,v??''])),_orig:r})
   const shown=list.slice(page*PAGE,page*PAGE+PAGE),pages=Math.ceil(list.length/PAGE)
   const set=k=>e=>setForm({...form,[k]:e.target.type==='checkbox'?e.target.checked:e.target.value})
   const save=async e=>{e.preventDefault();const phone=normPhone(form.phone);if(!/^[6-9]\d{9}$/.test(phone))return toast.error('Enter a valid 10-digit mobile number')
@@ -48,20 +54,36 @@ export default function Donors(){
     <PageHeader title="Donors" description={rows?`${rows.length} donors, ${rows.filter(r=>r.consent).length} can be contacted`:'Loading donors'}
       actions={<><button className="btn-quiet" onClick={exportCsv} disabled={!list.length}><Download size={15}/>Export</button><button className="btn" onClick={()=>setForm({...empty})}><Plus size={16}/>Add donor</button></>}/>
     <div className="card overflow-hidden p-0">
-      <div className="grid gap-2 border-b border-ink-700 p-3 sm:grid-cols-[1fr_auto_auto_auto]">
-        <div className="relative"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-fog-faint"/><input className="input pl-9" placeholder="Search name, mobile, area, email" value={q} onChange={e=>setQ(e.target.value)}/></div>
-        <select className="input w-auto" value={g} onChange={e=>setG(e.target.value)}><option value="">All groups</option>{BLOOD.map(b=><option key={b}>{b}</option>)}</select>
-        <select className="input w-auto" value={elig} onChange={e=>setElig(e.target.value)}><option value="">Any eligibility</option><option value="yes">Can donate now</option><option value="no">Waiting period</option></select>
-        <select className="input w-auto" value={consent} onChange={e=>setConsent(e.target.value)}><option value="">Any consent</option><option value="true">Can contact</option><option value="false">Consent pending</option></select></div>
-      <div className="overflow-x-auto"><table className="table"><thead><tr><th>Donor</th><th>Group</th><th>Area</th><th>Last donation</th><th>Next donation</th><th/></tr></thead>
-        <tbody>{rows===null?[0,1,2,3].map(i=><tr key={i}><td colSpan="6"><div className="skeleton h-8"/></td></tr>)
-        :shown.map(r=><tr key={r.id} className="cursor-pointer" onClick={()=>setForm({...empty,...Object.fromEntries(Object.entries(r).map(([k,v])=>[k,v??''])),_orig:r})}>
-          <td><div className="font-medium text-fg">{r.full_name}</div><div className="mt-0.5 flex items-center gap-2 text-xs text-fog-faint"><span className="code">{code('D',r.donor_no)}</span>{r.phone}</div></td>
-          <td><span className="font-display font-semibold text-blood">{r.blood_group||'-'}</span></td><td className="text-fog-muted">{r.area||'-'}</td>
-          <td className="text-fog-muted">{fmt(r.last_donation)}</td>
-          <td>{ok(r)?<Badge tone="green">Can donate</Badge>:<span className="text-fog-muted">{fmt(next(r))}</span>}</td>
-          <td className="text-right" onClick={e=>e.stopPropagation()}>{r.consent?<a className="btn-ghost" title="Message on WhatsApp" target="_blank" rel="noreferrer" href={wa(r.phone,`Hello ${r.full_name}, this is ${settings.club_name}.`)}><MessageCircle size={16}/></a>:<Badge>Consent pending</Badge>}</td></tr>)}
-        </tbody></table>
+      <div className="grid grid-cols-2 gap-2 border-b border-ink-700 p-3 lg:grid-cols-[1fr_auto_auto_auto_auto]">
+        <div className="relative col-span-2 lg:col-span-1"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-fog-faint"/><input className="input pl-9" placeholder="Search name, mobile, area, email" value={q} onChange={e=>setQ(e.target.value)}/></div>
+        <select className="input lg:w-auto" aria-label="Blood group" value={g} onChange={e=>setG(e.target.value)}><option value="">All groups</option>{BLOOD.map(b=><option key={b}>{b}</option>)}</select>
+        <select className="input lg:w-auto" aria-label="Eligibility" value={elig} onChange={e=>setElig(e.target.value)}><option value="">Any eligibility</option><option value="yes">Can donate now</option><option value="no">Waiting period</option></select>
+        <select className="input lg:w-auto" aria-label="Consent" value={consent} onChange={e=>setConsent(e.target.value)}><option value="">Any consent</option><option value="true">Can contact</option><option value="false">Consent pending</option></select>
+        <select className="input lg:w-auto" aria-label="Sort" value={sort.join(':')} onChange={e=>{const [k,d]=e.target.value.split(':');setSort([k,+d])}}>
+          <option value="no:1">ID: D-0001 first</option><option value="no:-1">ID: newest first</option><option value="name:1">Name A to Z</option><option value="name:-1">Name Z to A</option>
+          <option value="group:1">Blood group</option><option value="area:1">Area</option><option value="last:-1">Last donation, recent first</option></select></div>
+      <div className="hidden overflow-x-auto md:block"><table className="table table-fixed">
+        <colgroup><col className="w-[92px]"/><col/><col className="w-[84px]"/><col className="w-[15%]"/><col className="w-[14%]"/><col className="w-[15%]"/><col className="w-[64px]"/></colgroup>
+        <thead><tr><Th k="no">ID</Th><Th k="name">Donor</Th><Th k="group">Group</Th><Th k="area">Area</Th><Th k="last">Last donation</Th><Th k="next">Next donation</Th><th/></tr></thead>
+        <tbody>{rows===null?[0,1,2,3].map(i=><tr key={i}><td colSpan="7"><div className="skeleton h-8"/></td></tr>)
+        :shown.map(r=><tr key={r.id} className="cursor-pointer" onClick={()=>edit(r)}>
+          <td><span className="code whitespace-nowrap">{code('D',r.donor_no)}</span></td>
+          <td className="truncate"><div className="truncate font-medium text-fg">{r.full_name}</div><div className="mt-0.5 text-xs tabular-nums text-fog-faint">{r.phone}</div></td>
+          <td><span className="inline-grid h-8 min-w-[2.5rem] place-items-center rounded-lg bg-blood/10 px-1.5 font-display text-sm font-semibold text-blood">{r.blood_group||'-'}</span></td>
+          <td className="truncate text-fog-muted">{r.area||'-'}</td>
+          <td className="whitespace-nowrap tabular-nums text-fog-muted">{fmt(r.last_donation)}</td>
+          <td className="whitespace-nowrap">{ok(r)?<Badge tone="green">Can donate</Badge>:<span className="tabular-nums text-fog-muted">{fmt(next(r))}</span>}</td>
+          <td className="text-right" onClick={e=>e.stopPropagation()}>{r.consent?<a className="btn-ghost" title="Message on WhatsApp" aria-label={`WhatsApp ${r.full_name}`} target="_blank" rel="noreferrer" href={wa(r.phone,`Hello ${r.full_name}, this is ${settings.club_name}.`)}><MessageCircle size={16}/></a>
+            :<span title="Consent pending" className="mr-2 inline-block h-2 w-2 rounded-full bg-warn"/>}</td></tr>)}
+        </tbody></table></div>
+      <ul className="divide-y divide-ink-700/80 md:hidden">{rows===null?[0,1,2,3].map(i=><li key={i} className="p-4"><div className="skeleton h-10"/></li>)
+        :shown.map(r=><li key={r.id}><button onClick={()=>edit(r)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors active:bg-brand/[.06]">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-blood/10 font-display text-sm font-semibold text-blood">{r.blood_group||'-'}</span>
+          <span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className="truncate font-medium text-fg">{r.full_name}</span>{!r.consent&&<span title="Consent pending" className="h-2 w-2 shrink-0 rounded-full bg-warn"/>}</span>
+            <span className="mt-0.5 flex items-center gap-2 text-xs text-fog-faint"><span className="code whitespace-nowrap">{code('D',r.donor_no)}</span><span className="truncate">{r.area||r.phone}</span></span></span>
+          <span className="shrink-0 text-right text-xs">{ok(r)?<Badge tone="green">Can donate</Badge>:<span className="whitespace-nowrap text-fog-muted">From {next(r)?.toLocaleDateString('en-IN',{day:'2-digit',month:'short'})}</span>}</span>
+          <ChevronRight size={16} className="shrink-0 text-fog-faint"/></button></li>)}</ul>
+      <div>
         {rows&&!list.length&&<Empty icon={Users} title={rows.length?'No donors match':'No donors yet'} action={!rows.length&&<button className="btn" onClick={()=>setForm({...empty})}><Plus size={16}/>Add donor</button>}>
           {rows.length?'Change the search or filters.':'Add one here, import from Excel, or share a camp registration link.'}</Empty>}</div>
       {pages>1&&<div className="flex items-center justify-between border-t border-ink-700 px-4 py-3 text-sm text-fog-muted"><span>{page*PAGE+1} to {Math.min(list.length,(page+1)*PAGE)} of {list.length}</span>

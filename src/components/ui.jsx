@@ -10,12 +10,17 @@ export const spring={type:'spring',stiffness:420,damping:36}
 export function usePresence(open,ms=280){const [m,setM]=useState(open);const last=useRef(null)
   useEffect(()=>{if(open){setM(true);return}const t=setTimeout(()=>setM(false),ms);return()=>clearTimeout(t)},[open,ms]);return m}
 
-export function PageHeader({title,description,actions,children}){
-  return <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-    <div className="min-w-0"><h1 className="font-display text-[26px] font-semibold leading-tight text-fg">{title}</h1>
+// In the modern layout the page title and its buttons are shown inside the navy header band.
+export const HeroCtx=createContext(null)
+export function PageHeader({title,description,actions,children,eyebrow}){
+  const hero=useContext(HeroCtx),slot=hero?.slot;eyebrow=eyebrow??hero?.group
+  const body=<div className={`flex flex-wrap items-end justify-between gap-4 ${slot?'':'mb-6'}`}>
+    <div className="min-w-0">{eyebrow&&slot&&<div className="mb-1 text-xs font-semibold uppercase tracking-[.14em] text-brand-soft">{eyebrow}</div>}
+      <h1 className={`font-display font-semibold leading-tight text-fg ${slot?'text-[28px] md:text-[34px]':'text-[26px]'}`}>{title}</h1>
       {description&&<p className="mt-1 max-w-2xl text-sm text-fog-muted">{description}</p>}{children}</div>
-    {actions&&<div className="flex flex-wrap items-center gap-2">{actions}</div>}
+    {actions&&<div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{actions}</div>}
   </div>
+  return slot?createPortal(<motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} transition={{duration:.35,ease:[.2,.7,.2,1]}}>{body}</motion.div>,slot):body
 }
 
 export function Field({label,hint,children,className='',required}){

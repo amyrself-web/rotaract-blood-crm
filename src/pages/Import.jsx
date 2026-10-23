@@ -2,6 +2,7 @@ import {useMemo,useState} from 'react'
 import readXlsxFile from 'read-excel-file/browser'
 import Papa from 'papaparse'
 import {supabase} from '../lib/supabase'
+import {PageHeader} from '../components/ui'
 import {FIELDS,HINTS,clean} from '../lib/importer'
 const allPhones=async()=>{let out=[],from=0;for(;;){const {data,error}=await supabase.from('donors').select('phone').range(from,from+999);if(error)throw error;out=out.concat(data.map(x=>x.phone));if(data.length<1000)return out;from+=1000}}
 export default function Import(){
@@ -22,7 +23,7 @@ export default function Import(){
       if(error){setErr(error.message);break}n+=data.length}
     setBusy(false);setRes({n,bad});setRows(null)}
   const dl=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([Papa.unparse(res.bad)],{type:'text/csv'}));a.download='skipped-rows.csv';a.click()}
-  return <div><h1 className="h1">Import donors from Excel</h1>
+  return <div><PageHeader eyebrow="People" title="Import donors from Excel" description="Upload .xlsx or .csv, match the columns, check, then import"/>
     {err&&<p className="mb-3 text-sm text-blood">{err}</p>}
     {res&&<div className="card mb-5"><h2 className="font-semibold text-fg">{res.n} donors imported</h2>
       <p className="mt-1 text-sm text-fog-muted">{res.bad.length} rows skipped. Imported donors are marked consent pending: the WhatsApp button stays off until they agree to be contacted.</p>
