@@ -16,7 +16,7 @@ export default function Connect(){
   const confirm=useConfirm(),st=useWaStatus(4000)
   const [w,setW]=useState(null),[saving,setSaving]=useState(false),[qrImg,setQrImg]=useState(''),[test,setTest]=useState({phone:'',template:''})
   useEffect(()=>{supabase.from('wa_settings').select('*').eq('id',1).single().then(({data,error})=>error?toast.error(error.message):setW({...data,quiet_from:data.quiet_from.slice(0,5),quiet_to:data.quiet_to.slice(0,5)}))},[])
-  useEffect(()=>{if(st?.qr)QRCode.toDataURL(st.qr,{margin:2,width:300}).then(setQrImg);else setQrImg('')},[st?.qr])
+  useEffect(()=>{if(st?.qr)(st.qr.startsWith('data:image')?Promise.resolve(st.qr):QRCode.toDataURL(st.qr,{margin:2,width:300})).then(setQrImg);else setQrImg('')},[st?.qr])
   const save=async(patch={})=>{const next={...w,...patch};setW(next);setSaving(true)
     const {id,updated_at,last_rules_at,last_rules,...row}=next
     const {error}=await supabase.from('wa_settings').update({...row,per_minute:Number(row.per_minute),daily_cap:Number(row.daily_cap),site_url:siteUrl(),updated_at:new Date().toISOString()}).eq('id',1)
@@ -46,6 +46,7 @@ export default function Connect(){
         <ol className="space-y-4">
           <Step n="1"><b>Windows or Mac laptop:</b> install Node.js 20 from nodejs.org, then in a terminal:<Cmd>{`git clone https://github.com/amyrself-web/rotaract-blood-crm.git\ncd rotaract-blood-crm/whatsapp-worker\nnpm install\ncopy .env.example .env      (Mac: cp .env.example .env)\nnpm start`}</Cmd></Step>
           <Step n="2"><b>Old Android phone:</b> install Termux from F-Droid, then:<Cmd>{`pkg install nodejs-lts git -y\ngit clone https://github.com/amyrself-web/rotaract-blood-crm.git\ncd rotaract-blood-crm/whatsapp-worker && npm install\ncp .env.example .env && nano .env\nnpm start`}</Cmd></Step>
+          <Step n="★"><b>Better, if the computer has Docker:</b> run it with <a className="text-brand hover:underline" href="https://github.com/rmyndharis/OpenWA" target="_blank" rel="noreferrer">OpenWA</a>, which drives a real WhatsApp Web in a hidden Chrome (lower chance of a ban) and has its own dashboard:<Cmd>{`cd rotaract-blood-crm/whatsapp-worker\ncp .env.example .env      (paste the key, see step 3)\ndocker compose -f docker-compose.openwa.yml up -d`}</Cmd></Step>
           <Step n="3">In the <b>.env</b> file paste the Supabase <b>secret (service role) key</b> from Supabase → Project Settings → API keys. Keep that file private.</Step>
           <Step n="4">Keep the device on charge and on Wi-Fi. Use a separate club number, not a personal one.</Step></ol></div>}
     </section>}

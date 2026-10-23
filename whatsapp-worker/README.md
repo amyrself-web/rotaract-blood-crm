@@ -12,6 +12,21 @@ cp .env.example .env   # paste the service role key
 npm start
 ```
 
+## With OpenWA (recommended if you have Docker)
+
+[OpenWA](https://github.com/rmyndharis/OpenWA) is an open-source WhatsApp gateway with its own dashboard. Its
+`whatsapp-web.js` engine runs a real headless Chrome, which WhatsApp is less likely to flag than the built-in
+Baileys engine, and it has its own daily send pacing. The worker then only moves messages between the CRM and OpenWA.
+
+```bash
+cp .env.example .env        # paste the Supabase service role key
+docker compose -f docker-compose.openwa.yml up -d
+docker compose -f docker-compose.openwa.yml logs -f crm-worker
+```
+
+Scan the QR in the CRM (WhatsApp and alerts → Connect). OpenWA's dashboard is on http://localhost:2785; its admin
+key is in `openwa-data/.api-key`. It needs about 1 GB of RAM. Both run on your own computer: nothing is opened to the internet.
+
 ## Install as a service (Ubuntu or Debian server)
 
 ```bash

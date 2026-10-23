@@ -1,0 +1,61 @@
+# The club's WhatsApp sender with OpenWA (github.com/rmyndharis/OpenWA) on any always-on computer with Docker.
+#   1. cp .env.example .env   and paste the Supabase service role key
+#   2. docker compose -f docker-compose.openwa.yml up -d
+#   3. CRM → WhatsApp and alerts → Connect → "Club phone, linked by QR" → scan the QR with the club phone
+# OpenWA's own dashboard is at http://localhost:2785 (the admin key is in ./openwa-data/.api-key).
+services:
+  openwa:
+    image: ghcr.io/rmyndharis/openwa:${OPENWA_VERSION:-latest}
+    container_name: crm-openwa
+    restart: unless-stopped
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, KILL, SETGID, SETUID]
+    read_only: true
+    tmpfs: [/tmp]
+    mem_limit: ${OPENWA_MEM_LIMIT:-1g}
+    ports: ['127.0.0.1:2785:2785']
+    environment:
+      - NODE_ENV=production
+      - TZ=Asia/Kolkata
+      - PORT=2785
+      - HOME=/tmp
+      - XDG_CONFIG_HOME=/tmp/.config
+      - XDG_CACHE_HOME=/tmp/.cache
+      - AUTO_START_SESSIONS=true
+      - DATABASE_TYPE=sqlite
+      - DATABASE_SYNCHRONIZE=true
+      # whatsapp-web.js runs a real headless Chrome: lower ban risk than Baileys, needs ~400 MB
+      - ENGINE_TYPE=${OPENWA_ENGINE:-whatsapp-web.js}
+      - SESSION_DATA_PATH=/app/data/sessions
+      - PUPPETEER_HEADLESS=true
+      - PUPPETEER_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu
+      - STORAGE_TYPE=local
+      - STORAGE_LOCAL_PATH=/app/data/media
+      - REDIS_ENABLED=false
+      - QUEUE_ENABLED=false
+      - CACHE_ENABLED=false
+      - SIMULATE_TYPING=true
+      # OpenWA's own daily safety cap for a new number, on top of the CRM's limits
+      - SEND_PACING_ENABLED=true
+      # let OpenWA call the worker on this private network when someone replies STOP
+      - SSRF_ALLOWED_HOSTS=crm-worker
+    volumes:
+      - ./openwa-data:/app/data
+
+  crm-worker:
+    image: node:22-alpine
+    container_name: crm-worker
+    restart: unless-stopped
+    depends_on: [openwa]
+    working_dir: /app
+    command: sh -c "apk add --no-cache git >/dev/null && npm install --omit=dev --no-audit --no-fund && node worker.mjs"
+    env_file: .env
+    environment:
+      - ENGINE=openwa
+      - OPENWA_URL=http://openwa:2785
+      - OPENWA_API_KEY_FILE=/openwa-data/.api-key
+      - WEBHOOK_PUBLIC_URL=http://crm-worker:2790/openwa
+    volumes:
+      - ./:/app
+      - ./openwa-data:/openwa-data:ro

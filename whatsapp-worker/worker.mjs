@@ -7,7 +7,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import {createClient} from '@supabase/supabase-js'
 
-const VERSION='1.0.0'
+const VERSION='1.1.0'
+const ENGINE=(process.env.ENGINE||'baileys').toLowerCase()   // 'baileys' (built in) or 'openwa' (an OpenWA gateway on this machine)
 const here=path.dirname(new URL(import.meta.url).pathname)
 for(const f of [path.join(here,'.env'),'.env'])if(fs.existsSync(f))for(const line of fs.readFileSync(f,'utf8').split('\n')){const m=line.match(/^\s*([A-Z_]+)\s*=\s*(.*)\s*$/);if(m&&!process.env[m[1]])process.env[m[1]]=m[2].replace(/^["']|["']$/g,'')}
 const {SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY}=process.env,DRY=process.env.DRY_RUN==='1'
@@ -18,13 +19,13 @@ const log=(...a)=>console.log(new Date().toISOString(),...a)
 const sleep=ms=>new Promise(r=>setTimeout(r,ms))
 const istNow=()=>new Date(Date.now()+5.5*3600e3)   // read with getUTC* for Indian time
 
-let B=null,sock=null,state='starting',qr=null,me={},starting=false
+let B=null,sock=null,state='starting',qr=null,me={},starting=false,owa=null
 
 async function beat(){
   const {data,error}=await sb.rpc('wa_heartbeat',{p_status:state,p_qr:qr,p_phone:me.phone||null,p_name:me.name||null,p_version:VERSION})
   if(error)return log('heartbeat failed:',error.message)
-  if(data==='logout')await logout()
-  else if(data==='restart'){log('restart asked from the CRM');try{sock?.end?.()}catch{}setTimeout(start,1000)}
+  if(data==='logout')owa?await owa.logout():await logout()
+  else if(data==='restart'){log('restart asked from the CRM');if(owa)await owa.restart();else{try{sock?.end?.()}catch{}setTimeout(start,1000)}}
 }
 
 async function logout(){
@@ -34,7 +35,20 @@ async function logout(){
   setTimeout(start,2000)
 }
 
+// STOP / START replies, from either engine
+async function incoming(phone,text,reply){
+  const t=String(text||'').trim().toLowerCase()
+  if(/^(stop|unsubscribe|நிறுத்து|நிறுத்தவும்)$/.test(t)){await sb.rpc('wa_optout_add',{p_phone:phone,p_reason:'Replied STOP'});await reply('You will not get messages from us any more. Reply START if you want them again.');log('opt-out',phone)}
+  else if(t==='start'){await sb.rpc('wa_optout_remove',{p_phone:phone});await reply('Welcome back. You will get camp updates from us again. Reply STOP to stop.');log('opt-in',phone)}
+}
+
 async function start(){
+  if(ENGINE==='openwa'&&!DRY){
+    const {createOpenWA}=await import('./openwa.mjs')
+    owa=createOpenWA({log,setState:(s,q,who)=>{const changed=s!==state||q!==qr;state=s;qr=q;if(who)me=who;if(changed){if(s==='qr')log('scan the QR in the CRM (WhatsApp and alerts → Connect)');beat()}},
+      onIncoming:(phone,text)=>incoming(phone,text,msg=>owa.reply(phone,msg))})
+    return owa.start()
+  }
   if(starting)return;starting=true
   try{
     if(DRY){state='connected';me={phone:'0000000000',name:'Test (dry run)'};log('DRY_RUN: messages are printed, not sent');await beat();return}
@@ -57,8 +71,7 @@ async function start(){
     sock.ev.on('messages.upsert',async ({messages,type})=>{if(type!=='notify')return
       for(const m of messages){if(m.key.fromMe)continue;const jid=m.key.remoteJid||'';if(!jid.endsWith('@s.whatsapp.net'))continue
         const text=(m.message?.conversation||m.message?.extendedTextMessage?.text||'').trim().toLowerCase(),phone=jid.split('@')[0].slice(-10)
-        try{if(/^(stop|unsubscribe|நிறுத்து|நிறுத்தவும்)$/.test(text)){await sb.rpc('wa_optout_add',{p_phone:phone,p_reason:'Replied STOP'});await sock.sendMessage(jid,{text:'You will not get messages from us any more. Reply START if you want them again.'});log('opt-out',phone)}
-          else if(text==='start'){await sb.rpc('wa_optout_remove',{p_phone:phone});await sock.sendMessage(jid,{text:'Welcome back. You will get camp updates from us again. Reply STOP to stop.'});log('opt-in',phone)}}
+        try{await incoming(phone,text,msg=>sock.sendMessage(jid,{text:msg}))}
         catch(e){log('reply handling failed',e.message)}}})
   }catch(e){log('start failed:',e.message);state='starting';setTimeout(start,15000)}
   finally{starting=false}
@@ -68,6 +81,7 @@ async function sendOne(o){
   const jid=`91${o.phone}@s.whatsapp.net`
   try{
     if(DRY){log(`DRY_RUN to ${o.phone} (${o.name||''}): ${o.body.slice(0,80)}`);return sb.rpc('wa_result',{p_id:o.id,p_ok:true,p_error:null,p_msg_id:'dry-'+o.id.slice(0,8)})}
+    if(owa){const r=await owa.send(o.phone,o.body,o.id);if(r.ok)log('sent to',o.phone);return sb.rpc('wa_result',{p_id:o.id,p_ok:r.ok,p_error:r.ok?null:r.error,p_msg_id:r.ok?r.id:null})}
     const [r]=await sock.onWhatsApp(jid)
     if(!r?.exists)return sb.rpc('wa_result',{p_id:o.id,p_ok:false,p_error:'This number is not on WhatsApp',p_msg_id:null})
     await sock.presenceSubscribe(r.jid).catch(()=>{});await sock.sendPresenceUpdate('composing',r.jid).catch(()=>{})
@@ -102,7 +116,7 @@ async function dailyRules(){
   rulesDay=day;log('daily messages queued',JSON.stringify(data))
 }
 
-log(`CRM WhatsApp worker ${VERSION}${DRY?' (dry run)':''}`)
+log(`CRM WhatsApp worker ${VERSION} · engine ${ENGINE}${DRY?' (dry run)':''}`)
 await start()
 setInterval(beat,20000)
 setInterval(dailyRules,10*60000);dailyRules()
