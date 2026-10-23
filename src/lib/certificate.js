@@ -1,4 +1,4 @@
-import QRCode from 'qrcode'
+import {brandQr} from './qr'
 
 // Certificate is designed in HTML (so any language and the club logo render properly), then turned into an A4 landscape PDF.
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
@@ -25,7 +25,7 @@ function pattern(){
 
 export async function makeCertificate({name,camp,date,venue,bloodGroup,volume,certificate,verifyCode,donorNo,brand={}}){
   const [{default:html2canvas},{jsPDF}]=await Promise.all([import('html2canvas'),import('jspdf')])
-  const check=verifyCode||certificate,qr=await QRCode.toDataURL(verifyUrl(fmtCode(check)),{margin:0,width:260,color:{dark:'#0B1324',light:'#ffffff'}})
+  const check=verifyCode||certificate,qr=await brandQr(verifyUrl(fmtCode(check)),brand,{size:520,quiet:0})
   const {withBrand,logoImage}=await import('./docpdf');brand=withBrand(brand)
   const accent=brand.brand_color||'#4C8DFF'
   const club=brand.club_name||'Blood donation club'

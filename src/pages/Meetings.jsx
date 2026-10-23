@@ -172,9 +172,9 @@ export default function Meetings(){
 
 // Full-screen QR for the projector or a phone held up at the meeting
 function QrScreen({meeting,present,total,onClose}){
-  const [src,setSrc]=useState('')
+  const [src,setSrc]=useState(''),{brand}=useBrand()
   const url=`${location.origin}${location.pathname}#/checkin/${meeting.id}?c=${meeting.checkin_code}`
-  useEffect(()=>{import('qrcode').then(Q=>Q.toDataURL(url,{margin:1,width:520,color:{dark:'#0B1324',light:'#ffffff'}})).then(setSrc)},[url])
+  useEffect(()=>{import('../lib/qr').then(Q=>Q.brandQr(url,brand,{size:720,quiet:1})).then(setSrc)},[url,brand.logo_url])
   useEffect(()=>{const k=e=>e.key==='Escape'&&onClose();window.addEventListener('keydown',k);return()=>window.removeEventListener('keydown',k)},[onClose])
   return createPortal(<motion.div initial={{opacity:0}} animate={{opacity:1}} className="fixed inset-0 z-[70] grid place-items-center bg-[#081224]/95 p-6 text-center backdrop-blur" role="dialog" aria-label="Check-in QR">
     <button className="btn-ghost absolute right-4 top-4 text-white/70" aria-label="Close" onClick={onClose}><X size={22}/></button>

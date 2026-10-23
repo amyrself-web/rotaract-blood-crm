@@ -1,7 +1,7 @@
 // ID cards, entry passes and donor cards. Designed in HTML (so Tamil renders correctly) and saved as PDF,
 // either one card per page at real card size (85.6 x 54 mm, for a card printer or print shop)
 // or 9 per A4 sheet with cut marks (front sheet, then a back sheet ready for double-sided printing).
-import QRCode from 'qrcode'
+import {brandQr} from './qr'
 import {withBrand,logoImage} from './docpdf'
 import regUrl from '../assets/fonts/Manrope_400Regular.ttf?url'
 import semiUrl from '../assets/fonts/Manrope_600SemiBold.ttf?url'
@@ -31,14 +31,14 @@ async function prepare(){
       .map(f=>document.fonts?.load(f,'Aதமிழ்')?.catch(()=>{})))})()
   return ready
 }
-const qr=(text,dark='#0B1324')=>QRCode.toDataURL(text,{margin:0,width:300,color:{dark,light:'#ffffff'}})
+const qr=(text,brand)=>brandQr(text,brand,{size:600,quiet:0})
 const logoTag=(lg,box)=>lg?(()=>{const k=Math.min(box/lg.w,box/lg.h);return `<img src="${lg.data}" style="width:${Math.round(lg.w*k)}px;height:${Math.round(lg.h*k)}px"/>`})()
   :`<svg width="${box}" height="${box}" viewBox="0 0 100 100"><rect width="100" height="100" rx="24" fill="#E11D48"/><path d="M50 18C50 18 26 48 26 63a24 24 0 0 0 48 0C74 48 50 18 50 18z" fill="#fff"/></svg>`
 const initials=n=>String(n||'?').split(' ').filter(Boolean).map(x=>x[0]).slice(0,2).join('').toUpperCase()
 
 // ---------- member ID card (portrait) ----------
 async function memberFaces(m,brand,lg){
-  const accent=brand.brand_color||'#4C8DFF',photo=m.photo_url?await logoImage(m.photo_url):null,code=await qr(memberCardUrl(m.card_code))
+  const accent=brand.brand_color||'#4C8DFF',photo=m.photo_url?await logoImage(m.photo_url):null,code=await qr(memberCardUrl(m.card_code),brand)
   const ph=photo?(()=>{const k=Math.max(118/photo.w,146/photo.h);return `<img src="${photo.data}" style="width:${Math.round(photo.w*k)}px;height:${Math.round(photo.h*k)}px;margin-left:${Math.round((118-photo.w*k)/2)}px;margin-top:${Math.round((146-photo.h*k)/2)}px"/>`})()
     :`<div style="width:118px;height:146px;text-align:center;background:linear-gradient(135deg,${accent},#0B1324);color:#fff;font:800 40px/146px ${F}">${esc(initials(m.full_name))}</div>`
   const front=`<div style="position:relative;width:${PW}px;height:${PH}px;background:#fff;overflow:hidden;font-family:${F}">
@@ -73,7 +73,7 @@ async function memberFaces(m,brand,lg){
 // ---------- entry passes for a camp or event (portrait, front only) ----------
 const ROLE={Volunteer:'#2F6FED',Doctor:'#0E9F6E',Medical:'#0E9F6E',Organiser:'#C81E3A',Guest:'#7C5CFF',Media:'#D97706',Donor:'#C81E3A'}
 async function passFace(p,ev,brand,lg){
-  const col=ROLE[p.role]||brand.brand_color||'#2F6FED',code=await qr(`${brand.club_name} | ${ev.name} | ${p.role}${p.no?' '+p.no:''}${p.name?' | '+p.name:''}`)
+  const col=ROLE[p.role]||brand.brand_color||'#2F6FED',code=await qr(`${brand.club_name} | ${ev.name} | ${p.role}${p.no?' '+p.no:''}${p.name?' | '+p.name:''}`,brand)
   return `<div style="position:relative;width:${PW}px;height:${PH}px;background:#fff;overflow:hidden;font-family:${F}">
     <div style="position:absolute;left:0;right:0;top:0;height:150px;background:linear-gradient(160deg,#0B1324,#14244A)"></div>
     <div style="position:absolute;left:18px;right:18px;top:18px;display:flex;align-items:center;gap:10px">

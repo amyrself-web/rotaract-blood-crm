@@ -1,7 +1,8 @@
 import {useEffect,useMemo,useState} from 'react'
 import {toast} from 'sonner'
 import {Plus,QrCode,MessageCircle,Users,Pencil,Trash2,Copy,Download,MapPin,Clock,Tent,UserPlus} from 'lucide-react'
-import QRCode from 'qrcode'
+import {brandQr} from '../lib/qr'
+import {useBrand} from '../context/Brand'
 import {supabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
 import {fmt,wa,slots} from '../lib/util'
@@ -49,7 +50,7 @@ function Registrants({camp,onChanged}){
 }
 
 export default function Camps(){
-  const {settings,user}=useAuth(),confirm=useConfirm()
+  const {settings,user}=useAuth(),confirm=useConfirm(),{brand}=useBrand()
   const [rows,setRows]=useState(null),[form,setForm]=useState(null),[view,setView]=useState(null),[tab,setTab]=useState('share'),[qr,setQr]=useState(''),[filter,setFilter]=useState('active'),[busy,setBusy]=useState(false)
   const load=()=>supabase.from('camps').select('*, registrations(count)').is('deleted_at',null).order('camp_date',{ascending:false}).then(({data,error})=>error?toast.error(error.message):setRows(data))
   useEffect(()=>{load()},[])
@@ -71,7 +72,7 @@ export default function Camps(){
     setForm(null);load();undoToast(`${name} moved to the Recycle bin`,async()=>{const x=await supabase.from('camps').update({deleted_at:null,deleted_by:null}).eq('id',id);if(x.error)throw x.error;load()})}
   const setStatus=async(c,status)=>{const prev=c.status;const {error}=await supabase.from('camps').update({status}).eq('id',c.id);if(error)return toast.error(error.message);load()
     undoToast(`${c.name}: ${STATUS.find(s=>s[0]===status)[1]}`,async()=>{const x=await supabase.from('camps').update({status:prev}).eq('id',c.id);if(x.error)throw x.error;load()})}
-  const open=async(c,t)=>{setView(c);setTab(t);setQr(await QRCode.toDataURL(link(c.id),{width:320,margin:1,color:{dark:'#070D1A',light:'#ffffff'}}))}
+  const open=async(c,t)=>{setView(c);setTab(t);setQr(await brandQr(link(c.id),brand,{size:640,quiet:2}))}
   const list=useMemo(()=>(rows||[]).filter(c=>filter==='all'||(filter==='active'?!['completed','closed'].includes(c.status):['completed','closed'].includes(c.status))),[rows,filter])
   return <div>
     <PageHeader title="Camps" description="Plan camps, open registration and share the QR link."
