@@ -92,7 +92,15 @@ if($Engine -eq 'openwa'){
     Copy-Item (Join-Path $OwaDir '.env.minimal') $owaEnv
     Add-Content $owaEnv "`nNODE_ENV=production`nAUTO_START_SESSIONS=true`nSSRF_ALLOWED_HOSTS=localhost,127.0.0.1`nSEND_PACING_ENABLED=true`nSIMULATE_TYPING=true`nTZ=Asia/Kolkata"}
   Say 'Building OpenWA (this takes a few minutes)...'
-  Push-Location $OwaDir; & $Npm install --no-audit --no-fund; & $Npm run dashboard:install; & $Npm run build:all; Pop-Location
+  Push-Location $OwaDir
+  foreach($step in @('install --no-audit --no-fund','run dashboard:install','run build:all')){
+    Say "  npm $step"
+    & $Npm @($step -split ' ') 2>&1 | Tee-Object -Append -FilePath (Join-Path $OwaDir 'build.log')
+    if($LASTEXITCODE -ne 0){Pop-Location
+      Say "OpenWA build failed at 'npm $step'. The full output is in $OwaDir\build.log" Red
+      Say "Quick way out: .\install-windows.ps1 -Uninstall ; then .\install-windows.ps1   (built-in engine, no build needed)" Yellow; exit 1}}
+  Pop-Location
+  if(-not (Test-Path (Join-Path $OwaDir 'dist\main.js'))){Say "OpenWA build finished but dist\main.js is missing. See $OwaDir\build.log" Red; exit 1}
   Add-CrmTask 'CRM OpenWA' $OwaDir "`"$Node`" dist\main.js" (Join-Path $OwaDir 'openwa.log')
   Say 'Waiting for OpenWA to create its admin key...'
   $keyFile=Join-Path $OwaDir 'data\.api-key'; $t=0; while(-not (Test-Path $keyFile) -and $t -lt 120){Start-Sleep 2;$t+=2}
