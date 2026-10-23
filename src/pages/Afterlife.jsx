@@ -1,13 +1,14 @@
 import {useEffect,useState} from 'react'
 import {toast} from 'sonner'
 import {motion} from 'framer-motion'
-import {Plus,Eye,HeartHandshake,FileText,Download,Trash2,AlertTriangle,Clock,Phone,ChevronRight,Search,Mail,ChevronDown} from 'lucide-react'
+import {Plus,Eye,HeartHandshake,FileText,Download,Trash2,AlertTriangle,Clock,Phone,ChevronRight,Search,Mail,ChevronDown,IdCard} from 'lucide-react'
 import {supabase} from '../lib/supabase'
 import {useBrand} from '../context/Brand'
 import {BLOOD,normPhone,fmt} from '../lib/util'
 import {PageHeader,Drawer,Field,Badge,Empty,Tabs,useLive,undoToast,code,errText,todayIso} from '../components/ui'
 import {rotaryYear,afterlifePdf,csv,KIND_LABEL,iso} from '../lib/clubReports'
 import {gratitudeLetterHtml} from '../lib/letter'
+import {pledgeCard} from '../lib/cards'
 import CountUp from '../components/CountUp'
 
 const STATUS=['informed','team sent','collected','handed over','not suitable','family declined']
@@ -49,6 +50,7 @@ export default function Afterlife(){
     setCf(null);load()}
   const savePledge=async e=>{e.preventDefault();for(const [k,l] of [['phone','Mobile'],['witness_phone','Witness mobile'],['family_phone','Family mobile']])if(pf[k]&&!/^[6-9]\d{9}$/.test(normPhone(pf[k])))return toast.error(`${l} must be 10 digits`)
     setBusy(true);const row=clean({...pf,phone:pf.phone?normPhone(pf.phone):'',witness_phone:pf.witness_phone?normPhone(pf.witness_phone):'',family_phone:pf.family_phone?normPhone(pf.family_phone):''},['id','pledge_no','created_at','created_by','deleted_at','deleted_by','_orig','donor_id','member_id'])
+    row.card_issued_on=row.card_issued?(row.card_issued_on||todayIso()):null
     const r=pf.id?await supabase.from('pledges').update(row).eq('id',pf.id).select().single():await supabase.from('pledges').insert(row).select().single();setBusy(false)
     if(r.error)return toast.error(r.error.message)
     if(pf.id){const prev=clean(pf._orig,['id','pledge_no','created_at','created_by','deleted_at','deleted_by','donor_id','member_id']);undoToast('Pledge updated',async()=>{const x=await supabase.from('pledges').update(prev).eq('id',pf.id);if(x.error)throw x.error;load()})}
@@ -94,7 +96,7 @@ export default function Afterlife(){
     :<div className="card overflow-hidden p-0"><ul className="divide-y divide-ink-700/80">{shownPledges.map(p=><li key={p.id}><button onClick={()=>openPledge(p)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-brand/[.04]">
       <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand"><HeartHandshake size={20}/></span>
       <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2"><span className="code">{code('PL',p.pledge_no,4)}</span><span className="truncate font-medium text-fg">{p.full_name}</span>{kindsOf(p).map(k=><Badge key={k} tone="blue">{KIND_LABEL[k]}</Badge>)}</span>
-        <span className="mt-0.5 block truncate text-xs text-fog-faint">Pledged {fmt(p.pledged_on)}{p.area?` · ${p.area}`:''}{p.phone?` · ${p.phone}`:''}{p.card_issued?' · card issued':''}</span></span>
+        <span className="mt-0.5 block truncate text-xs text-fog-faint">Pledged {fmt(p.pledged_on)}{p.area?` · ${p.area}`:''}{p.phone?` · ${p.phone}`:''}{p.card_issued?` · card issued${p.card_issued_on?` ${fmt(p.card_issued_on)}`:''}`:''}</span></span>
       <Badge tone={sTone[p.status]}>{p.status}</Badge><ChevronRight size={16} className="shrink-0 text-fog-faint"/></button></li>)}</ul></div>)}
 
     <Drawer open={!!cf} onClose={()=>setCf(null)} width="max-w-2xl" title={cf?.id?`${code('ED',cf.case_no,4)} · ${cf.deceased_name}`:'Record donation after death'} description="Fields marked * are required. Times are Indian time."
@@ -145,6 +147,8 @@ export default function Afterlife(){
     <Drawer open={!!pf} onClose={()=>setPf(null)} width="max-w-2xl" title={pf?.id?`${code('PL',pf.pledge_no,4)} · ${pf.full_name}`:'New pledge'} description="Someone who promises to donate after death. Tell the family; their consent is still needed later."
       footer={pf&&<>{pf.id&&<button className="btn-quiet mr-auto text-blood" onClick={()=>binIt('pledges',pf,pf.full_name,setPf)}><Trash2 size={15}/>Recycle bin</button>}
         {pf.id&&['active','deceased'].includes(pf.status)&&<button className="btn-quiet" onClick={()=>fromPledge(pf)}><Eye size={15}/>Record donation</button>}
+        {pf.id&&pf.status==='active'&&<button className="btn-quiet" disabled={!!pdf} onClick={()=>run('card',async()=>{await pledgeCard(pf._orig||pf,brand,'card')
+          if(!pf._orig?.card_issued){const on=todayIso(),x=await supabase.from('pledges').update({card_issued:true,card_issued_on:on}).eq('id',pf.id);if(x.error)throw x.error;setPf({...pf,card_issued:true,card_issued_on:on,_orig:{...pf._orig,card_issued:true,card_issued_on:on}});load()}})}><IdCard size={15}/>{pdf==='card'?'Preparing…':'Donor card'}</button>}
         <button className="btn-quiet" onClick={()=>setPf(null)}>Cancel</button><button className="btn" form="pledge-form" disabled={busy}>{busy?'Saving…':pf.id?'Save changes':'Save pledge'}</button></>}>
       {pf&&<form id="pledge-form" onSubmit={savePledge} className="grid gap-4 sm:grid-cols-2">
         <fieldset className="sm:col-span-2"><legend className="label">Pledges to donate *</legend><div className="flex flex-wrap gap-2">{Object.entries(KIND_LABEL).map(([k,l])=><label key={k} className={`chip cursor-pointer px-3 py-1.5 text-sm ${pf[k]?'border-brand/50 bg-brand/15 text-fg':''}`}>
@@ -164,7 +168,7 @@ export default function Afterlife(){
         <Field label="Registered with (eye bank)"><input className="input" value={pf.institution} onChange={p1('institution')}/></Field>
         <Field label="Status"><select className="input" value={pf.status} onChange={p1('status')}><option value="active">Active</option><option value="withdrawn">Withdrawn</option><option value="deceased">Passed away</option><option value="fulfilled">Fulfilled</option></select></Field>
         <label className="flex items-center gap-2 text-sm text-fog"><input type="checkbox" checked={!!pf.family_informed} onChange={p1('family_informed')}/>Family has been told</label>
-        <label className="flex items-center gap-2 text-sm text-fog"><input type="checkbox" checked={!!pf.card_issued} onChange={p1('card_issued')}/>Donor card issued</label>
+        <label className="flex items-center gap-2 text-sm text-fog"><input type="checkbox" checked={!!pf.card_issued} onChange={p1('card_issued')}/>Donor card issued{pf.card_issued&&pf.card_issued_on?` on ${fmt(pf.card_issued_on)}`:''}</label>
         <Field label="Notes" className="sm:col-span-2"><textarea className="input min-h-[64px]" value={pf.notes} onChange={p1('notes')}/></Field>
       </form>}
     </Drawer>

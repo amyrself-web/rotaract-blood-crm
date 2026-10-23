@@ -31,6 +31,7 @@ import MyClub from './pages/MyClub'
 import CheckIn from './pages/CheckIn'
 import Certificates from './pages/Certificates'
 import Funds from './pages/Funds'
+import VerifyMember from './pages/VerifyMember'
 import {ALL_NAV,allowed} from './nav'
 import {Lock} from 'lucide-react'
 
@@ -48,7 +49,7 @@ function Toasts(){const {mode}=useBrand()
 export default function App(){return <BrandProvider><AuthProvider><ConfirmProvider><HashRouter><Routes>
   <Route path="/login" element={<Login/>}/>
   <Route path="/register/:campId" element={<Register/>}/>
-  <Route path="/home" element={<Landing/>}/><Route path="/verify" element={<Verify/>}/><Route path="/verify/:code" element={<Verify/>}/>
+  <Route path="/home" element={<Landing/>}/><Route path="/verify" element={<Verify/>}/><Route path="/verify/:code" element={<Verify/>}/><Route path="/member/:code" element={<VerifyMember/>}/>
   <Route element={<Guard/>}>
     <Route index element={<Home/>}/><Route path="profile" element={<Profile/>}/><Route path="my-club" element={<MyClub/>}/><Route path="checkin/:id" element={<CheckIn/>}/>
     {PAGES.map(([to,P])=><Route key={to} path={to.slice(1)} element={<Need to={to}><P/></Need>}/>)}

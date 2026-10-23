@@ -1,12 +1,13 @@
 import {useEffect,useState} from 'react'
 import {toast} from 'sonner'
 import {motion} from 'framer-motion'
-import {Droplet,Tent,MessageCircle,UserPlus,Phone,StickyNote,Award,Ban,Siren,Hospital,FileText,Plus,Trash2} from 'lucide-react'
+import {Droplet,Tent,MessageCircle,UserPlus,Phone,StickyNote,Award,Ban,Siren,Hospital,FileText,Plus,Trash2,IdCard} from 'lucide-react'
 import {supabase} from '../lib/supabase'
 import {useBrand} from '../context/Brand'
 import {fmt} from '../lib/util'
 import {Field,undoToast,errText,todayIso,code} from './ui'
 import {donorHistoryPdf,timelineText} from '../lib/clubReports'
+import {bloodDonorCard} from '../lib/cards'
 
 const KINDS=[['outside_donation','Donated elsewhere'],['emergency_donation','Emergency donation'],['call','Phone call'],['note','Note'],['award','Award or recognition'],['deferral','Deferred (outside camp)']]
 const icon=t=>t.type==='camp'?(t.status==='donated'?Droplet:t.status==='deferred'?Ban:Tent):t.type==='message'?MessageCircle:t.type==='added'?UserPlus
@@ -31,6 +32,7 @@ export default function DonorHistory({donor}){
       <div key={l} className="tile py-2.5"><div className={`text-lg font-semibold tabular-nums ${b?'text-blood':'text-fg'}`}>{v}</div><div className="text-[11px] text-fog-muted">{l}</div></div>)}</div>
     <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-fog-muted"><span>First donation <b className="text-fg">{fmt(s.first)}</b></span><span>·</span><span>Last <b className="text-fg">{fmt(s.last)}</b></span><span>·</span><span>{s.ml} ml at our camps</span><div className="flex-1"/>
       <button className="btn-quiet px-3 py-1.5 text-xs" onClick={()=>donorHistoryPdf(brand,donor,h).catch(e=>toast.error(errText(e)))}><FileText size={14}/>History PDF</button>
+      <button className="btn-quiet px-3 py-1.5 text-xs" onClick={()=>bloodDonorCard(donor,s,brand,'card').catch(e=>toast.error(errText(e)))}><IdCard size={14}/>Donor card</button>
       {!add&&<button className="btn px-3 py-1.5 text-xs" onClick={()=>setAdd({kind:'outside_donation',event_date:todayIso(),place:'',units:1,notes:''})}><Plus size={14}/>Add to history</button>}</div>
     {add&&<form onSubmit={save} className="tile mb-4 grid gap-3 p-3 sm:grid-cols-2">
       <Field label="What happened" required><select className="input" value={add.kind} onChange={e=>setAdd({...add,kind:e.target.value})}>{KINDS.map(([k,l])=><option key={k} value={k}>{l}</option>)}</select></Field>

@@ -2,13 +2,16 @@ import {useEffect,useRef,useState} from 'react'
 import {Link} from 'react-router-dom'
 import {toast} from 'sonner'
 import {motion,AnimatePresence} from 'framer-motion'
-import {CalendarDays,Clock,MapPin,Video,CheckCircle2,Circle,ChevronDown,Phone,Pencil,Wallet,Droplet,Tent,QrCode,PartyPopper,Users} from 'lucide-react'
+import {CalendarDays,Clock,MapPin,Video,CheckCircle2,Circle,ChevronDown,Phone,Pencil,Wallet,Droplet,Tent,QrCode,PartyPopper,Users,IdCard,Download} from 'lucide-react'
 import {supabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
 import {BLOOD,fmt,normPhone} from '../lib/util'
 import {PageHeader,Drawer,Field,Badge,Empty,useLive,code,errText,todayIso} from '../components/ui'
 import {celebrate} from '../lib/fx'
 import CountUp from '../components/CountUp'
+import {useBrand} from '../context/Brand'
+import {memberIdCards} from '../lib/cards'
+import {PhotoPicker} from '../components/PhotoPicker'
 
 const ST={present:['Present','green'],late:['Late','blue'],leave:['On leave','amber'],absent:['Absent','red']}
 const t5=t=>t?String(t).slice(0,5):''
@@ -46,6 +49,7 @@ export function CheckInCard({meeting,onDone}){
 
 export default function MyClub(){
   const {profile,refresh}=useAuth()
+  const {brand}=useBrand(),[card,setCard]=useState(null),[dl,setDl]=useState(false)
   const [d,setD]=useState(undefined),[open,setOpen]=useState(null),[leave,setLeave]=useState(null),[edit,setEdit]=useState(null),[busy,setBusy]=useState(false)
   const load=()=>supabase.rpc('my_club').then(({data,error})=>error?toast.error(error.message):setD(data))
   useEffect(()=>{load()},[]);useLive(['meetings','meeting_attendance','meeting_actions','member_dues','members'],load)
@@ -54,6 +58,8 @@ export default function MyClub(){
   const m=d.me,a=d.attendance,pct=a.held?Math.round(a.present/a.held*100):null,today=istToday()
   const todays=d.upcoming.filter(x=>x.date===today),later=d.upcoming.filter(x=>x.date!==today),openActs=d.actions.filter(x=>!x.done)
   const paidYear=d.dues.filter(x=>x.paid_on>=d.year.from&&x.paid_on<=d.year.to).reduce((s,x)=>s+Number(x.amount),0)
+  const openCard=()=>supabase.rpc('my_member').then(({data,error})=>error||!data?.id?toast.error(error?.message||'Member record not found'):setCard(data))
+  const getCard=async()=>{setDl(true);try{await memberIdCards([card],brand,'card')}catch(e){toast.error(errText(e))}setDl(false)}
   const act=async x=>{const {error}=await supabase.rpc('member_action_done',{p_action:x.id,p_done:!x.done});if(error)return toast.error(error.message);if(!x.done)toast.success('Nice work. Marked done.');load()}
   const applyLeave=async e=>{e.preventDefault();const {error}=await supabase.rpc('member_leave',{p_meeting:leave.id,p_reason:leave.reason});if(error)return toast.error(error.message);toast.success('Leave applied. The secretary can see it.');setLeave(null);load()}
   const save=async e=>{e.preventDefault();if(edit.phone&&!/^[6-9]\d{9}$/.test(normPhone(edit.phone)))return toast.error('Mobile number must be 10 digits');setBusy(true)
@@ -77,7 +83,7 @@ export default function MyClub(){
 
   return <div>
     <PageHeader eyebrow={`${code('M',m.member_no,3)} · ${m.position}`} title={`Hello, ${m.full_name.split(' ')[0]}`} description={`${m.membership_type} member since ${fmt(m.joined_on)}`}
-      actions={<button className="btn-quiet" onClick={()=>setEdit({phone:m.phone||'',email:m.email||'',dob:m.dob||'',gender:m.gender||'',blood_group:m.blood_group||'',address:m.address||'',area:m.area||'',occupation:m.occupation||'',organisation:m.organisation||'',emergency_contact:m.emergency_contact||''})}><Pencil size={15}/>Edit my details</button>}/>
+      actions={<><button className="btn-quiet" onClick={openCard}><IdCard size={15}/>My ID card</button><button className="btn-quiet" onClick={()=>setEdit({phone:m.phone||'',email:m.email||'',dob:m.dob||'',gender:m.gender||'',blood_group:m.blood_group||'',address:m.address||'',area:m.area||'',occupation:m.occupation||'',organisation:m.organisation||'',emergency_contact:m.emergency_contact||''})}><Pencil size={15}/>Edit my details</button></>}/>
     <div className="mb-5 space-y-3">{todays.map(x=><CheckInCard key={x.id} meeting={x} onDone={load}/>)}</div>
     <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
       <div className="card py-4"><div className={`text-2xl font-semibold ${pct==null?'text-fg':pct>=75?'text-ok':pct>=50?'text-warn':'text-blood'}`}>{pct==null?'-':<><CountUp value={pct}/>%</>}</div><div className="text-xs text-fog-muted">My attendance this year</div><div className="mt-1 text-[11px] text-fog-faint">{a.present} of {a.held} meetings{a.leave?` · ${a.leave} leave`:''}</div></div>
@@ -110,6 +116,11 @@ export default function MyClub(){
           {x.phone&&<a className="btn-ghost" href={`tel:${x.phone}`} aria-label={`Call ${x.name}`}><Phone size={15}/></a>}</li>)}</ul>
           <p className="mt-3 text-xs text-fog-faint">{d.team.length} active members in the club.</p></section></div></div>
 
+    <Drawer open={!!card} onClose={()=>setCard(null)} title="My ID card" description="Add your photo, then download the card. Show it at club events; the QR code proves you are a member."
+      footer={card&&<><button className="btn-quiet" onClick={()=>setCard(null)}>Close</button><button className="btn" disabled={dl} onClick={getCard}><Download size={15}/>{dl?'Preparing…':'Download ID card'}</button></>}>
+      {card&&<div className="space-y-4"><PhotoPicker self member={card} onSaved={u=>setCard({...card,photo_url:u||null})}/>
+        <p className="text-sm text-fog-muted">The card shows your name, member ID {code('M',card.member_no,3)}, position, blood group and photo. It is valid till 30 June of this Rotary year; download it again after that.</p></div>}
+    </Drawer>
     <Drawer open={!!edit} onClose={()=>setEdit(null)} title="My details" description="Position and membership type are changed by the secretary."
       footer={edit&&<><button className="btn-quiet" onClick={()=>setEdit(null)}>Cancel</button><button className="btn" form="me-form" disabled={busy}>{busy?'Saving…':'Save'}</button></>}>
       {edit&&<form id="me-form" onSubmit={save} className="grid gap-4 sm:grid-cols-2">

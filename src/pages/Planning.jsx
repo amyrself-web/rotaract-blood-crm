@@ -5,6 +5,7 @@ import {supabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
 import {normPhone,fmt,wa} from '../lib/util'
 import {PageHeader,Drawer,Field,Tabs,Badge,Empty,useLive,undoToast,code} from '../components/ui'
+import {Materials,Passes} from '../components/CampKit'
 
 const DESKS=['Registration','Screening','Donation','Refreshment','Certificate','Crowd control']
 const CATS=['Refreshments','Printing','Banners','Transport','Sound system','Certificates','Other']
@@ -54,9 +55,11 @@ export default function Planning(){
   const EditBtn=({t,row})=><button className="btn-ghost ml-auto" aria-label={`Edit ${NAME[t]}`} onClick={()=>setEdit({table:t,row})}><Pencil size={15}/></button>
   if(camps&&!camps.length)return <div><PageHeader title="Camp planning"/><div className="card"><Empty icon={ClipboardList} title="Create a camp first">Planning is kept per camp.</Empty></div></div>
   return <div>
-    <PageHeader title="Camp planning" description="Checklist, volunteers and money for one camp."
+    <PageHeader title="Camp planning" description="Checklist, volunteers, materials, entry passes and money for one camp."
       actions={camps&&<select aria-label="Camp" className="input w-auto" value={cid} onChange={e=>setCid(e.target.value)}>{camps.map(c=><option key={c.id} value={c.id}>{c.name} ({fmt(c.camp_date)})</option>)}</select>}/>
-    <Tabs id="plan-tabs" value={tab} onChange={k=>{setTab(k);setF({})}} tabs={[['tasks',`Checklist ${done}/${d.tasks.length}`],['camp_volunteers',`Volunteers ${d.camp_volunteers.length}`],['money','Money']]}/>
+    <Tabs id="plan-tabs" value={tab} onChange={k=>{setTab(k);setF({})}} tabs={[['tasks',`Checklist ${done}/${d.tasks.length}`],['camp_volunteers',`Volunteers ${d.camp_volunteers.length}`],['materials','Materials'],['passes','Entry passes'],['money','Money']]}/>
+    {tab==='materials'&&<Materials camp={camp}/>}
+    {tab==='passes'&&camp&&<Passes camp={camp} volunteers={d.camp_volunteers}/>}
     {tab==='tasks'&&<div className="card"><div className="mb-4 flex items-center justify-between gap-3"><div className="flex-1"><div className="text-sm text-fog-muted">{done} of {d.tasks.length} done</div>
         <div className="mt-2 h-1.5 max-w-xs overflow-hidden rounded-full bg-ink-700"><div className="h-full rounded-full bg-ok transition-all duration-500" style={{width:(d.tasks.length?done/d.tasks.length*100:0)+'%'}}/></div></div>
         {!d.tasks.length&&<button className="btn" onClick={()=>add('tasks',CHECK.map(title=>({title})),'Checklist added')}>Add standard checklist</button>}</div>
