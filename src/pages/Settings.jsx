@@ -20,8 +20,12 @@ export default function SettingsPage(){
     if(fl.size>2*1024*1024)return toast.error('Logo must be smaller than 2 MB')
     setUp(true);const path=`logo-${Date.now()}.${fl.name.split('.').pop().toLowerCase()}`
     const {error}=await supabase.storage.from('branding').upload(path,fl,{upsert:true,contentType:fl.type,cacheControl:'3600'})
-    setUp(false);if(error)return toast.error(error.message)
-    setF({...f,logo_url:supabase.storage.from('branding').getPublicUrl(path).data.publicUrl});toast.success('Logo uploaded. Save settings to use it.')}
+    if(error){setUp(false);return toast.error(/row-level security|not authorized|403/i.test(error.message)?'Only people with the Settings permission can upload the logo.':error.message)}
+    // save the new logo straight away so it is used everywhere without a second click
+    const logo_url=supabase.storage.from('branding').getPublicUrl(path).data.publicUrl
+    const r=await supabase.from('settings').update({logo_url}).eq('id',1);setUp(false)
+    if(r.error)return toast.error(r.error.message)
+    setF(x=>({...x,logo_url}));setSettings?.(s=>({...s,logo_url}));refreshBrand?.();toast.success('Logo uploaded and saved. It now shows in the app, reports and certificates.')}
   const save=async e=>{e.preventDefault()
     if(!f.brand_name?.trim())return toast.error('Enter a CRM name')
     if(!/^#[0-9a-f]{6}$/i.test(f.brand_color||''))return toast.error('Pick a colour')

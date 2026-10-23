@@ -146,6 +146,8 @@ do $$ begin
     values('branding','branding',true,2097152,array['image/png','image/jpeg','image/webp']) on conflict (id) do nothing;
     if not exists(select 1 from pg_policies where schemaname='storage' and policyname='branding upload') then
       create policy "branding upload" on storage.objects for insert to authenticated with check (bucket_id='branding' and public.perm('settings'));
+      -- the upload reads back the row it creates, so the bucket also needs a read rule
+      create policy "branding read" on storage.objects for select to anon, authenticated using (bucket_id='branding');
       create policy "branding replace" on storage.objects for update to authenticated using (bucket_id='branding' and public.perm('settings'));
     end if;
   end if; end $$;
