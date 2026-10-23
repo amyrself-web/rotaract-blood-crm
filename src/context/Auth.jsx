@@ -8,12 +8,17 @@ export function AuthProvider({children}){
   const [user,setUser]=useState(null),[profile,setProfile]=useState(null),[perms,setPerms]=useState({}),[settings,setSettings]=useState(DEFAULT_SETTINGS),[loading,setLoading]=useState(hasSupabase)
   const load=useCallback(async u=>{
     if(!u){setProfile(null);setPerms({});return}
-    const {data}=await supabase.from('profiles').select('*').eq('id',u.id).single();setProfile(data)
+    const key='auth-cache-'+u.id,cached=()=>{try{return JSON.parse(localStorage.getItem(key)||'null')}catch{return null}}
+    const {data,error}=await supabase.from('profiles').select('*').eq('id',u.id).single().then(r=>r,e=>({data:null,error:e}))
+    // no internet (camp venue): carry on with what this device saw last time, so camp day still opens
+    if(error&&(!navigator.onLine||/fetch|network|load failed/i.test(error.message||''))){const c=cached();if(c){setProfile(c.profile);setPerms(c.perms);setSettings({...DEFAULT_SETTINGS,...c.settings});return}}
+    setProfile(data)
     const acc=await supabase.rpc('my_access')
     const base=!acc.error&&acc.data?.perms?acc.data.perms:effectivePerms(data?.role,data?.permissions),linked=!!acc.data?.member
-    setPerms({...base,_member:linked,_myclub:linked&&data?.role!=='member'})
+    const perms={...base,_member:linked,_myclub:linked&&data?.role!=='member'};setPerms(perms)
     const s=await supabase.from('settings').select('*').eq('id',1).maybeSingle()
-    if(!s.error&&s.data)setSettings({...DEFAULT_SETTINGS,...s.data})},[])
+    if(!s.error&&s.data)setSettings({...DEFAULT_SETTINGS,...s.data})
+    try{if(data)localStorage.setItem(key,JSON.stringify({profile:data,perms,settings:s.data||{}}))}catch{}},[])
   useEffect(()=>{if(!hasSupabase)return
     supabase.auth.getSession().then(async({data})=>{const u=data.session?.user??null;setUser(u);await load(u);setLoading(false)})
     const {data:sub}=supabase.auth.onAuthStateChange((e,s)=>{const u=s?.user??null;setUser(u);if(e!=='TOKEN_REFRESHED')setTimeout(()=>load(u),0)})

@@ -7,6 +7,7 @@ import {useBrand} from '../context/Brand'
 import {code,useLive,PageHeader} from '../components/ui'
 import CountUp from '../components/CountUp'
 import {ClaimMember} from './MyClub'
+import MyData from '../components/MyData'
 import {useAuth} from '../context/Auth'
 const badge=n=>n>=10?'Life saver':n>=5?'Regular donor':n>=2?'Repeat donor':n===1?'First donation done':'Ready to donate'
 export default function Portal(){
@@ -42,5 +43,6 @@ export default function Portal(){
         <button className="btn" disabled={busy===h.cert_no} onClick={async()=>{setBusy(h.cert_no);try{await makeCertificate({name:d.name,camp:h.camp,venue:h.venue,date:fmt(h.date),bloodGroup:d.blood_group,volume:h.volume,certificate:h.cert_no?certNo(h.cert_no):h.code,verifyCode:h.verify_code,donorNo:code('D',d.donor_no),brand});if(h.reg_id)supabase.rpc('log_certificate',{p_reg:h.reg_id,p_kind:'download'})}finally{setBusy(null)}}}><Award size={16}/>{busy===h.cert_no?'Preparing…':'Certificate'}</button></div>)}
       {out.map((o,i)=><div key={'o'+i} className="flex items-center justify-between border-t border-ink-700 py-2 first:border-0"><div><div className="text-fg">{o.kind==='emergency_donation'?'Emergency donation':'Donation'} at {o.place}</div><div className="text-sm text-fog-muted">{fmt(o.date)}</div></div><span className="text-xs text-fog-faint">Recorded by the club</span></div>)}
       {!n&&<p className="text-sm text-fog-faint">Your donations will appear here after your first camp.</p>}</div>
-    <details className="mt-5"><summary className="cursor-pointer text-sm text-fog-muted hover:text-fg">Are you a member of the club? Link your member record</summary><div className="mt-3 max-w-md"><ClaimMember compact onDone={refresh}/></div></details></div>
+    <details className="mt-5"><summary className="cursor-pointer text-sm text-fog-muted hover:text-fg">Are you a member of the club? Link your member record</summary><div className="mt-3 max-w-md"><ClaimMember compact onDone={refresh}/></div></details>
+    <MyData/></div>
 }

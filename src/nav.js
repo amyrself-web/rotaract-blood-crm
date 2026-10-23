@@ -1,4 +1,4 @@
-import {LayoutDashboard,Users,CalendarDays,ClipboardCheck,MessageCircle,Droplets,BarChart3,ShieldCheck,Upload,ClipboardList,CalendarRange,History,Settings2,Tent,Trash2,IdCard,Presentation,Eye,UserRoundCheck,Award,HandCoins} from 'lucide-react'
+import {LayoutDashboard,Users,CalendarDays,ClipboardCheck,MessageCircle,Droplets,BarChart3,ShieldCheck,Upload,ClipboardList,CalendarRange,History,Settings2,Tent,Trash2,IdCard,Presentation,Eye,UserRoundCheck,Award,HandCoins,ShieldCheck as Shield} from 'lucide-react'
 // perm: module needed to see the page (null = everyone signed in)
 export const NAV=[
  {group:'Overview',items:[
@@ -24,6 +24,7 @@ export const NAV=[
   {to:'/reports',label:'Reports',desc:'PDF report, receipts, CSV',icon:BarChart3,perm:['reports']},
   {to:'/users',label:'Users and roles',desc:'Logins and permissions',icon:ShieldCheck,perm:['users']},
   {to:'/audit',label:'Audit log',desc:'Every change, with undo',icon:History,perm:['audit']},
+  {to:'/privacy',label:'Privacy and backup',desc:'Data requests, consent, backups',icon:Shield,perm:['settings']},
   {to:'/trash',label:'Recycle bin',desc:'Restore deleted records',icon:Trash2,perm:['donors','camps','emergency','members','meetings','afterlife']},
   {to:'/settings',label:'Settings',desc:'Brand, logo and rules',icon:Settings2,perm:['settings']}]}]
 export const ALL_NAV=NAV.flatMap(g=>g.items)
