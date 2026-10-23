@@ -6,6 +6,8 @@ import {useAuth,ROLES} from '../context/Auth'
 import {supabase,hasSupabase} from '../lib/supabase'
 import {fmt} from '../lib/util'
 import CountUp from '../components/CountUp'
+import {useBrand} from '../context/Brand'
+import {Logo} from '../components/Brand'
 
 // One orchestrated moment: a drop falls and a pulse line draws across the brand panel.
 function Pulse(){
@@ -17,7 +19,7 @@ function Pulse(){
 }
 
 export default function Login(){
-  const {signIn,signUp,demo,user,profile}=useAuth(),nav=useNavigate()
+  const {signIn,signUp,demo,user,profile}=useAuth(),{brand}=useBrand(),nav=useNavigate()
   const [mode,setMode]=useState('in'),[f,setF]=useState({name:'',email:'',password:''}),[msg,setMsg]=useState(''),[busy,setBusy]=useState(false),[show,setShow]=useState(false),[camp,setCamp]=useState(null)
   useEffect(()=>{if(user&&profile){let to='/';try{to=sessionStorage.getItem('after-login')||'/';sessionStorage.removeItem('after-login')}catch{}nav(to,{replace:true})}},[user,profile])
   useEffect(()=>{if(hasSupabase)supabase.rpc('public_camp_info').then(({data})=>setCamp(data))},[])
@@ -29,8 +31,8 @@ export default function Login(){
     else if(mode==='up')setMsg('Account created. Confirm your email, then sign in.')}
   return <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
     <section className="relative hidden flex-col justify-between overflow-hidden border-r border-ink-700 bg-ink-900/60 p-12 lg:flex">
-      <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-blood to-blood-deep text-white"><Droplet size={20} fill="currentColor"/></span>
-        <div><div className="font-display font-semibold text-fg">Sankari Rotaract Club</div><div className="text-sm text-fog-faint">Blood donation CRM</div></div></div>
+      <div className="flex items-center gap-3"><Logo size={44}/>
+        <div><div className="font-display font-semibold text-fg">{brand.club_name}</div><div className="text-sm text-fog-faint">{brand.brand_name}{brand.tagline?` · ${brand.tagline}`:''}</div></div></div>
       <div>
         <motion.div initial={{y:-140,opacity:0}} animate={{y:0,opacity:1}} transition={{type:'spring',stiffness:120,damping:14,delay:.15}}
           className="mb-8 grid h-16 w-16 place-items-center rounded-[28px_28px_28px_4px] bg-blood text-white shadow-[0_20px_60px_-10px_rgba(240,67,90,.7)] [transform-origin:bottom_left]">
@@ -44,7 +46,7 @@ export default function Login(){
     </section>
     <section className="flex items-center justify-center p-6">
       <motion.div className="w-full max-w-sm" initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} transition={{duration:.4,delay:.1}}>
-        <div className="mb-8 lg:hidden"><span className="mb-4 grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-blood to-blood-deep text-white"><Droplet fill="currentColor"/></span></div>
+        <div className="mb-8 flex items-center gap-3 lg:hidden"><Logo size={48}/><div><div className="font-display font-semibold text-fg">{brand.club_name}</div><div className="text-xs text-fog-faint">{brand.brand_name}</div></div></div>
         <h2 className="font-display text-3xl font-semibold text-fg">{mode==='in'?'Sign in':'Create a donor account'}</h2>
         <p className="mt-2 text-sm text-fog-muted">{mode==='in'?'Club members and donors use the same sign-in.':'See your donations and download certificates.'}</p>
         <form onSubmit={submit} className="mt-8 space-y-4">

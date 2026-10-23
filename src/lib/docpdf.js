@@ -8,11 +8,26 @@ const hexRgb=h=>{const m=/^#?([0-9a-f]{6})$/i.exec(h||'');if(!m)return [76,141,2
 export const NAVY=[11,19,36],INK=[40,50,68],MUTED=[108,121,145],LINE=[226,231,240],BLOOD=[200,30,58],SOFT=[247,249,252],GREEN=[22,130,80]
 export const rs=n=>'Rs. '+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:2})
 export const pad=(p,n,w=3)=>n==null?'':`${p}-${String(n).padStart(w,'0')}`
-export async function imageData(url){
-  if(!url)return null
-  try{const b=await (await fetch(url,{mode:'cors'})).blob()
-    return await new Promise(res=>{const f=new FileReader();f.onload=()=>res(f.result);f.onerror=()=>res(null);f.readAsDataURL(b)})}catch{return null}
+// Loads the club logo for PDFs: any format the browser can show (PNG, JPEG, WebP, SVG) is redrawn as PNG,
+// with its real proportions. The cache-busting query avoids a cached copy that was loaded without CORS headers.
+// brand passed by the page, topped up with the last brand saved on this device (never an old hard-coded name)
+export const withBrand=b=>{let c={};try{c=JSON.parse(localStorage.getItem('brand-cache')||'{}')}catch{}
+  return {...c,...Object.fromEntries(Object.entries(b||{}).filter(([,v])=>v!=null&&v!==''))}}
+const logoCache=new Map()
+export function logoImage(url){
+  if(!url)return Promise.resolve(null)
+  if(!logoCache.has(url))logoCache.set(url,(async()=>{
+    try{const r=await fetch(url+(url.includes('?')?'&':'?')+'pdf=1',{mode:'cors',cache:'no-store'});if(!r.ok)throw new Error('logo '+r.status)
+      const src=URL.createObjectURL(await r.blob())
+      const img=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=no;i.src=src})
+      const k=Math.min(1,600/Math.max(img.naturalWidth||1,img.naturalHeight||1)),w=Math.max(1,Math.round((img.naturalWidth||300)*k)),h=Math.max(1,Math.round((img.naturalHeight||300)*k))
+      const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);URL.revokeObjectURL(src)
+      return {data:c.toDataURL('image/png'),w,h}}catch(e){console.warn('Logo could not be loaded for the PDF',e);logoCache.delete(url);return null}})())
+  return logoCache.get(url)
 }
+export async function imageData(url){return (await logoImage(url))?.data||null}
+// draws the logo inside a box, keeping its shape
+export function placeLogo(doc,lg,x,y,box){const k=Math.min(box/lg.w,box/lg.h),w=lg.w*k,h=lg.h*k;doc.addImage(lg.data,'PNG',x+(box-w)/2,y+(box-h)/2,w,h)}
 
 let fontCache
 const b64=buf=>{let s='';const a=new Uint8Array(buf);for(let i=0;i<a.length;i+=0x8000)s+=String.fromCharCode.apply(null,a.subarray(i,i+0x8000));return btoa(s)}
@@ -37,13 +52,13 @@ function drop(color){
 
 // Draws the letterhead (first page) and returns the y where content starts.
 export async function letterhead(doc,{brand={},label,heading,subtitle,meta=[],W,F}){
-  const M=16,accent=hexRgb(brand.brand_color),club=brand.club_name||'Sankari Rotaract Club'
-  const logo=(await imageData(brand.logo_url))||drop()
-  if(logo){try{doc.addImage(logo,M,12,17,17)}catch{}}
+  const M=16,accent=hexRgb(brand.brand_color),club=brand.club_name||'Blood donation club'
+  const lg=await logoImage(brand.logo_url)
+  try{if(lg)placeLogo(doc,lg,M,11.5,18);else{const d=drop();if(d)doc.addImage(d,'PNG',M,12,17,17)}}catch(e){console.warn(e)}
   const x=M+21
   doc.setFont(F,'bold').setFontSize(15).setTextColor(...NAVY).text(club,x,19)
   doc.setFont(F,'normal').setFontSize(8).setTextColor(...MUTED)
-  doc.text([brand.address||'Rotaract Club · Blood donation and community service',brand.reg_no?`Reg. no. ${brand.reg_no}`:''].filter(Boolean),x,24)
+  doc.text([brand.address||'Blood donation and community service',brand.reg_no?`Reg. no. ${brand.reg_no}`:''].filter(Boolean),x,24)
   const contact=[brand.contact_phone&&['Phone',brand.contact_phone],brand.contact_email&&['Email',brand.contact_email]].filter(Boolean)
   contact.forEach(([k,v],i)=>{doc.setFont(F,'semibold').setFontSize(7).setTextColor(...accent).text(k.toUpperCase(),W-M,16+i*7.5,{align:'right'})
     doc.setFont(F,'normal').setFontSize(8.5).setTextColor(...INK).text(v,W-M,19.6+i*7.5,{align:'right'})})
@@ -66,12 +81,12 @@ export async function letterhead(doc,{brand={},label,heading,subtitle,meta=[],W,
   return ty+11
 }
 function runningHeader(doc,{brand,label,W,F}){
-  const M=16;doc.setFont(F,'bold').setFontSize(9).setTextColor(...NAVY).text(brand.club_name||'Sankari Rotaract Club',M,13)
+  const M=16;doc.setFont(F,'bold').setFontSize(9).setTextColor(...NAVY).text(brand.club_name||'Blood donation club',M,13)
   doc.setFont(F,'normal').setFontSize(8).setTextColor(...MUTED).text(String(label||''),W-M,13,{align:'right'})
   doc.setDrawColor(...LINE).setLineWidth(.3).line(M,16,W-M,16);doc.setFillColor(...BLOOD).rect(M,15.5,12,1,'F')
 }
 export function footers(doc,{brand={},label,W,H,F,first=true}){
-  const M=16,pages=doc.getNumberOfPages(),accent=hexRgb(brand.brand_color),club=brand.club_name||'Sankari Rotaract Club'
+  const M=16,pages=doc.getNumberOfPages(),accent=hexRgb(brand.brand_color),club=brand.club_name||'Blood donation club'
   const stamp=new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})
   for(let i=1;i<=pages;i++){doc.setPage(i)
     if(i>1||!first)runningHeader(doc,{brand,label,W,F})
@@ -87,6 +102,7 @@ export function footers(doc,{brand={},label,W,H,F,first=true}){
 /* blocks: {type:'boxes',boxes:[{title,rows:[[k,v]]}]} | {type:'table',heading,columns,rows,opts,empty} | {type:'text',heading,text}
            | {type:'stats',items:[[label,value,tone]]} | {type:'totals',rows:[[k,v]],final:[k,v],negative} | {type:'signatures',items:[[name,title]]} */
 export async function buildPdf({title,heading,subtitle,docNo,meta,prepared,brand={},blocks=[],filename,footer,landscape=false,save=true}){
+  brand=withBrand(brand)
   const [{jsPDF},{default:autoTable}]=await Promise.all([import('jspdf'),import('jspdf-autotable')])
   const doc=new jsPDF({unit:'mm',format:'a4',orientation:landscape?'landscape':'portrait'})
   const F=await useFonts(doc),W=landscape?297:210,H=landscape?210:297,M=16,accent=hexRgb(brand.brand_color)
@@ -128,13 +144,14 @@ export async function buildPdf({title,heading,subtitle,docNo,meta,prepared,brand
         doc.setFont(F,'bold').setFontSize(9).setTextColor(...NAVY).text(nm||'',X,y+5);doc.setFont(F,'normal').setFontSize(7.8).setTextColor(...MUTED).text(t||'',X,y+9.5)});y+=16}
   }
   footers(doc,{brand,label:footer||title,W,H,F})
-  doc.setProperties({title:heading||title,creator:brand.club_name||'Sankari Rotaract Club'})
+  doc.setProperties({title:heading||title,creator:brand.club_name||'Blood donation club'})
   if(save)doc.save(filename||`${title.replace(/\W+/g,'-').toLowerCase()}.pdf`)
   return doc
 }
 
 // Letter of gratitude to the family of an eye or body donor, on the club letterhead.
 export async function gratitudeLetter(c,brand={},fmt){
+  brand=withBrand(brand)
   const {jsPDF}=await import('jspdf')
   const doc=new jsPDF({unit:'mm',format:'a4'}),W=210,H=297,M=16,F=await useFonts(doc)
   let y=await letterhead(doc,{brand,label:'Letter of gratitude',heading:c.deceased_name,

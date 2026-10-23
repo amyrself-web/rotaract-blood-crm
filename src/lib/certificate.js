@@ -26,9 +26,11 @@ function pattern(){
 export async function makeCertificate({name,camp,date,venue,bloodGroup,volume,certificate,verifyCode,donorNo,brand={}}){
   const [{default:html2canvas},{jsPDF}]=await Promise.all([import('html2canvas'),import('jspdf')])
   const check=verifyCode||certificate,qr=await QRCode.toDataURL(verifyUrl(fmtCode(check)),{margin:0,width:260,color:{dark:'#0B1324',light:'#ffffff'}})
+  const {withBrand,logoImage}=await import('./docpdf');brand=withBrand(brand)
   const accent=brand.brand_color||'#4C8DFF'
-  const club=brand.club_name||'Sankari Rotaract Club'
-  const logo=brand.logo_url?`<img src="${esc(brand.logo_url)}" crossorigin="anonymous" style="width:74px;height:74px;object-fit:contain;border-radius:16px;background:#fff;padding:6px;box-shadow:0 4px 14px rgba(11,19,36,.12)"/>`
+  const club=brand.club_name||'Blood donation club'
+  const lg=await logoImage(brand.logo_url),fit=lg?Math.min(70/lg.w,70/lg.h):1
+  const logo=lg?`<div style="width:84px;height:84px;border-radius:18px;background:#fff;box-shadow:0 4px 14px rgba(11,19,36,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0"><img src="${lg.data}" style="width:${Math.round(lg.w*fit)}px;height:${Math.round(lg.h*fit)}px"/></div>`
     :`<svg width="64" height="64" viewBox="0 0 100 100"><path d="${DROP}" fill="#E11D48"/><path d="M38 64a12 12 0 0 0 12 12" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" opacity=".8"/></svg>`
   const sign=(n,t)=>n||t?`<div style="text-align:center;width:210px"><div style="height:44px"></div><div style="border-top:1.5px solid #0B1324;padding-top:8px;font:600 15px Sora,sans-serif;color:#0B1324">${esc(n||'')}</div>
     <div style="font:500 12px Manrope,sans-serif;color:#5D6E8F;margin-top:2px">${esc(t||'')}</div></div>`:''

@@ -38,13 +38,14 @@ export async function reportPdf(r,fmt,brand={},prepared=''){
 
 // 80 mm thermal receipt with the camp summary, like a supermarket bill.
 export async function receiptPdf(r,fmt,brand={}){
+  brand=(await import('./docpdf')).withBrand(brand)
   const {jsPDF}=await import('jspdf'),G=['A+','A-','B+','B-','AB+','AB-','O+','O-'].filter(g=>r.by_group[g])
   const lines=24+G.length+(r.sponsor_list.length+r.expense_list.length)
   const doc=new jsPDF({unit:'mm',format:[80,Math.max(140,lines*5+60)]}),W=80,L=5,R=75
   let y=8;const c=(t,s=8,b=false)=>{doc.setFont('courier',b?'bold':'normal').setFontSize(s).setTextColor(0,0,0).text(String(t),W/2,y,{align:'center',maxWidth:70});y+=s*.45+1.6}
   const kv=(k,v,b=false)=>{doc.setFont('courier',b?'bold':'normal').setFontSize(8).text(String(k),L,y);doc.text(String(v),R,y,{align:'right'});y+=4.2}
   const rule=(ch='-')=>{doc.setFont('courier','normal').setFontSize(8).text(ch.repeat(40),W/2,y,{align:'center'});y+=4}
-  c((brand.club_name||'Rotaract Club').toUpperCase(),10,true);if(brand.address)c(brand.address,7);if(brand.contact_phone)c('Ph: '+brand.contact_phone,7)
+  c((brand.club_name||'Blood donation club').toUpperCase(),10,true);if(brand.address)c(brand.address,7);if(brand.contact_phone)c('Ph: '+brand.contact_phone,7)
   rule('=');c('BLOOD DONATION CAMP',9,true);c('SUMMARY RECEIPT',8);rule('=')
   kv('Camp no.',pad('C',r.camp_no,3));kv('Date',fmt(r.camp.date));doc.setFont('courier','normal').setFontSize(8).text(r.camp.name,L,y,{maxWidth:70});y+=4.2*Math.ceil(r.camp.name.length/36)
   rule()

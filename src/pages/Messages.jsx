@@ -5,7 +5,7 @@ import {useAuth} from '../context/Auth'
 import {BLOOD,nextEligible,fmt,wa} from '../lib/util'
 import CountUp from '../components/CountUp'
 import {useLive,PageHeader} from '../components/ui'
-const SIGN=' - Sankari Rotaract Club'
+const SIGN=' - {club}'
 const DEFAULTS={
   birthday:'Happy Birthday {name}! Wishing you good health and happiness.'+SIGN,
   reminder_early:'Hello {name}, thank you for registering for {camp} on {date} at {venue}. Your slot: {slot}. We look forward to seeing you.'+SIGN,
@@ -13,13 +13,13 @@ const DEFAULTS={
   reminder_today:'Good morning {name}! {camp} is today at {venue}. Your slot: {slot}. See you there.'+SIGN,
   thank_you:'Thank you {name} for donating blood at {camp}. Your gift can save lives.'+SIGN,
   eligible_again:'Hello {name}, you are eligible to donate blood again. Join our next camp and save lives.'+SIGN,
-  invite:'Hello {name}, Sankari Rotaract Club is holding a blood donation camp: {camp} on {date} at {venue}. Register here: {link}'}
+  invite:'Hello {name}, {club} is holding a blood donation camp: {camp} on {date} at {venue}. Register here: {link}'}
 const NAMES={birthday:'Birthday',reminder_early:'Reminder, early',reminder_1d:'Reminder, day before',reminder_today:'Reminder, camp morning',thank_you:'Thank-you',eligible_again:'Eligible again',invite:'Camp invite'}
 const TABS=[['birthday','Birthdays'],['reminder','Camp reminders'],['thanks','Thank-you'],['eligible','Eligible again'],['invite','Invite donors'],['templates','Templates']]
-const fill=(b,v)=>b.replace(/\{(\w+)\}/g,(_,k)=>v[k]??'')
+let CLUB='';const fill=(b,v)=>b.replace(/\{(\w+)\}/g,(_,k)=>k==='club'?(v.club||CLUB):v[k]??'')
 async function allDonors(){let out=[],from=0;for(;;){const {data,error}=await supabase.from('donors').select('id,full_name,phone,dob,blood_group,gender,last_donation,consent,donor_no').is('deleted_at',null).order('id').range(from,from+999);if(error)throw error;out=out.concat(data);if(data.length<1000)return out;from+=1000}}
 export default function Messages(){
-  const {user,can}=useAuth(),admin=can('settings')
+  const {user,can,settings}=useAuth(),admin=can('settings');CLUB=settings.club_name||''
   const [donors,setDonors]=useState([]),[camps,setCamps]=useState([]),[tpl,setTpl]=useState(DEFAULTS),[tab,setTab]=useState('birthday'),[cid,setCid]=useState(''),[stage,setStage]=useState('early'),[grp,setGrp]=useState(''),[regs,setRegs]=useState([]),[sent,setSent]=useState(new Set()),[err,setErr]=useState(''),[draft,setDraft]=useState({})
   const today=new Date().toLocaleDateString('en-CA')
   const [tick,setTick]=useState(0)
@@ -59,7 +59,7 @@ export default function Messages(){
     {tab==='templates'?<div className="space-y-4">{Object.keys(DEFAULTS).map(k=><div key={k} className="card"><div className="mb-2 text-sm font-semibold text-fg">{NAMES[k]}</div>
         <textarea className="input" rows="3" disabled={!admin} value={draft[k]??tpl[k]} onChange={e=>setDraft({...draft,[k]:e.target.value})}/>
         {admin&&draft[k]!==undefined&&<button className="btn mt-2" onClick={()=>saveTpl(k)}>Save</button>}</div>)}
-      <p className="text-xs text-fog-faint">Words in curly brackets are filled in per donor: {'{name} {camp} {date} {venue} {slot} {link}'}. Only people with the Settings permission can edit.</p></div>
+      <p className="text-xs text-fog-faint">Words in curly brackets are filled in per donor: {'{name} {camp} {date} {venue} {slot} {link} {club}'}. Only people with the Settings permission can edit.</p></div>
     :<>
       {['reminder','thanks','invite'].includes(tab)&&<div className="mb-3 flex flex-wrap gap-2">
         <select className="input w-auto" value={cid} onChange={e=>setCid(e.target.value)}>{camps.map(c=><option key={c.id} value={c.id}>{c.name} ({fmt(c.camp_date)})</option>)}</select>

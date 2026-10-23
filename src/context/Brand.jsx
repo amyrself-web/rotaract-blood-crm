@@ -11,11 +11,20 @@ export const hexToRgb=rgb
 export function applyAccent(hex){if(!/^#[0-9a-f]{6}$/i.test(hex||''))return;const c=rgb(hex),r=document.documentElement.style
   r.setProperty('--brand',c.join(' '));r.setProperty('--brand-deep',mix(c,[0,0,0],.25).join(' '));r.setProperty('--brand-soft',mix(c,[255,255,255],.45).join(' '))}
 export function BrandProvider({children}){
-  const [brand,setBrand]=useState(DEFAULT_BRAND)
+  // last known brand is kept on this device so the right name and logo show from the first paint
+  const [brand,setBrandState]=useState(()=>{try{return {...DEFAULT_BRAND,...JSON.parse(localStorage.getItem('brand-cache')||'{}')}}catch{return DEFAULT_BRAND}})
+  const setBrand=v=>setBrandState(b=>{const n=typeof v==='function'?v(b):v;try{localStorage.setItem('brand-cache',JSON.stringify(n))}catch{}return n})
   const [mode,setModeState]=useState(()=>document.documentElement.dataset.theme==='light'?'light':'dark')
-  const refreshBrand=useCallback(async()=>{if(!hasSupabase)return;const {data,error}=await supabase.rpc('public_brand');if(!error&&data)setBrand(b=>({...b,...Object.fromEntries(Object.entries(data).filter(([,v])=>v!==null))}))},[])
+  const refreshBrand=useCallback(async()=>{if(!hasSupabase)return;const {data,error}=await supabase.rpc('public_brand');if(!error&&data)setBrand({...DEFAULT_BRAND,...Object.fromEntries(Object.entries(data).filter(([,v])=>v!==null&&v!==''))})},[])
   useEffect(()=>{refreshBrand()},[refreshBrand])
-  useEffect(()=>{applyAccent(brand.brand_color);document.title=brand.brand_name||'Blood CRM'
+  // anyone signed in sees a new name or logo as soon as Settings are saved
+  useEffect(()=>{if(!hasSupabase)return;const ch=supabase.channel('brand-live').on('postgres_changes',{event:'UPDATE',schema:'public',table:'settings'},()=>refreshBrand()).subscribe()
+    const vis=()=>document.visibilityState==='visible'&&refreshBrand();document.addEventListener('visibilitychange',vis)
+    return()=>{supabase.removeChannel(ch);document.removeEventListener('visibilitychange',vis)}},[refreshBrand])
+  useEffect(()=>{applyAccent(brand.brand_color);document.title=[brand.brand_name,brand.club_name!==brand.brand_name&&brand.club_name].filter(Boolean).join(' · ')||'Blood donation CRM'
+    // browser tab icon follows the club logo
+    let l=document.querySelector("link[rel~='icon']");if(!l){l=document.createElement('link');l.rel='icon';document.head.appendChild(l)}
+    l.href=brand.logo_url||"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%23E11D48'/%3E%3Cpath d='M50 18C50 18 26 48 26 63a24 24 0 0 0 48 0C74 48 50 18 50 18z' fill='white'/%3E%3C/svg%3E"
     let own=null;try{own=localStorage.getItem('theme')}catch{}
     if(!own&&brand.default_theme){setModeState(brand.default_theme);if(brand.default_theme==='light')document.documentElement.dataset.theme='light';else delete document.documentElement.dataset.theme}},[brand])
   const setMode=m=>{setModeState(m);if(m==='light')document.documentElement.dataset.theme='light';else delete document.documentElement.dataset.theme;try{localStorage.setItem('theme',m)}catch{}}
