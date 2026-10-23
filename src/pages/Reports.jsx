@@ -9,10 +9,31 @@ import {useLive,PageHeader} from '../components/ui'
 import {toast} from 'sonner'
 import {FileText,Receipt} from 'lucide-react'
 import CountUp from '../components/CountUp'
+import {rotaryYear,iso,memberDirectoryPdf,duesPdf,attendancePdf,afterlifePdf} from '../lib/clubReports'
+import {IdCard,Wallet,Presentation,Eye} from 'lucide-react'
+
+function ClubReports({brand,can}){
+  const ry=rotaryYear(),d=new Date()
+  const opts={year:{...ry,label:ry.label},month:{from:iso(new Date(d.getFullYear(),d.getMonth(),1)),to:iso(new Date(d.getFullYear(),d.getMonth()+1,0)),label:d.toLocaleDateString('en-IN',{month:'short',year:'numeric'}).replace(' ','-')},custom:null}
+  const [k,setK]=useState('year'),[c,setC]=useState({from:ry.from,to:iso(d)}),[busy,setBusy]=useState('')
+  const P=k==='custom'?{...c,label:`${c.from}_to_${c.to}`}:opts[k]
+  const go=async(id,f)=>{setBusy(id);try{await f()}catch(e){toast.error(e.message||String(e))}setBusy('')}
+  const items=[['members',IdCard,'Member directory','Every member with position, contact and blood group',()=>memberDirectoryPdf(brand)],
+    ['members',Wallet,'Dues collection','Receipts in the period and who has not paid',()=>duesPdf(brand,P)],
+    ['meetings',Presentation,'Attendance register','Attendance % per member and every meeting held',()=>attendancePdf(brand,P)],
+    ['afterlife',Eye,'Eye and body donation','Donations after death and new pledges',()=>afterlifePdf(brand,P)]].filter(x=>can(x[0]))
+  if(!items.length)return null
+  return <div className="card mt-5"><div className="mb-4 flex flex-wrap items-end gap-3"><div className="flex-1"><h2 className="font-semibold text-fg">Club reports</h2><p className="text-sm text-fog-muted">A4 PDF reports for members, meetings and eye donation.</p></div>
+    <select className="input w-auto" aria-label="Period" value={k} onChange={e=>setK(e.target.value)}><option value="year">Rotary year {ry.label}</option><option value="month">This month</option><option value="custom">Choose dates</option></select>
+    {k==='custom'&&<><input type="date" className="input w-auto" aria-label="From" value={c.from} onChange={e=>setC({...c,from:e.target.value})}/><input type="date" className="input w-auto" aria-label="To" value={c.to} onChange={e=>setC({...c,to:e.target.value})}/></>}</div>
+    <div className="grid gap-3 sm:grid-cols-2">{items.map(([,I,t,dsc,f])=><button key={t} disabled={!!busy} onClick={()=>go(t,f)} className="tile group flex items-center gap-3 p-4 text-left transition hover:border-brand/40">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand transition-transform group-hover:scale-110"><I size={19}/></span>
+      <span className="min-w-0 flex-1"><span className="block font-medium text-fg">{busy===t?'Preparing…':t}</span><span className="block text-xs text-fog-muted">{dsc}</span></span><FileText size={16} className="text-fog-faint"/></button>)}</div></div>
+}
 const safe=v=>typeof v==='string'&&/^[=+\-@\t\r]/.test(v)?"'"+v:v  // stops spreadsheet formula injection
 const dl=(name,rows)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([Papa.unparse(rows.map(r=>Object.fromEntries(Object.entries(r).map(([k,v])=>[k,safe(v)]))))],{type:'text/csv'}));a.download=name;a.click()}
 export default function Reports(){
-  const {brand}=useBrand(),{profile}=useAuth()
+  const {brand}=useBrand(),{profile,can}=useAuth()
   const [camps,setCamps]=useState([]),[cid,setCid]=useState(''),[r,setR]=useState(null),[err,setErr]=useState(''),[busy,setBusy]=useState('')
   useEffect(()=>{supabase.from('camps').select('id,name,camp_date').order('camp_date',{ascending:false}).then(({data})=>{setCamps(data||[]);if(data?.length)setCid(data[0].id)})},[])
   const load=()=>cid&&supabase.rpc('camp_report_full',{p_camp:cid}).then(({data,error})=>error?setErr(error.message):(setErr(''),setR(data)))
@@ -31,5 +52,5 @@ export default function Reports(){
       {r.by_group.Unknown>0&&<p className="mt-2 text-xs text-fog-faint">{r.by_group.Unknown} donation(s) with blood group not recorded.</p>}</div>
       <div className="card mb-5"><h2 className="mb-2 font-semibold text-fg">Money</h2><div className="text-sm text-fog">Sponsorship received Rs. {Number(r.sponsors_received).toLocaleString('en-IN')} · Expenses Rs. {Number(r.expenses).toLocaleString('en-IN')} · Balance Rs. {Number(r.sponsors_received-r.expenses).toLocaleString('en-IN')}</div></div></>}
     <div className="card"><h2 className="mb-1 font-semibold text-fg">Export to Excel (CSV)</h2><p className="mb-3 text-sm text-fog-muted">These files hold donors' personal details. Share them only with club office bearers.</p>
-      <div className="flex flex-wrap gap-2"><button className="btn" onClick={donors}>All donors</button><button className="btn" disabled={!cid} onClick={regs}>Registrants of this camp</button></div></div></div>
+      <div className="flex flex-wrap gap-2"><button className="btn" onClick={donors}>All donors</button><button className="btn" disabled={!cid} onClick={regs}>Registrants of this camp</button></div></div><ClubReports brand={brand} can={can}/></div>
 }

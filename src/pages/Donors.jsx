@@ -6,7 +6,8 @@ import Papa from 'papaparse'
 import {supabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
 import {BLOOD,normPhone,fmt,wa} from '../lib/util'
-import {PageHeader,Drawer,Field,Badge,Empty,useConfirm,errText,useLive,undoToast,code,adultMax,adultMin,todayIso} from '../components/ui'
+import {PageHeader,Drawer,Field,Badge,Empty,useConfirm,errText,useLive,undoToast,code,adultMax,adultMin,todayIso,Tabs} from '../components/ui'
+import DonorHistory from '../components/DonorHistory'
 
 const empty={full_name:'',phone:'',email:'',blood_group:'',gender:'',dob:'',area:'',last_donation:'',consent:false}
 const PAGE=25
@@ -14,7 +15,7 @@ async function all(){let out=[],from=0;for(;;){const {data,error}=await supabase
 
 export default function Donors(){
   const {settings,can,user}=useAuth(),confirm=useConfirm(),[sp]=useSearchParams()
-  const [rows,setRows]=useState(null),[q,setQ]=useState(sp.get('q')||''),[g,setG]=useState(''),[elig,setElig]=useState(''),[consent,setConsent]=useState(''),[page,setPage]=useState(0),[form,setForm]=useState(null),[busy,setBusy]=useState(false),[sort,setSort]=useState(()=>{try{return JSON.parse(localStorage.getItem('donor-sort'))||['no',1]}catch{return ['no',1]}})
+  const [rows,setRows]=useState(null),[q,setQ]=useState(sp.get('q')||''),[g,setG]=useState(''),[elig,setElig]=useState(''),[consent,setConsent]=useState(''),[page,setPage]=useState(0),[form,setForm]=useState(null),[busy,setBusy]=useState(false),[dtab,setDtab]=useState('details'),[sort,setSort]=useState(()=>{try{return JSON.parse(localStorage.getItem('donor-sort'))||['no',1]}catch{return ['no',1]}})
   const load=()=>all().then(setRows).catch(e=>toast.error(errText(e)))
   useEffect(()=>{load()},[])
   useLive(['donors'],load)
@@ -28,7 +29,8 @@ export default function Donors(){
       const A=v(a),B=v(b);return (A<B?-1:A>B?1:a.donor_no-b.donor_no)*d}),[rows,q,g,elig,consent,settings,sort])
   const Th=({k,children,className=''})=>{const on=sort[0]===k,I=on?(sort[1]>0?ArrowUp:ArrowDown):ArrowUpDown
     return <th className={className} aria-sort={on?(sort[1]>0?'ascending':'descending'):'none'}><button onClick={()=>setSort(on?[k,-sort[1]]:[k,1])} className={`inline-flex items-center gap-1 transition-colors hover:text-fg ${on?'text-fg':''}`}>{children}<I size={12} className={on?'':'opacity-40'}/></button></th>}
-  const edit=r=>setForm({...empty,...Object.fromEntries(Object.entries(r).map(([k,v])=>[k,v??''])),_orig:r})
+  const edit=(r,t='details')=>{setDtab(t);setForm({...empty,...Object.fromEntries(Object.entries(r).map(([k,v])=>[k,v??''])),_orig:r})}
+  useEffect(()=>{if(rows&&sp.get('history')&&q){const r=rows.find(x=>x.phone===q);if(r)edit(r,'history')}},[rows])
   const shown=list.slice(page*PAGE,page*PAGE+PAGE),pages=Math.ceil(list.length/PAGE)
   const set=k=>e=>setForm({...form,[k]:e.target.type==='checkbox'?e.target.checked:e.target.value})
   const save=async e=>{e.preventDefault();const phone=normPhone(form.phone);if(!/^[6-9]\d{9}$/.test(phone))return toast.error('Enter a valid 10-digit mobile number')
@@ -52,7 +54,7 @@ export default function Donors(){
   const exportCsv=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([Papa.unparse(list.map(({id,user_id,...r})=>r))],{type:'text/csv'}));a.download='donors.csv';a.click()}
   return <div>
     <PageHeader title="Donors" description={rows?`${rows.length} donors, ${rows.filter(r=>r.consent).length} can be contacted`:'Loading donors'}
-      actions={<><button className="btn-quiet" onClick={exportCsv} disabled={!list.length}><Download size={15}/>Export</button><button className="btn" onClick={()=>setForm({...empty})}><Plus size={16}/>Add donor</button></>}/>
+      actions={<><button className="btn-quiet" onClick={exportCsv} disabled={!list.length}><Download size={15}/>Export</button><button className="btn" onClick={()=>{setDtab('details');setForm({...empty})}}><Plus size={16}/>Add donor</button></>}/>
     <div className="card overflow-hidden p-0">
       <div className="grid grid-cols-2 gap-2 border-b border-ink-700 p-3 lg:grid-cols-[1fr_auto_auto_auto_auto]">
         <div className="relative col-span-2 lg:col-span-1"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-fog-faint"/><input className="input pl-9" placeholder="Search name, mobile, area, email" value={q} onChange={e=>setQ(e.target.value)}/></div>
@@ -89,10 +91,12 @@ export default function Donors(){
       {pages>1&&<div className="flex items-center justify-between border-t border-ink-700 px-4 py-3 text-sm text-fog-muted"><span>{page*PAGE+1} to {Math.min(list.length,(page+1)*PAGE)} of {list.length}</span>
         <div className="flex gap-2"><button className="btn-quiet" disabled={!page} onClick={()=>setPage(page-1)}>Previous</button><button className="btn-quiet" disabled={page>=pages-1} onClick={()=>setPage(page+1)}>Next</button></div></div>}
     </div>
-    <Drawer open={!!form} onClose={()=>setForm(null)} title={form?.id?`Edit donor ${code('D',form.donor_no)}`:'Add donor'} description={form?.id?`Added ${fmt(form.created_at)}${form.source?` from ${form.source}`:''}`:'Fields marked * are required. Mobile number must be unique.'}
-      footer={form&&<>{form.id&&can('donors')&&<button className="btn-quiet mr-auto text-blood" onClick={remove}><Trash2 size={15}/>Move to Recycle bin</button>}
+    <Drawer open={!!form} onClose={()=>setForm(null)} width={dtab==='history'&&form?.id?'max-w-2xl':'max-w-lg'} title={form?.id?`Edit donor ${code('D',form.donor_no)}`:'Add donor'} description={form?.id?`Added ${fmt(form.created_at)}${form.source?` from ${form.source}`:''}`:'Fields marked * are required. Mobile number must be unique.'}
+      footer={form&&(dtab==='details'||!form.id)&&<>{form.id&&can('donors')&&<button className="btn-quiet mr-auto text-blood" onClick={remove}><Trash2 size={15}/>Move to Recycle bin</button>}
         <button className="btn-quiet" onClick={()=>setForm(null)}>Cancel</button><button className="btn" form="donor-form" disabled={busy}>{busy?'Saving…':form.id?'Save changes':'Add donor'}</button></>}>
-      {form&&<form id="donor-form" onSubmit={save} className="grid gap-4 sm:grid-cols-2">
+      {form?.id&&<Tabs id="donor-tabs" value={dtab} onChange={setDtab} tabs={[['details','Details'],['history','Full history']]}/>}
+      {form?.id&&dtab==='history'&&<DonorHistory donor={form._orig}/>}
+      {form&&(dtab==='details'||!form.id)&&<form id="donor-form" onSubmit={save} className="grid gap-4 sm:grid-cols-2">
         <Field label="Full name" required className="sm:col-span-2"><input className="input" required minLength={2} maxLength={80} value={form.full_name} onChange={set('full_name')}/></Field>
         <Field label="Mobile" required hint="10 digits, starts with 6, 7, 8 or 9"><input className="input" required inputMode="numeric" value={form.phone} onChange={set('phone')}/></Field>
         <Field label="Email"><input className="input" type="email" value={form.email} onChange={set('email')}/></Field>

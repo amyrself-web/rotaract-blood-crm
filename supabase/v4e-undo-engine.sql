@@ -2,11 +2,12 @@
 -- Reverses every change made in one transaction (one save, delete or camp-day step).
 create or replace function _revert_tx(p_txid bigint) returns int language plpgsql security definer set search_path=public as $$
 declare r record; pk text; cols text; n int := 0;
-  rank jsonb := '{"profiles":0,"camps":1,"donors":1,"handovers":1,"registrations":2,"screenings":3,"donations":3,"blood_units":4}';
+  rank jsonb := '{"profiles":0,"camps":1,"donors":1,"handovers":1,"registrations":2,"screenings":3,"donations":3,"blood_units":4,"members":1,"meetings":1,"pledges":1}';
 begin
   if exists(select 1 from audit_logs where txid=p_txid and reverted_at is null and table_name not in
      ('donors','camps','registrations','screenings','donations','blood_units','handovers','emergency_requests','tasks','camp_volunteers','sponsors','expenses',
-      'settings','message_templates','stock_thresholds','profiles')) then raise exception 'This change cannot be undone'; end if;
+      'settings','message_templates','stock_thresholds','profiles',
+      'members','member_dues','meetings','meeting_actions','pledges','afterlife_cases','donor_events')) then raise exception 'This change cannot be undone'; end if;
   if exists(select 1 from audit_logs where txid=p_txid and reverted_at is null and table_name in ('profiles','settings') and action<>'update') then
     raise exception 'Adding or removing users and settings cannot be undone here'; end if;
   perform set_config('app.reverting','1',true);
@@ -22,7 +23,7 @@ begin
   -- 2. set changed columns back to their old values, newest first
   for r in select * from audit_logs where txid=p_txid and reverted_at is null and action='update' order by id desc loop
     pk := _pk(r.table_name);
-    select string_agg(quote_ident(k),',') into cols from jsonb_object_keys(r.changes) k where k not in ('id','created_at','donor_no','camp_no','member_no','req_no','token_no','cert_no','handover_no','sponsor_no','expense_no','volunteer_no');
+    select string_agg(quote_ident(k),',') into cols from jsonb_object_keys(r.changes) k where k not in ('id','created_at','donor_no','camp_no','member_no','req_no','token_no','cert_no','handover_no','sponsor_no','expense_no','volunteer_no','member_no','receipt_no','meeting_no','action_no','pledge_no','case_no','event_no','verify_code');
     if cols is null then continue; end if;
     execute format('update %I set (%s) = (select %s from jsonb_populate_record(null::%I, $1)) where %I::text = $2', r.table_name, cols, cols, r.table_name, pk)
       using r.snapshot, r.snapshot->>pk; n:=n+1;

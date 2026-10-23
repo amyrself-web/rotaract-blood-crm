@@ -24,6 +24,9 @@ import Calendar from './pages/Calendar'
 import Audit from './pages/Audit'
 import SettingsPage from './pages/Settings'
 import Profile from './pages/Profile'
+import Members from './pages/Members'
+import Meetings from './pages/Meetings'
+import Afterlife from './pages/Afterlife'
 import {ALL_NAV,allowed} from './nav'
 import {Lock} from 'lucide-react'
 
@@ -34,9 +37,9 @@ function Guard(){const {user,profile,loading}=useAuth()
   if(loading)return <div className="grid min-h-screen place-items-center"><div className="h-10 w-10 animate-spin rounded-full border-2 border-ink-600 border-t-blood"/></div>
   return user&&profile?<Layout/>:<Navigate to="/login" replace/>}
 const PAGES=[['/donors',Donors],['/camps',Camps],['/import',Import],['/camp-day',CampDay],['/messages',Messages],['/stock',Stock],['/planning',Planning],
-  ['/reports',Reports],['/users',UsersPage],['/calendar',Calendar],['/audit',Audit],['/settings',SettingsPage],['/trash',Trash]]
+  ['/reports',Reports],['/users',UsersPage],['/calendar',Calendar],['/audit',Audit],['/settings',SettingsPage],['/trash',Trash],['/members',Members],['/meetings',Meetings],['/afterlife',Afterlife]]
 function Toasts(){const {mode}=useBrand()
-  return <Toaster position="bottom-right" theme={mode} toastOptions={{style:{background:'rgb(var(--ink-800))',border:'1px solid rgb(var(--ink-600))',color:'rgb(var(--fg))',fontFamily:'Manrope, system-ui, sans-serif'}}}/>}
+  return <Toaster position="top-center" offset={14} theme={mode} toastOptions={{style:{background:'rgb(var(--ink-800))',border:'1px solid rgb(var(--ink-600))',color:'rgb(var(--fg))',fontFamily:'Manrope, system-ui, sans-serif'}}}/>}
 export default function App(){return <BrandProvider><AuthProvider><ConfirmProvider><HashRouter><Routes>
   <Route path="/login" element={<Login/>}/>
   <Route path="/register/:campId" element={<Register/>}/>

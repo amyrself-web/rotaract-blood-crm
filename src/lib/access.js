@@ -13,11 +13,14 @@ export const MODULES=[
   ['reports','Reports','Camp reports and exports'],
   ['users','Users','Create users, roles and permissions'],
   ['audit','Audit log','See who changed what'],
-  ['settings','Settings','Club details, rules, templates']]
+  ['settings','Settings','Club details, rules, templates'],
+  ['members','Club members','Member records, dues and history'],
+  ['meetings','Meetings','Weekly and monthly meetings, attendance, minutes'],
+  ['afterlife','Eye and body donation','Pledges and donations after death']]
 export const ROLE_DEFAULTS={
   admin:MODULES.map(m=>m[0]),
-  coordinator:['donors','camps','import','planning','campday','messages','stock','emergency','reports'],
-  medical:['campday','screening','stock','stock_edit','emergency'],
+  coordinator:['donors','camps','import','planning','campday','messages','stock','emergency','reports','members','meetings','afterlife'],
+  medical:['campday','screening','stock','stock_edit','emergency','afterlife'],
   volunteer:['campday'],donor:[]}
 export const ROLE_LABEL={admin:'Admin',coordinator:'Coordinator',medical:'Medical',volunteer:'Volunteer',donor:'Donor'}
 export const ROLE_HINT={admin:'Everything, including users and settings',coordinator:'Runs camps, donors and messages',medical:'Screening, donations and stock',volunteer:'Camp day desk only',donor:'Own donor portal only'}

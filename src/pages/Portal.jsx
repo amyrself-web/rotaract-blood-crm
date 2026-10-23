@@ -22,7 +22,7 @@ export default function Portal(){
       <label className="block text-sm text-fog-muted">Date of birth<input type="date" className="input mt-1" required value={f.dob} onChange={e=>setF({...f,dob:e.target.value})}/></label>
       <label className="flex gap-2 text-sm text-fog"><input type="checkbox" required checked={f.consent} onChange={e=>setF({...f,consent:e.target.checked})}/>I agree to be contacted about camps and blood donation drives.</label>
       {err&&<p className="text-sm text-blood">{err}</p>}<button className="btn w-full">Link my record</button></form></div>
-  const d=p.donor,n=p.history.length,ne=nextEligible(d.last_donation,d.gender),regIds=new Set(p.upcoming.map(u=>u.camp_id)),gave=new Set(p.history.map(h=>h.camp+'|'+h.date))
+  const d=p.donor,out=p.outside||[],n=p.history.length+out.reduce((x,o)=>x+(o.units||1),0),ne=nextEligible(d.last_donation,d.gender),regIds=new Set(p.upcoming.map(u=>u.camp_id)),gave=new Set(p.history.map(h=>h.camp+'|'+h.date))
   return <div><PageHeader eyebrow={d.donor_no?code('D',d.donor_no):undefined} title={`Hello, ${d.name}`} description="Thank you for being a blood donor"/>
     {err&&<p className="mb-3 text-sm text-blood">{err}</p>}
     <div className="card mb-5 grid grid-cols-2 gap-4 text-center sm:grid-cols-4">
@@ -36,6 +36,7 @@ export default function Portal(){
       {!p.open_camps.length&&<p className="text-sm text-fog-faint">No camp is open right now.</p>}</div>
     <div className="card"><h2 className="mb-3 font-semibold text-fg">Your donations</h2>
       {p.history.map(h=><div key={h.code} className="flex items-center justify-between border-t border-ink-700 py-2 first:border-0"><div><div className="text-fg">{h.camp}</div><div className="text-sm text-fog-muted">{fmt(h.date)}</div></div>
-        <button className="btn" disabled={busy===h.cert_no} onClick={async()=>{setBusy(h.cert_no);try{await makeCertificate({name:d.name,camp:h.camp,venue:h.venue,date:fmt(h.date),bloodGroup:d.blood_group,volume:h.volume,certificate:h.cert_no?certNo(h.cert_no):h.code,donorNo:code('D',d.donor_no),brand})}finally{setBusy(null)}}}><Award size={16}/>{busy===h.cert_no?'Preparing…':'Certificate'}</button></div>)}
+        <button className="btn" disabled={busy===h.cert_no} onClick={async()=>{setBusy(h.cert_no);try{await makeCertificate({name:d.name,camp:h.camp,venue:h.venue,date:fmt(h.date),bloodGroup:d.blood_group,volume:h.volume,certificate:h.cert_no?certNo(h.cert_no):h.code,verifyCode:h.verify_code,donorNo:code('D',d.donor_no),brand})}finally{setBusy(null)}}}><Award size={16}/>{busy===h.cert_no?'Preparing…':'Certificate'}</button></div>)}
+      {out.map((o,i)=><div key={'o'+i} className="flex items-center justify-between border-t border-ink-700 py-2 first:border-0"><div><div className="text-fg">{o.kind==='emergency_donation'?'Emergency donation':'Donation'} at {o.place}</div><div className="text-sm text-fog-muted">{fmt(o.date)}</div></div><span className="text-xs text-fog-faint">Recorded by the club</span></div>)}
       {!n&&<p className="text-sm text-fog-faint">Your donations will appear here after your first camp.</p>}</div></div>
 }

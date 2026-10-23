@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useRef,useState} from 'react'
 import {NavLink,Outlet,useLocation,useNavigate} from 'react-router-dom'
 import {motion} from 'framer-motion'
-import {Droplet,LogOut,Menu,Search,Bell,ChevronsLeft,UserRound,X,AlertTriangle,Cake,Clock,ListChecks,LayoutTemplate} from 'lucide-react'
+import {Droplet,LogOut,Menu,Search,Bell,ChevronsLeft,UserRound,X,AlertTriangle,Cake,Clock,ListChecks,LayoutTemplate,Presentation,Eye} from 'lucide-react'
 import {useAuth} from '../context/Auth'
 import {NAV,ALL_NAV,allowed} from '../nav'
 import {supabase} from '../lib/supabase'
@@ -32,7 +32,7 @@ function Sidebar({collapsed,setCollapsed,mobile,closeMobile}){
 
 export function useNotifications(){
   const {can}=useAuth(),[items,setItems]=useState([]),[tick,setTick]=useState(0)
-  useLive(['emergency_requests','blood_units','tasks','donors'],()=>setTick(x=>x+1))
+  useLive(['emergency_requests','blood_units','tasks','donors','meetings','meeting_actions','afterlife_cases'],()=>setTick(x=>x+1))
   useEffect(()=>{let live=true;(async()=>{
     const out=[],today=new Date().toLocaleDateString('en-CA'),soon=new Date(Date.now()+3*864e5).toLocaleDateString('en-CA')
     if(can('emergency')){const r=await supabase.from('emergency_requests').select('id,blood_group,units_needed,hospital').eq('status','open').limit(5)
@@ -44,6 +44,12 @@ export function useNotifications(){
       if(n)out.push({icon:Cake,tone:'blue',text:`${n} donor birthday${n>1?'s':''} today`,to:'/messages'})}
     if(can('planning')){const r=await supabase.from('tasks').select('id',{count:'exact',head:true}).eq('done',false).lte('due',today)
       if(r.count)out.push({icon:ListChecks,tone:'amber',text:`${r.count} camp task${r.count>1?'s are':' is'} due`,to:'/planning'})}
+    if(can('meetings')){const m=await supabase.from('meetings').select('title,start_time').is('deleted_at',null).eq('status','scheduled').eq('meeting_date',today).limit(2)
+      m.data?.forEach(x=>out.push({icon:Presentation,tone:'blue',text:`Meeting today${x.start_time?` at ${x.start_time.slice(0,5)}`:''}: ${x.title}`,to:'/meetings'}))
+      const a=await supabase.from('meeting_actions').select('id',{count:'exact',head:true}).eq('done',false).lt('due',today)
+      if(a.count)out.push({icon:ListChecks,tone:'amber',text:`${a.count} meeting action item${a.count>1?'s are':' is'} overdue`,to:'/meetings'})}
+    if(can('afterlife')){const c=await supabase.from('afterlife_cases').select('id',{count:'exact',head:true}).is('deleted_at',null).in('status',['informed','team sent'])
+      if(c.count)out.push({icon:Eye,tone:'red',text:`${c.count} eye/body donation case${c.count>1?'s':''} in progress`,to:'/afterlife'})}
     if(live)setItems(out)})();return()=>{live=false}},[can,tick])
   return items
 }

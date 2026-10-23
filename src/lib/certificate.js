@@ -3,6 +3,7 @@ import QRCode from 'qrcode'
 // Certificate is designed in HTML (so any language and the club logo render properly), then turned into an A4 landscape PDF.
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
 export const certNo=n=>n==null?'':`CRT-${String(n).padStart(6,'0')}`
+export const fmtCode=c=>c&&c.length===12?c.match(/.{4}/g).join('-'):c||''
 export const verifyUrl=c=>`${location.origin}${location.pathname}#/verify/${encodeURIComponent(c)}`
 
 const DROP='M50 6C50 6 18 46 18 66a32 32 0 0 0 64 0C82 46 50 6 50 6z'
@@ -22,9 +23,9 @@ function pattern(){
     <path d="${DROP}" transform="translate(830 330) scale(3.4)" fill="#F0435A" fill-opacity=".035"/></svg>`
 }
 
-export async function makeCertificate({name,camp,date,venue,bloodGroup,volume,certificate,donorNo,brand={}}){
+export async function makeCertificate({name,camp,date,venue,bloodGroup,volume,certificate,verifyCode,donorNo,brand={}}){
   const [{default:html2canvas},{jsPDF}]=await Promise.all([import('html2canvas'),import('jspdf')])
-  const qr=await QRCode.toDataURL(verifyUrl(certificate),{margin:0,width:260,color:{dark:'#0B1324',light:'#ffffff'}})
+  const check=verifyCode||certificate,qr=await QRCode.toDataURL(verifyUrl(fmtCode(check)),{margin:0,width:260,color:{dark:'#0B1324',light:'#ffffff'}})
   const accent=brand.brand_color||'#4C8DFF'
   const club=brand.club_name||'Sankari Rotaract Club'
   const logo=brand.logo_url?`<img src="${esc(brand.logo_url)}" crossorigin="anonymous" style="width:74px;height:74px;object-fit:contain;border-radius:16px;background:#fff;padding:6px;box-shadow:0 4px 14px rgba(11,19,36,.12)"/>`
@@ -60,7 +61,7 @@ export async function makeCertificate({name,camp,date,venue,bloodGroup,volume,ce
     <div style="margin-top:auto;display:flex;align-items:flex-end;gap:38px">
       ${sign(brand.signatory_name,brand.signatory_title||'President')}${sign(brand.signatory2_name,brand.signatory2_name?brand.signatory2_title||'Secretary':'')}
       <div style="flex:1"></div>
-      <div style="text-align:center"><img src="${qr}" style="width:96px;height:96px"/><div style="font:600 10.5px Manrope,sans-serif;color:#5D6E8F;margin-top:6px">Scan to verify</div></div></div>
+      <div style="text-align:center"><img src="${qr}" style="width:96px;height:96px"/><div style="font:600 10.5px Manrope,sans-serif;color:#5D6E8F;margin-top:6px">Scan to verify</div><div style="font:700 10.5px 'Courier New',monospace;color:#0B1324;margin-top:2px;letter-spacing:.5px">${esc(fmtCode(check))}</div></div></div>
   </div>
   <div style="position:absolute;right:66px;top:150px">${seal()}</div>`
   document.body.appendChild(el)
