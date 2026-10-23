@@ -12,6 +12,8 @@ import {buildPdf,rs,pad} from '../lib/docpdf'
 import CountUp from '../components/CountUp'
 import {memberIdCards} from '../lib/cards'
 import {PhotoPicker} from '../components/PhotoPicker'
+import {InductionTab,NewYear} from '../components/ClubAdmin'
+import {Crown} from 'lucide-react'
 
 const genPw=()=>{const a='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';return 'Rc-'+[...crypto.getRandomValues(new Uint32Array(10))].map(x=>a[x%a.length]).join('')}
 export const POSITIONS=['President','Vice President','Secretary','Joint Secretary','Treasurer','Sergeant-at-Arms','Club Service Director','Community Service Director',
@@ -26,7 +28,7 @@ const Bar=({v})=><div className="flex items-center gap-2"><div className="h-1.5 
 export default function Members(){
   const {can}=useAuth(),{brand}=useBrand(),confirm=useConfirm(),ry=rotaryYear()
   const [rows,setRows]=useState(null),[dues,setDues]=useState([]),[att,setAtt]=useState({}),[q,setQ]=useState(''),[st,setSt]=useState('active'),[type,setType]=useState('')
-  const [form,setForm]=useState(null),[tab,setTab]=useState('details'),[busy,setBusy]=useState(false),[prof,setProf]=useState(null),[pay,setPay]=useState(null),[pdf,setPdf]=useState(''),[login,setLogin]=useState(null),[loginInfo,setLoginInfo]=useState(null)
+  const [newYear,setNewYear]=useState(false),[form,setForm]=useState(null),[tab,setTab]=useState('details'),[busy,setBusy]=useState(false),[prof,setProf]=useState(null),[pay,setPay]=useState(null),[pdf,setPdf]=useState(''),[login,setLogin]=useState(null),[loginInfo,setLoginInfo]=useState(null)
   const load=async()=>{try{
     const [m,d,a]=await Promise.all([supabase.from('members').select('*').is('deleted_at',null).order('member_no'),supabase.from('member_dues').select('member_id,amount,paid_on').gte('paid_on',ry.from).lte('paid_on',ry.to),
       supabase.rpc('attendance_summary',{p_from:ry.from,p_to:ry.to})])
@@ -76,7 +78,9 @@ export default function Members(){
         <button className="btn-quiet" disabled={!!pdf} onClick={()=>run('dir',()=>memberDirectoryPdf(brand))}><FileText size={15}/>{pdf==='dir'?'Preparing…':'Directory PDF'}</button>
         <button className="btn-quiet" disabled={!!pdf} onClick={()=>run('dues',()=>duesPdf(brand,ry))}><Wallet size={15}/>{pdf==='dues'?'Preparing…':'Dues report'}</button>
         <button className="btn-quiet" disabled={!!pdf||!active.length} onClick={()=>run('ids',()=>memberIdCards(active,brand,'sheet'))}><IdCard size={15}/>{pdf==='ids'?'Preparing…':'ID cards'}</button>
+        <button className="btn-quiet" onClick={()=>setNewYear(true)}><Crown size={15}/>New Rotary year</button>
         <button className="btn" onClick={()=>open(null)}><Plus size={16}/>Add member</button></>}/>
+    <NewYear open={newYear} onClose={()=>setNewYear(false)} members={rows||[]} positions={POSITIONS} onDone={load}/>
     <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
       <Stat label="Active members" value={active.length} sub={`${(rows||[]).filter(r=>r.membership_type==='Prospective').length} prospective`}/>
       <Stat label={`Average attendance ${ry.label}`} value={pcts.length?Math.round(pcts.reduce((a,b)=>a+b,0)/pcts.length)+'%':'-'}/>
@@ -110,7 +114,8 @@ export default function Members(){
     <Drawer open={!!form} onClose={()=>setForm(null)} width="max-w-2xl" title={form?.id?`${form.full_name} · ${code('M',form.member_no,3)}`:'Add member'} description={form?.id?`${form.position} · joined ${fmt(form.joined_on)}`:'Fields marked * are required.'}
       footer={form&&tab==='details'&&<>{form.id&&<button className="btn-quiet mr-auto text-blood" onClick={remove}><Trash2 size={15}/>Move to Recycle bin</button>}
         <button className="btn-quiet" onClick={()=>setForm(null)}>Cancel</button><button className="btn" form="member-form" disabled={busy}>{busy?'Saving…':form.id?'Save changes':'Add member'}</button></>}>
-      {form&&<>{form.id&&<Tabs id="mem-tabs" value={tab} onChange={setTab} tabs={[['details','Details'],['dues','Dues'],['attendance','Attendance'],['blood','Blood donations'],['card','ID card'],['login','Login']]}/>}
+      {form&&<>{form.id&&<Tabs id="mem-tabs" value={tab} onChange={setTab} tabs={[['details','Details'],['dues','Dues'],['attendance','Attendance'],['blood','Blood donations'],['card','ID card'],['induction','Induction'],['login','Login']]}/>}
+      {tab==='induction'&&form.id&&<InductionTab member={{...form._orig,...form}} onChange={()=>{load();setForm(f=>({...f,membership_type:'Active'}))}}/>}
       {tab==='card'&&<div className="space-y-4">
         <PhotoPicker member={form} onSaved={url=>{setForm({...form,photo_url:url});load()}}/>
         <div className="tile flex flex-wrap items-center gap-3 p-4"><IdCard size={20} className="text-brand"/><div className="flex-1"><div className="font-medium text-fg">Member ID card</div><div className="text-xs text-fog-muted">Card size with photo, blood group and a QR code. Anyone who scans it sees only the name, member ID, position and whether the card is valid (till 30 June).</div></div>

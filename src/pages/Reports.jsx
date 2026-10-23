@@ -7,25 +7,30 @@ import {useBrand} from '../context/Brand'
 import {useAuth} from '../context/Auth'
 import {useLive,PageHeader} from '../components/ui'
 import {toast} from 'sonner'
-import {FileText,Receipt} from 'lucide-react'
+import {Clock,FileText,FolderHeart,Receipt,Send} from 'lucide-react'
 import CountUp from '../components/CountUp'
-import {rotaryYear,iso,memberDirectoryPdf,duesPdf,attendancePdf,afterlifePdf} from '../lib/clubReports'
+import {afterlifePdf,attendancePdf,districtPdf,duesPdf,hoursPdf,iso,memberDirectoryPdf,projectsPdf,rotaryYear} from '../lib/clubReports'
 import {IdCard,Wallet,Presentation,Eye} from 'lucide-react'
 
 function ClubReports({brand,can}){
   const ry=rotaryYear(),d=new Date()
   const opts={year:{...ry,label:ry.label},month:{from:iso(new Date(d.getFullYear(),d.getMonth(),1)),to:iso(new Date(d.getFullYear(),d.getMonth()+1,0)),label:d.toLocaleDateString('en-IN',{month:'short',year:'numeric'}).replace(' ','-')},custom:null}
-  const [k,setK]=useState('year'),[c,setC]=useState({from:ry.from,to:iso(d)}),[busy,setBusy]=useState('')
+  const [mon,setMon]=useState(()=>{const x=new Date(d.getFullYear(),d.getMonth()-(d.getDate()<10?1:0),1);return iso(x).slice(0,7)}),[k,setK]=useState('year'),[c,setC]=useState({from:ry.from,to:iso(d)}),[busy,setBusy]=useState('')
   const P=k==='custom'?{...c,label:`${c.from}_to_${c.to}`}:opts[k]
   const go=async(id,f)=>{setBusy(id);try{await f()}catch(e){toast.error(e.message||String(e))}setBusy('')}
   const items=[['members',IdCard,'Member directory','Every member with position, contact and blood group',()=>memberDirectoryPdf(brand)],
     ['members',Wallet,'Dues collection','Receipts in the period and who has not paid',()=>duesPdf(brand,P)],
     ['meetings',Presentation,'Attendance register','Attendance % per member and every meeting held',()=>attendancePdf(brand,P)],
-    ['afterlife',Eye,'Eye and body donation','Donations after death and new pledges',()=>afterlifePdf(brand,P)]].filter(x=>can(x[0]))
+    ['afterlife',Eye,'Eye and body donation','Donations after death and new pledges',()=>afterlifePdf(brand,P)],
+    ['members',FolderHeart,'Service projects','Every project with people helped, hours and money',()=>projectsPdf(brand,P)],
+    ['members',Clock,'Volunteer hours','Approved service hours per member',()=>hoursPdf(brand,P)]].filter(x=>can(x[0]))
   if(!items.length)return null
   return <div className="card mt-5"><div className="mb-4 flex flex-wrap items-end gap-3"><div className="flex-1"><h2 className="font-semibold text-fg">Club reports</h2><p className="text-sm text-fog-muted">A4 PDF reports for members, meetings and eye donation.</p></div>
     <select className="input w-auto" aria-label="Period" value={k} onChange={e=>setK(e.target.value)}><option value="year">Rotary year {ry.label}</option><option value="month">This month</option><option value="custom">Choose dates</option></select>
     {k==='custom'&&<><input type="date" className="input w-auto" aria-label="From" value={c.from} onChange={e=>setC({...c,from:e.target.value})}/><input type="date" className="input w-auto" aria-label="To" value={c.to} onChange={e=>setC({...c,to:e.target.value})}/></>}</div>
+    {(can('reports')||can('members'))&&<div className="tile mb-3 flex flex-wrap items-center gap-3 border-brand/40 bg-brand/[.06] p-4"><span className="grid h-10 w-10 place-items-center rounded-xl bg-brand text-white"><Send size={18}/></span>
+      <div className="min-w-0 flex-1"><div className="font-semibold text-fg">Monthly report for the district</div><div className="text-xs text-fog-muted">Members, meetings and attendance, projects, camps, eye donation and money for one month, ready to send to the DRR.</div></div>
+      <input type="month" className="input w-auto" aria-label="Month" value={mon} onChange={e=>setMon(e.target.value)}/><button className="btn" disabled={!!busy} onClick={()=>go('district',()=>districtPdf(brand,mon+'-01'))}><FileText size={15}/>{busy==='district'?'Preparing…':'Make report'}</button></div>}
     <div className="grid gap-3 sm:grid-cols-2">{items.map(([,I,t,dsc,f])=><button key={t} disabled={!!busy} onClick={()=>go(t,f)} className="tile group flex items-center gap-3 p-4 text-left transition hover:border-brand/40">
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand transition-transform group-hover:scale-110"><I size={19}/></span>
       <span className="min-w-0 flex-1"><span className="block font-medium text-fg">{busy===t?'Preparing…':t}</span><span className="block text-xs text-fog-muted">{dsc}</span></span><FileText size={16} className="text-fog-faint"/></button>)}</div></div>

@@ -91,3 +91,47 @@ export async function donorHistoryPdf(brand,donor,h){
     {type:'stats',items:[['Donations',s.donations,'blood'],['Camps registered',s.camps],['Deferred',s.deferred],['Did not come',s.no_show],['Messages',s.messages]]},
     {type:'table',heading:'Full history (newest first)',columns:['Date','Type','Details','By'],rows:h.timeline.map(t=>[fmt(t.date),{camp:'Camp',event:'Record',message:'Message',added:'Added'}[t.type],timelineText(t),t.by||''])}]})
 }
+
+// ---------- service projects, volunteer hours, monthly district report ----------
+export async function projectsPdf(brand,{from,to,label}){
+  const [p,h]=await Promise.all([supabase.from('projects').select('*').is('deleted_at',null).gte('start_date',from).lte('start_date',to).order('start_date'),
+    supabase.from('project_hours').select('project_id,hours,member_id').eq('approved',true).gte('work_date',from).lte('work_date',to)]).then(x=>x.map(must))
+  const hrs=id=>h.filter(x=>x.project_id===id).reduce((a,x)=>a+Number(x.hours),0)
+  const done=p.filter(x=>x.status==='completed'),ben=p.reduce((a,x)=>a+(x.beneficiaries||0),0)
+  return buildPdf({title:'Service projects',heading:`Service projects ${label}`,subtitle:`${p.length} projects from ${fmt(from)} to ${fmt(to)}`,docNo:`PJ-${stamp()}`,brand,footer:`Projects ${label}`,filename:`projects-${slug(label)}.pdf`,landscape:true,blocks:[
+    {type:'stats',items:[['Projects',p.length],['Completed',done.length],['People helped',ben],['Volunteer hours',h.reduce((a,x)=>a+Number(x.hours),0)]]},
+    {type:'table',heading:'Projects',columns:['No.','Date','Project','Avenue','Partner','Status','Helped','Hours','Spent'],
+      rows:p.map(x=>[pad('P',x.project_no),x.start_date?fmt(x.start_date):'-',x.title,x.avenue,x.partner||'',x.status,x.beneficiaries??'',hrs(x.id)||'',x.spent?rs(x.spent):'']),
+      opts:{columnStyles:{6:{halign:'right'},7:{halign:'right'},8:{halign:'right'}}},empty:'No projects in this period.'},
+    ...done.filter(x=>x.outcome).map(x=>({type:'text',heading:`${pad('P',x.project_no)} ${x.title}`,text:x.outcome})),
+    {type:'signatures',items:[[brand.signatory2_name,brand.signatory2_title||'Secretary'],[brand.signatory_name,brand.signatory_title||'President']]}]})
+}
+export async function hoursPdf(brand,{from,to,label}){
+  const [h,m]=await Promise.all([supabase.from('project_hours').select('member_id,hours,project_id').eq('approved',true).gte('work_date',from).lte('work_date',to),
+    supabase.from('members').select('id,member_no,full_name,position,status').is('deleted_at',null).order('member_no')]).then(x=>x.map(must))
+  const rows=m.map(x=>{const mine=h.filter(y=>y.member_id===x.id);return {...x,hours:mine.reduce((a,y)=>a+Number(y.hours),0),projects:new Set(mine.map(y=>y.project_id).filter(Boolean)).size}}).filter(x=>x.hours||x.status==='active').sort((a,b)=>b.hours-a.hours)
+  const total=rows.reduce((a,x)=>a+x.hours,0)
+  return buildPdf({title:'Volunteer hours',heading:`Volunteer service hours ${label}`,subtitle:`Approved hours from ${fmt(from)} to ${fmt(to)}`,docNo:`VH-${stamp()}`,brand,footer:`Volunteer hours ${label}`,filename:`volunteer-hours-${slug(label)}.pdf`,blocks:[
+    {type:'stats',items:[['Total hours',total],['Members who served',rows.filter(x=>x.hours).length],['Average per member',rows.length?(total/rows.length).toFixed(1):0],['Top',rows[0]?.hours?rows[0].full_name:'-']]},
+    {type:'table',heading:'Hours by member',columns:['#','ID','Member','Position','Projects','Hours'],rows:rows.map((x,i)=>[i+1,pad('M',x.member_no),x.full_name,x.position,x.projects,x.hours]),
+      opts:{columnStyles:{0:{cellWidth:10},4:{halign:'center'},5:{halign:'right',fontStyle:'bold'}},foot:[['','','','','Total',total]]}},
+    {type:'signatures',items:[[brand.signatory2_name,brand.signatory2_title||'Secretary'],[brand.signatory_name,brand.signatory_title||'President']]}]})
+}
+export async function districtPdf(brand,month){
+  const r=must(await supabase.rpc('district_report',{p_month:month}))
+  const mon=new Date(r.from).toLocaleDateString('en-IN',{month:'long',year:'numeric'}),pct=x=>x.expected?Math.round(x.present/x.expected*100):0
+  const avg=r.meetings.length?Math.round(r.meetings.reduce((a,x)=>a+pct(x),0)/r.meetings.length):0,units=r.camps.reduce((a,x)=>a+x.donated,0)
+  return buildPdf({title:'Monthly report',heading:`Monthly club report, ${mon}`,subtitle:`For the District Rotaract Representative · ${fmt(r.from)} to ${fmt(r.to)}`,docNo:`MR-${r.from.slice(0,7)}`,brand,footer:`Monthly report ${mon}`,filename:`monthly-report-${r.from.slice(0,7)}.pdf`,blocks:[
+    {type:'stats',items:[['Active members',r.members.active],['Meetings',r.meetings.length],['Average attendance',avg+'%'],['Projects',r.projects.length]]},
+    {type:'stats',items:[['Blood units',units],['Eye donations',r.afterlife.eye],['Service hours',r.hours],['Funds received',rs(Number(r.funds.received)+Number(r.funds.dues))]]},
+    {type:'boxes',boxes:[{title:'MEMBERSHIP',rows:[['Members',r.members.active],['Prospective',r.members.prospective],['Joined',r.members.joined.join(', ')||'None'],['Left',r.members.left.join(', ')||'None']]},
+      {title:'MONEY',rows:[['Donations',rs(r.funds.received)],['Dues',rs(r.funds.dues)],['Spent',rs(r.funds.spent)],['Balance',rs(Number(r.funds.received)+Number(r.funds.dues)-Number(r.funds.spent))]]}]},
+    {type:'table',heading:'Meetings',columns:['No.','Date','Type','Title','Chief guest','Present','Attendance'],rows:r.meetings.map(x=>[pad('MT',x.no),fmt(x.date),x.kind,x.title,x.chief_guest||'',`${x.present}/${x.expected}`,pct(x)+'%']),
+      opts:{columnStyles:{5:{halign:'center'},6:{halign:'right'}}},empty:'No meetings held this month.'},
+    {type:'table',heading:'Service projects',columns:['No.','Date','Project','Avenue','Helped','Volunteers','Hours'],rows:r.projects.map(x=>[pad('P',x.no),x.date?fmt(x.date):'',x.title,x.avenue,x.beneficiaries??'',x.volunteers,x.hours]),
+      opts:{columnStyles:{4:{halign:'right'},5:{halign:'right'},6:{halign:'right'}}},empty:'No projects this month.'},
+    {type:'table',heading:'Blood donation camps',columns:['Camp','Date','Venue','Registered','Donated','Deferred'],rows:r.camps.map(x=>[x.name,fmt(x.date),x.venue||'',x.registered,x.donated,x.deferred]),
+      opts:{columnStyles:{3:{halign:'right'},4:{halign:'right'},5:{halign:'right'}}},empty:'No camps this month.'},
+    {type:'boxes',boxes:[{title:'EYE AND BODY DONATION',rows:[['New pledges',r.afterlife.pledges],['Eye donations',r.afterlife.eye],['Body donations',r.afterlife.body]]}]},
+    {type:'signatures',items:[[brand.signatory2_name,brand.signatory2_title||'Secretary'],[brand.signatory_name,brand.signatory_title||'President']]}]})
+}

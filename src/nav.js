@@ -1,4 +1,4 @@
-import {LayoutDashboard,Users,CalendarDays,ClipboardCheck,MessageCircle,Droplets,BarChart3,ShieldCheck,Upload,ClipboardList,CalendarRange,History,Settings2,Tent,Trash2,IdCard,Presentation,Eye,UserRoundCheck,Award,HandCoins,ShieldCheck as Shield} from 'lucide-react'
+import {LayoutDashboard,Users,CalendarDays,ClipboardCheck,MessageCircle,Droplets,BarChart3,ShieldCheck,Upload,ClipboardList,CalendarRange,History,Settings2,Tent,Trash2,IdCard,Presentation,Eye,UserRoundCheck,Award,HandCoins,ShieldCheck as Shield,FolderHeart,Megaphone} from 'lucide-react'
 // perm: module needed to see the page (null = everyone signed in)
 export const NAV=[
  {group:'Overview',items:[
@@ -19,6 +19,8 @@ export const NAV=[
  {group:'Club',items:[
   {to:'/members',label:'Members',desc:'Member records, dues, history',icon:IdCard,perm:['members']},
   {to:'/meetings',label:'Meetings',desc:'Weekly and monthly, attendance, minutes',icon:Presentation,perm:['meetings']},
+  {to:'/projects',label:'Service projects',desc:'Projects, volunteer hours',icon:FolderHeart,perm:['members']},
+  {to:'/notices',label:'Notice board',desc:'Announcements and polls for members',icon:Megaphone,perm:['meetings']},
   {to:'/funds',label:'Money and accounts',desc:'Donation receipts, expenses, accounts',icon:HandCoins,perm:['funds']}]},
  {group:'Admin',items:[
   {to:'/reports',label:'Reports',desc:'PDF report, receipts, CSV',icon:BarChart3,perm:['reports']},

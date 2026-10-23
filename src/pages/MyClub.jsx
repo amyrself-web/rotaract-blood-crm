@@ -12,6 +12,7 @@ import CountUp from '../components/CountUp'
 import {useBrand} from '../context/Brand'
 import {memberIdCards} from '../lib/cards'
 import {PhotoPicker} from '../components/PhotoPicker'
+import MyClubExtra from '../components/MyClubExtra'
 
 const ST={present:['Present','green'],late:['Late','blue'],leave:['On leave','amber'],absent:['Absent','red']}
 const t5=t=>t?String(t).slice(0,5):''
@@ -94,6 +95,7 @@ export default function MyClub(){
 
     <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
       <div className="space-y-5">
+        <MyClubExtra/>
         <section className="card"><h2 className="mb-3 flex items-center gap-2 font-semibold text-fg"><CalendarDays size={17} className="text-brand"/>Upcoming meetings</h2>
           {later.length?<ul className="space-y-2">{later.map(x=><Meet key={x.id} x={x} up/>)}</ul>:<p className="text-sm text-fog-faint">No meetings scheduled yet.</p>}</section>
         <section className="card"><h2 className="mb-3 font-semibold text-fg">Recent meetings and minutes</h2>
