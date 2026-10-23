@@ -1,13 +1,13 @@
 import {useEffect,useState} from 'react'
 import {toast} from 'sonner'
 import {motion} from 'framer-motion'
-import {Plus,Eye,HeartHandshake,FileText,Download,Trash2,AlertTriangle,Clock,Phone,ChevronRight,Search,Mail} from 'lucide-react'
+import {Plus,Eye,HeartHandshake,FileText,Download,Trash2,AlertTriangle,Clock,Phone,ChevronRight,Search,Mail,ChevronDown} from 'lucide-react'
 import {supabase} from '../lib/supabase'
 import {useBrand} from '../context/Brand'
 import {BLOOD,normPhone,fmt} from '../lib/util'
 import {PageHeader,Drawer,Field,Badge,Empty,Tabs,useLive,undoToast,code,errText,todayIso} from '../components/ui'
 import {rotaryYear,afterlifePdf,csv,KIND_LABEL,iso} from '../lib/clubReports'
-import {gratitudeLetter} from '../lib/docpdf'
+import {gratitudeLetterHtml} from '../lib/letter'
 import CountUp from '../components/CountUp'
 
 const STATUS=['informed','team sent','collected','handed over','not suitable','family declined']
@@ -31,7 +31,7 @@ function Guide(){
 export default function Afterlife(){
   const {brand}=useBrand(),ry=rotaryYear()
   const [view,setView]=useState('cases'),[cases,setCases]=useState(null),[pledges,setPledges]=useState(null),[sum,setSum]=useState(null),[q,setQ]=useState('')
-  const [cf,setCf]=useState(null),[pf,setPf]=useState(null),[busy,setBusy]=useState(false),[pdf,setPdf]=useState('')
+  const [cf,setCf]=useState(null),[pf,setPf]=useState(null),[busy,setBusy]=useState(false),[pdf,setPdf]=useState(''),[letterMenu,setLetterMenu]=useState(false)
   const load=async()=>{try{const [c,p,s]=await Promise.all([supabase.from('afterlife_cases').select('*').is('deleted_at',null).order('case_no',{ascending:false}),
       supabase.from('pledges').select('*').is('deleted_at',null).order('pledge_no',{ascending:false}),supabase.rpc('afterlife_summary',{p_from:ry.from,p_to:ry.to})])
     if(c.error)throw c.error;setCases(c.data);setPledges(p.data||[]);setSum(s.data)}catch(e){toast.error(errText(e))}}
@@ -99,7 +99,12 @@ export default function Afterlife(){
 
     <Drawer open={!!cf} onClose={()=>setCf(null)} width="max-w-2xl" title={cf?.id?`${code('ED',cf.case_no,4)} · ${cf.deceased_name}`:'Record donation after death'} description="Fields marked * are required. Times are Indian time."
       footer={cf&&<>{cf.id&&<button className="btn-quiet mr-auto text-blood" onClick={()=>binIt('afterlife_cases',cf,cf.deceased_name,setCf)}><Trash2 size={15}/>Recycle bin</button>}
-        {cf.id&&['collected','handed over'].includes(cf.status)&&<button className="btn-quiet" disabled={!!pdf} onClick={()=>run('letter',async()=>{await gratitudeLetter(cf._orig,brand,fmt);if(!cf._orig.letter_issued){await supabase.from('afterlife_cases').update({letter_issued:true}).eq('id',cf.id);load()}})}><Mail size={15}/>{pdf==='letter'?'Preparing…':'Letter to family'}</button>}
+        {cf.id&&['collected','handed over'].includes(cf.status)&&<div className="relative">
+          <button className="btn-quiet" disabled={!!pdf} aria-haspopup="menu" aria-expanded={letterMenu} onClick={()=>setLetterMenu(!letterMenu)}><Mail size={15}/>{pdf==='letter'?'Preparing…':'Letter to family'}<ChevronDown size={14}/></button>
+          {letterMenu&&<><div className="fixed inset-0 z-10" onClick={()=>setLetterMenu(false)}/><div role="menu" className="absolute bottom-full right-0 z-20 mb-2 w-56 rounded-xl border border-ink-600 bg-ink-900 p-1.5 shadow-2xl">
+            {[['en','English','Letter of Gratitude'],['ta','தமிழ்','நன்றி மடல்'],['both','English + தமிழ்','Two pages in one PDF']].map(([k,l,d])=><button key={k} role="menuitem" className="flex w-full flex-col rounded-lg px-3 py-2 text-left hover:bg-ink-750"
+              onClick={()=>{setLetterMenu(false);run('letter',async()=>{await gratitudeLetterHtml(cf._orig,brand,k);if(!cf._orig.letter_issued){await supabase.from('afterlife_cases').update({letter_issued:true}).eq('id',cf.id);load()}})}}>
+              <span className="text-sm font-medium text-fg">{l}</span><span className="text-xs text-fog-faint">{d}</span></button>)}</div></>}</div>}
         <button className="btn-quiet" onClick={()=>setCf(null)}>Cancel</button><button className="btn" form="case-form" disabled={busy}>{busy?'Saving…':cf.id?'Save changes':'Save'}</button></>}>
       {cf&&<form id="case-form" onSubmit={saveCase} className="grid gap-4 sm:grid-cols-2">
         <fieldset className="sm:col-span-2"><legend className="label">What was donated *</legend><div className="flex flex-wrap gap-2">{Object.entries(KIND_LABEL).map(([k,l])=><label key={k} className={`chip cursor-pointer px-3 py-1.5 text-sm ${cf.kinds.includes(k)?'border-blood/50 bg-blood/15 text-fg':''}`}>
