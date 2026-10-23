@@ -91,6 +91,16 @@ if($Engine -eq 'openwa'){
   if(-not (Test-Path $owaEnv)){
     Copy-Item (Join-Path $OwaDir '.env.minimal') $owaEnv
     Add-Content $owaEnv "`nNODE_ENV=production`nAUTO_START_SESSIONS=true`nSSRF_ALLOWED_HOSTS=localhost,127.0.0.1`nSEND_PACING_ENABLED=true`nSIMULATE_TYPING=true`nTZ=Asia/Kolkata"}
+  # OpenWA's database driver (better-sqlite3) is compiled on install, which needs the Visual Studio C++ build tools
+  $vswhere="${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+  function HasVC{(Test-Path $vswhere) -and [bool](& $vswhere -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath)}
+  if(-not (HasVC)){
+    Say 'Installing Visual Studio C++ Build Tools (needed by OpenWA; about 3 GB, 10 to 20 minutes)...'
+    $vsArgs='--quiet --wait --norestart --nocache --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended'
+    if(Get-Command winget -ErrorAction SilentlyContinue){winget install --id Microsoft.VisualStudio.2022.BuildTools -e --accept-package-agreements --accept-source-agreements --override $vsArgs}
+    if(-not (HasVC)){$bt=Join-Path $env:TEMP 'vs_BuildTools.exe';Invoke-WebRequest 'https://aka.ms/vs/17/release/vs_BuildTools.exe' -OutFile $bt;Start-Process $bt -ArgumentList $vsArgs -Wait}
+    if(-not (HasVC)){Say 'Could not install the C++ build tools. Install "Build Tools for Visual Studio" with "Desktop development with C++" from https://visualstudio.microsoft.com/downloads/ and run this again.' Red; exit 1}}
+  Stop-ScheduledTask -TaskName 'CRM OpenWA' -ErrorAction SilentlyContinue
   Say 'Building OpenWA (this takes a few minutes)...'
   Push-Location $OwaDir
   foreach($step in @('install --no-audit --no-fund','run dashboard:install','run build:all')){
