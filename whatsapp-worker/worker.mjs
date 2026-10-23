@@ -5,11 +5,12 @@
 // 4. Queues the daily automatic messages at 8 am in case the database scheduler is not set up.
 import fs from 'node:fs'
 import path from 'node:path'
+import {fileURLToPath} from 'node:url'
 import {createClient} from '@supabase/supabase-js'
 
 const VERSION='1.1.0'
 const ENGINE=(process.env.ENGINE||'baileys').toLowerCase()   // 'baileys' (built in) or 'openwa' (an OpenWA gateway on this machine)
-const here=path.dirname(new URL(import.meta.url).pathname)
+const here=path.dirname(fileURLToPath(import.meta.url))   // works on Windows too
 for(const f of [path.join(here,'.env'),'.env'])if(fs.existsSync(f))for(const line of fs.readFileSync(f,'utf8').split('\n')){const m=line.match(/^\s*([A-Z_]+)\s*=\s*(.*)\s*$/);if(m&&!process.env[m[1]])process.env[m[1]]=m[2].replace(/^["']|["']$/g,'')}
 const {SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY}=process.env,DRY=process.env.DRY_RUN==='1'
 const AUTH_DIR=path.resolve(here,process.env.AUTH_DIR||'auth')

@@ -12,6 +12,20 @@ cp .env.example .env   # paste the service role key
 npm start
 ```
 
+## Windows Server or Windows 10/11
+
+Copy this folder to the server (or `git clone` the repository), open **PowerShell as Administrator** in it and run:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass -Force
+.\install-windows.ps1                 # built-in engine, light
+.\install-windows.ps1 -Engine openwa  # OpenWA with a hidden Chrome: lower ban risk, needs about 1 GB RAM
+```
+
+It installs Node.js and Git (with winget, or tells you where to download them), asks for the Supabase service
+role key, and adds a scheduled task that starts with Windows and restarts the sender if it stops.
+Remove it with `.\install-windows.ps1 -Uninstall`. Logs are in `worker.log`.
+
 ## With OpenWA (recommended if you have Docker)
 
 [OpenWA](https://github.com/rmyndharis/OpenWA) is an open-source WhatsApp gateway with its own dashboard. Its

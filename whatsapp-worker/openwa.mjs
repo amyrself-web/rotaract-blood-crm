@@ -61,7 +61,7 @@ export function createOpenWA({log,setState,onIncoming}){
         const from=String(d.senderPhone||d.from||'').split('@')[0].replace(/\D/g,'').slice(-10)
         if(from.length===10&&!String(d.from||'').endsWith('@g.us'))await onIncoming(from,String(d.body||''))}catch(e){log('webhook:',e.message)}
     })
-  }).listen(hookPort,'0.0.0.0',()=>log('listening for OpenWA webhooks on port',hookPort))
+  }).listen(hookPort,process.env.WEBHOOK_HOST||'0.0.0.0',()=>log('listening for OpenWA webhooks on port',hookPort))
 
   return {
     async start(){await tick();setInterval(tick,5000)},
