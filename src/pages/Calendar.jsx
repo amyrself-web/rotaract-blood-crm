@@ -4,7 +4,7 @@ import {motion} from 'framer-motion'
 import {ChevronLeft,ChevronRight,MapPin,Clock,ListChecks} from 'lucide-react'
 import {supabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
-import {PageHeader,Drawer,Badge} from '../components/ui'
+import {PageHeader,Drawer,Badge,useLive} from '../components/ui'
 import {fmt} from '../lib/util'
 
 const TONE={planned:'neutral',open:'blue',live:'red',completed:'green',closed:'neutral'}
@@ -13,8 +13,10 @@ const iso=d=>d.toLocaleDateString('en-CA')
 
 export default function Calendar(){
   const {can}=useAuth(),[cur,setCur]=useState(()=>{const d=new Date();d.setDate(1);return d}),[camps,setCamps]=useState([]),[tasks,setTasks]=useState([]),[sel,setSel]=useState(null),[dir,setDir]=useState(0)
+  const [tick,setTick]=useState(0)
+  useLive(['camps','registrations','tasks'],()=>setTick(x=>x+1))
   useEffect(()=>{supabase.from('camps').select('*, registrations(count)').order('camp_date').then(({data})=>setCamps(data||[]))
-    if(can('planning'))supabase.from('tasks').select('id,title,due,done,camp_id').not('due','is',null).then(({data})=>setTasks(data||[]))},[can])
+    if(can('planning'))supabase.from('tasks').select('id,title,due,done,camp_id').not('due','is',null).then(({data})=>setTasks(data||[]))},[can,tick])
   const days=useMemo(()=>{const first=new Date(cur),start=new Date(first);start.setDate(1-((first.getDay()+6)%7))
     return Array.from({length:42},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return d})},[cur])
   const by=useMemo(()=>{const m={};camps.forEach(c=>{(m[c.camp_date]??={c:[],t:[]}).c.push(c)});tasks.forEach(t=>{(m[t.due]??={c:[],t:[]}).t.push(t)});return m},[camps,tasks])
@@ -25,7 +27,7 @@ export default function Calendar(){
     <PageHeader title="Calendar" description="Camps and planning deadlines by date."
       actions={<div className="flex items-center gap-1 rounded-xl border border-ink-700 bg-ink-900/70 p-1">
         <button className="btn-ghost" aria-label="Previous month" onClick={()=>move(-1)}><ChevronLeft size={18}/></button>
-        <button className="min-w-[150px] rounded-lg px-3 py-1.5 font-display text-sm font-semibold text-white hover:bg-ink-700" onClick={()=>{const d=new Date();d.setDate(1);setDir(0);setCur(d)}}>{month}</button>
+        <button className="min-w-[150px] rounded-lg px-3 py-1.5 font-display text-sm font-semibold text-fg hover:bg-ink-700" onClick={()=>{const d=new Date();d.setDate(1);setDir(0);setCur(d)}}>{month}</button>
         <button className="btn-ghost" aria-label="Next month" onClick={()=>move(1)}><ChevronRight size={18}/></button></div>}/>
     <div className="grid gap-5 xl:grid-cols-[1fr_280px]">
       <div className="card overflow-hidden p-0">
@@ -34,14 +36,14 @@ export default function Calendar(){
           {days.map(d=>{const k=iso(d),e=by[k],inMonth=d.getMonth()===cur.getMonth()
             return <div key={k} className={`min-h-[96px] border-b border-r border-ink-700/70 p-1.5 ${inMonth?'':'bg-ink-950/40'} [&:nth-child(7n)]:border-r-0`}>
               <div className={`mb-1 grid h-6 w-6 place-items-center rounded-full text-xs ${k===today?'bg-blood font-semibold text-white':inMonth?'text-fog-muted':'text-ink-500'}`}>{d.getDate()}</div>
-              {e?.c.map(c=><button key={c.id} onClick={()=>setSel(c)} className="mb-1 flex w-full items-center gap-1.5 truncate rounded-md bg-ink-700/80 px-1.5 py-1 text-left text-[11px] font-medium text-white hover:bg-ink-600">
+              {e?.c.map(c=><button key={c.id} onClick={()=>setSel(c)} className="mb-1 flex w-full items-center gap-1.5 truncate rounded-md bg-ink-700/80 px-1.5 py-1 text-left text-[11px] font-medium text-fg hover:bg-ink-600">
                 <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${DOT[c.status]}`}/><span className="truncate">{c.name}</span></button>)}
               {e?.t.length>0&&<div className="flex items-center gap-1 px-1 text-[11px] text-fog-faint"><ListChecks size={11}/>{e.t.length} task{e.t.length>1?'s':''}</div>}
             </div>})}
         </motion.div></div>
-      <aside className="card h-fit"><h2 className="mb-3 font-semibold text-white">Coming up</h2>
+      <aside className="card h-fit"><h2 className="mb-3 font-semibold text-fg">Coming up</h2>
         {upcoming.map(c=><button key={c.id} onClick={()=>setSel(c)} className="mb-2 block w-full rounded-xl border border-ink-700 p-3 text-left transition hover:border-ink-500">
-          <div className="text-sm font-semibold text-white">{c.name}</div><div className="mt-0.5 text-xs text-fog-muted">{fmt(c.camp_date)}{c.venue&&`, ${c.venue}`}</div></button>)}
+          <div className="text-sm font-semibold text-fg">{c.name}</div><div className="mt-0.5 text-xs text-fog-muted">{fmt(c.camp_date)}{c.venue&&`, ${c.venue}`}</div></button>)}
         {!upcoming.length&&<p className="text-sm text-fog-faint">No camps ahead.</p>}
         <div className="mt-4 space-y-1.5 border-t border-ink-700 pt-3 text-xs text-fog-muted">{Object.keys(DOT).map(s=><div key={s} className="flex items-center gap-2 capitalize"><span className={`h-2 w-2 rounded-full ${DOT[s]}`}/>{s}</div>)}</div></aside>
     </div>
@@ -51,7 +53,7 @@ export default function Calendar(){
         <Badge tone={TONE[sel.status]}><span className="capitalize">{sel.status}</span></Badge>
         <div className="flex items-center gap-2 text-fog"><Clock size={15} className="text-fog-faint"/>{sel.start_time?.slice(0,5)||'?'} to {sel.end_time?.slice(0,5)||'?'}</div>
         <div className="flex items-center gap-2 text-fog"><MapPin size={15} className="text-fog-faint"/>{sel.venue||'Venue not set'}</div>
-        <div className="rounded-xl border border-ink-700 p-4"><div className="font-display text-2xl font-semibold text-white">{sel.registrations?.[0]?.count??0}</div>
+        <div className="rounded-xl border border-ink-700 p-4"><div className="font-display text-2xl font-semibold text-fg">{sel.registrations?.[0]?.count??0}</div>
           <div className="text-fog-muted">registered{sel.target_donors?` of ${sel.target_donors} target`:''}</div></div>
         {tasks.filter(t=>t.camp_id===sel.id).length>0&&<div><div className="label">Tasks</div>{tasks.filter(t=>t.camp_id===sel.id).map(t=><div key={t.id} className={`flex justify-between py-1 ${t.done?'text-fog-faint line-through':'text-fog'}`}><span>{t.title}</span><span>{fmt(t.due)}</span></div>)}</div>}
       </div>}

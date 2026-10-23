@@ -6,28 +6,20 @@ import {useAuth} from '../context/Auth'
 import {NAV,ALL_NAV,allowed} from '../nav'
 import {supabase} from '../lib/supabase'
 import {ROLE_LABEL} from '../lib/access'
-import {spring,usePresence} from './ui'
-
-function Brand({collapsed}){
-  return <div className="flex items-center gap-3 px-2">
-    <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-blood to-blood-deep text-white shadow-[0_8px_24px_-8px_rgba(240,67,90,.8)]">
-      <Droplet size={19} fill="currentColor" className="animate-beat"/></span>
-    {!collapsed&&<div className="min-w-0"><div className="truncate font-display text-[15px] font-semibold leading-tight text-white">Rotaract Blood</div>
-      <div className="truncate text-xs text-fog-faint">Sankari donor CRM</div></div>}
-  </div>
-}
+import {spring,usePresence,useLive} from './ui'
+import {BrandMark,ThemeToggle} from './Brand'
 
 function Sidebar({collapsed,setCollapsed,mobile,closeMobile}){
   const {can}=useAuth()
   return <div className="flex h-full flex-col gap-6 p-3">
-    <div className="flex items-center justify-between pt-2"><Brand collapsed={collapsed&&!mobile}/>
+    <div className="flex items-center justify-between pt-2"><BrandMark collapsed={collapsed&&!mobile}/>
       {mobile?<button className="btn-ghost" aria-label="Close menu" onClick={closeMobile}><X size={18}/></button>
       :!collapsed&&<button className="btn-ghost" aria-label="Collapse menu" onClick={()=>setCollapsed(true)}><ChevronsLeft size={17}/></button>}</div>
     <nav className="flex-1 space-y-5 overflow-y-auto">{NAV.map(g=>{const items=g.items.filter(i=>allowed(i,can));if(!items.length)return null
       return <div key={g.group}>{!(collapsed&&!mobile)&&<div className="mb-1.5 px-3 text-xs font-medium text-fog-faint">{g.group}</div>}
         <div className="space-y-0.5">{items.map(({to,label,icon:I})=>
           <NavLink key={to} to={to} end={to==='/'} onClick={closeMobile} title={collapsed&&!mobile?label:undefined}
-            className={({isActive})=>`relative flex items-center gap-3 rounded-[10px] px-3 py-2 text-sm font-medium transition-colors ${isActive?'text-white':'text-fog-muted hover:bg-ink-800 hover:text-white'} ${collapsed&&!mobile?'justify-center':''}`}>
+            className={({isActive})=>`relative flex items-center gap-3 rounded-[10px] px-3 py-2 text-sm font-medium transition-colors ${isActive?'text-fg':'text-fog-muted hover:bg-ink-800 hover:text-fg'} ${collapsed&&!mobile?'justify-center':''}`}>
             {({isActive})=><>{isActive&&<motion.span layoutId={mobile?'nav-m':'nav'} transition={spring} className="absolute inset-0 rounded-[10px] bg-gradient-to-r from-brand/20 to-brand/5 ring-1 ring-brand/25">
                 <span className="absolute -left-3 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-blood shadow-[0_0_10px_rgba(240,67,90,.9)]"/></motion.span>}
               <I size={18} className="relative shrink-0"/>{!(collapsed&&!mobile)&&<span className="relative truncate">{label}</span>}</>}
@@ -37,19 +29,20 @@ function Sidebar({collapsed,setCollapsed,mobile,closeMobile}){
 }
 
 function useNotifications(){
-  const {can}=useAuth(),[items,setItems]=useState([])
+  const {can}=useAuth(),[items,setItems]=useState([]),[tick,setTick]=useState(0)
+  useLive(['emergency_requests','blood_units','tasks','donors'],()=>setTick(x=>x+1))
   useEffect(()=>{let live=true;(async()=>{
     const out=[],today=new Date().toLocaleDateString('en-CA'),soon=new Date(Date.now()+3*864e5).toLocaleDateString('en-CA')
     if(can('emergency')){const r=await supabase.from('emergency_requests').select('id,blood_group,units_needed,hospital').eq('status','open').limit(5)
       r.data?.forEach(x=>out.push({icon:AlertTriangle,tone:'red',text:`${x.blood_group} x ${x.units_needed} needed at ${x.hospital}`,to:'/stock'}))}
     if(can('stock')){const r=await supabase.from('blood_units').select('id',{count:'exact',head:true}).in('status',['collected','in_transit','testing','available']).lte('expiry_date',soon)
       if(r.count)out.push({icon:Clock,tone:'amber',text:`${r.count} blood unit${r.count>1?'s':''} expire within 3 days`,to:'/stock'})}
-    if(can('messages')){const r=await supabase.from('donors').select('dob').eq('consent',true).not('dob','is',null)
+    if(can('messages')){const r=await supabase.from('donors').select('dob').is('deleted_at',null).eq('consent',true).not('dob','is',null)
       const n=(r.data||[]).filter(d=>d.dob.slice(5)===today.slice(5)).length
       if(n)out.push({icon:Cake,tone:'blue',text:`${n} donor birthday${n>1?'s':''} today`,to:'/messages'})}
     if(can('planning')){const r=await supabase.from('tasks').select('id',{count:'exact',head:true}).eq('done',false).lte('due',today)
       if(r.count)out.push({icon:ListChecks,tone:'amber',text:`${r.count} camp task${r.count>1?'s are':' is'} due`,to:'/planning'})}
-    if(live)setItems(out)})();return()=>{live=false}},[can])
+    if(live)setItems(out)})();return()=>{live=false}},[can,tick])
   return items
 }
 
@@ -58,8 +51,9 @@ function Palette({open,setOpen}){
   const pages=ALL_NAV.filter(n=>allowed(n,can)).filter(n=>n.label.toLowerCase().includes(q.toLowerCase())).map(n=>({label:n.label,hint:'Page',icon:n.icon,go:()=>nav(n.to)}))
   useEffect(()=>{if(!open){setQ('');setDonors([]);return}setTimeout(()=>ref.current?.focus(),30)},[open])
   useEffect(()=>{if(!can('donors')||q.trim().length<2){setDonors([]);return}
-    const t=setTimeout(async()=>{const s=q.replace(/[%,()]/g,'');const {data}=await supabase.from('donors').select('id,full_name,phone,blood_group').or(`full_name.ilike.%${s}%,phone.ilike.%${s}%`).limit(6)
-      setDonors((data||[]).map(d=>({label:d.full_name,hint:`${d.blood_group||''} ${d.phone}`,icon:UserRound,go:()=>nav('/donors?q='+encodeURIComponent(d.phone))})))},200);return()=>clearTimeout(t)},[q,can,nav])
+    const t=setTimeout(async()=>{const s=q.replace(/[%,()]/g,'');const id=/^d-?0*(\d+)$/i.exec(s.trim());let qq=supabase.from('donors').select('id,full_name,phone,blood_group,donor_no').is('deleted_at',null)
+      qq=id?qq.eq('donor_no',Number(id[1])):qq.or(`full_name.ilike.%${s}%,phone.ilike.%${s}%`);const {data}=await qq.limit(6)
+      setDonors((data||[]).map(d=>({label:d.full_name,hint:`D-${String(d.donor_no).padStart(4,'0')} ${d.blood_group||''}`,icon:UserRound,go:()=>nav('/donors?q='+encodeURIComponent(d.phone))})))},200);return()=>clearTimeout(t)},[q,can,nav])
   const all=[...pages,...donors];useEffect(()=>setI(0),[q])
   const pick=x=>{x?.go();setOpen(false)}
   const mounted=usePresence(open,200);if(!mounted)return null
@@ -68,11 +62,11 @@ function Palette({open,setOpen}){
     <motion.div role="dialog" aria-label="Search" className="relative w-full max-w-lg overflow-hidden rounded-shell border border-ink-600 bg-ink-900 shadow-2xl"
       initial={{opacity:0,y:-12,scale:.98}} animate={open?{opacity:1,y:0,scale:1}:{opacity:0,y:-8,scale:.98}} transition={spring}>
       <div className="flex items-center gap-3 border-b border-ink-700 px-4"><Search size={18} className="text-fog-faint"/>
-        <input ref={ref} value={q} onChange={e=>setQ(e.target.value)} placeholder="Go to a page or find a donor"
+        <input ref={ref} value={q} onChange={e=>setQ(e.target.value)} placeholder="Go to a page, find a donor by name, mobile or ID (D-0012)"
           onKeyDown={e=>{if(e.key==='ArrowDown'){e.preventDefault();setI(x=>Math.min(x+1,all.length-1))}if(e.key==='ArrowUp'){e.preventDefault();setI(x=>Math.max(x-1,0))}if(e.key==='Enter')pick(all[i]);if(e.key==='Escape')setOpen(false)}}
-          className="h-14 flex-1 bg-transparent text-[15px] text-white outline-none placeholder:text-fog-faint"/></div>
+          className="h-14 flex-1 bg-transparent text-[15px] text-fg outline-none placeholder:text-fog-faint"/></div>
       <ul className="max-h-80 overflow-y-auto p-2">{all.map((x,k)=><li key={k}><button onMouseEnter={()=>setI(k)} onClick={()=>pick(x)}
-        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm ${k===i?'bg-ink-700 text-white':'text-fog-muted'}`}>
+        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm ${k===i?'bg-ink-700 text-fg':'text-fog-muted'}`}>
         <x.icon size={16}/><span className="flex-1 truncate">{x.label}</span><span className="text-xs text-fog-faint">{x.hint}</span></button></li>)}
         {!all.length&&<li className="px-3 py-6 text-center text-sm text-fog-faint">Nothing matches "{q}"</li>}</ul>
     </motion.div></div>
@@ -106,23 +100,26 @@ export default function Layout(){
 
     <div className="min-w-0 flex-1">
       <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-ink-700/80 bg-ink-950/75 px-4 backdrop-blur-xl md:px-8">
+        <motion.div key={loc.pathname} aria-hidden className="pointer-events-none absolute -bottom-px left-0 h-[2px] bg-gradient-to-r from-blood via-brand to-blood"
+          initial={{width:'0%',opacity:1}} animate={{width:'100%',opacity:[1,1,0]}} transition={{duration:.9,times:[0,.75,1],ease:'easeOut'}}/>
         <button className="btn-ghost md:hidden" aria-label="Open menu" onClick={()=>setMobile(true)}><Menu size={19}/></button>
-        <div className="min-w-0 flex-1 truncate font-display text-[15px] font-semibold text-white">{title}</div>
+        <div className="min-w-0 flex-1 truncate font-display text-[15px] font-semibold text-fg">{title}</div>
         <button onClick={()=>setPal(true)} className="hidden items-center gap-2 rounded-[10px] border border-ink-600 bg-ink-900/80 px-3 py-1.5 text-sm text-fog-faint transition hover:border-ink-500 hover:text-fog-muted sm:flex">
           <Search size={15}/><span className="w-40 text-left">Search</span><kbd className="rounded border border-ink-600 px-1.5 text-[11px]">Ctrl K</kbd></button>
         <button className="btn-ghost sm:hidden" aria-label="Search" onClick={()=>setPal(true)}><Search size={18}/></button>
+        <ThemeToggle/>
         <div className="relative"><button className="btn-ghost relative" aria-label={`Notifications, ${notes.length}`} onClick={()=>setBell(!bell)}><Bell size={18}/>
             {notes.length>0&&<span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-blood px-1 text-[10px] font-bold text-white">{notes.length}</span>}</button>
-          <Popover open={bell} onClose={()=>setBell(false)} className="w-80"><div className="px-2 py-1.5 text-sm font-semibold text-white">Needs attention</div>
+          <Popover open={bell} onClose={()=>setBell(false)} className="w-80"><div className="px-2 py-1.5 text-sm font-semibold text-fg">Needs attention</div>
             {notes.map((n,k)=><button key={k} onClick={()=>{nav(n.to);setBell(false)}} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm text-fog hover:bg-ink-750">
               <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${tone[n.tone]}`}><n.icon size={15}/></span>{n.text}</button>)}
             {!notes.length&&<div className="px-2 py-4 text-sm text-fog-faint">All clear for today.</div>}</Popover></div>
         <div className="relative"><button onClick={()=>setMe(!me)} className="flex items-center gap-2.5 rounded-[10px] py-1 pl-1 pr-2 transition hover:bg-ink-800" aria-label="Account menu">
             <span className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-brand to-brand-deep text-sm font-semibold text-white">{initial}</span>
-            <span className="hidden text-left leading-tight lg:block"><span className="block text-sm font-medium text-white">{profile.full_name||'User'}</span>
+            <span className="hidden text-left leading-tight lg:block"><span className="block text-sm font-medium text-fg">{profile.full_name||'User'}</span>
               <span className="block text-xs text-fog-faint">{profile.designation||ROLE_LABEL[profile.role]}</span></span></button>
           <Popover open={me} onClose={()=>setMe(false)} className="w-56">
-            <div className="border-b border-ink-700 px-2 pb-2 pt-1"><div className="truncate text-sm font-medium text-white">{profile.full_name||'User'}</div><div className="truncate text-xs text-fog-faint">{profile.email}</div></div>
+            <div className="border-b border-ink-700 px-2 pb-2 pt-1"><div className="truncate text-sm font-medium text-fg">{profile.full_name||'User'}</div><div className="truncate text-xs text-fog-faint">{profile.email}</div></div>
             <button onClick={()=>{nav('/profile');setMe(false)}} className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-fog hover:bg-ink-750"><UserRound size={15}/>My profile</button>
             <button onClick={signOut} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-fog hover:bg-ink-750"><LogOut size={15}/>Sign out</button></Popover></div>
       </header>

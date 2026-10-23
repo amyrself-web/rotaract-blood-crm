@@ -17,6 +17,10 @@ export function AuthProvider({children}){
     supabase.auth.getSession().then(async({data})=>{const u=data.session?.user??null;setUser(u);await load(u);setLoading(false)})
     const {data:sub}=supabase.auth.onAuthStateChange((e,s)=>{const u=s?.user??null;setUser(u);if(e!=='TOKEN_REFRESHED')setTimeout(()=>load(u),0)})
     return()=>sub.subscription.unsubscribe()},[load])
+  useEffect(()=>{if(!hasSupabase||!user?.id||user.id==='demo')return
+    const ch=supabase.channel('me-'+user.id).on('postgres_changes',{event:'UPDATE',schema:'public',table:'profiles',filter:'id=eq.'+user.id},()=>load(user))
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'settings'},()=>load(user)).subscribe()
+    return()=>{supabase.removeChannel(ch)}},[user?.id,load])
   const signIn=(email,password)=>supabase.auth.signInWithPassword({email,password})
   const signUp=(email,password,full_name)=>supabase.auth.signUp({email,password,options:{data:{full_name}}})
   const signOut=()=>{if(hasSupabase)return supabase.auth.signOut();setUser(null);setProfile(null)}

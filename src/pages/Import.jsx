@@ -24,17 +24,17 @@ export default function Import(){
   const dl=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([Papa.unparse(res.bad)],{type:'text/csv'}));a.download='skipped-rows.csv';a.click()}
   return <div><h1 className="h1">Import donors from Excel</h1>
     {err&&<p className="mb-3 text-sm text-blood">{err}</p>}
-    {res&&<div className="card mb-5"><h2 className="font-semibold text-white">{res.n} donors imported</h2>
+    {res&&<div className="card mb-5"><h2 className="font-semibold text-fg">{res.n} donors imported</h2>
       <p className="mt-1 text-sm text-fog-muted">{res.bad.length} rows skipped. Imported donors are marked consent pending: the WhatsApp button stays off until they agree to be contacted.</p>
       {res.bad.length>0&&<button className="btn mt-3" onClick={dl}>Download skipped rows</button>}</div>}
     <div className="card mb-5"><p className="mb-3 text-sm text-fog-muted">Upload an .xlsx or .csv file. The first row must hold the column names. Nothing is saved until you press Import.</p>
       <input type="file" accept=".xlsx,.csv" onChange={onFile} className="text-sm"/></div>
     {rows&&<>
-      <div className="card mb-5"><h2 className="mb-3 font-semibold text-white">Match your columns</h2>
+      <div className="card mb-5"><h2 className="mb-3 font-semibold text-fg">Match your columns</h2>
         <div className="grid gap-3 sm:grid-cols-2">{FIELDS.map(([k,label,req])=><label key={k} className="text-sm text-fog-muted">{label}{req&&' (required)'}
           <select className="input mt-1" value={map[k]} onChange={e=>setMap({...map,[k]:e.target.value===''?'':+e.target.value})}>
             <option value="">Not in my file</option>{rows[0].map((h,i)=><option key={i} value={i}>{String(h??`Column ${i+1}`)}</option>)}</select></label>)}</div></div>
-      <div className="card mb-5"><h2 className="font-semibold text-white">{ok.length} ready to import, {bad.length} will be skipped</h2>
+      <div className="card mb-5"><h2 className="font-semibold text-fg">{ok.length} ready to import, {bad.length} will be skipped</h2>
         {ok.length>0&&<div className="mt-3 overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-fog-muted"><tr><th className="py-1 font-medium">Name</th><th className="font-medium">Mobile</th><th className="font-medium">Group</th><th className="font-medium">Area</th><th className="font-medium">Last donation</th></tr></thead>
           <tbody>{ok.slice(0,5).map(r=><tr key={r.phone} className="border-t border-ink-700"><td className="py-1">{r.full_name}</td><td>{r.phone}</td><td>{r.blood_group||'-'}</td><td>{r.area||'-'}</td><td>{r.last_donation||'-'}</td></tr>)}</tbody></table><p className="mt-1 text-xs text-fog-faint">First 5 rows shown.</p></div>}
         {bad.length>0&&<div className="mt-4 text-sm"><div className="mb-1 text-fog-muted">Skipped rows (first 6):</div>{bad.slice(0,6).map(b=><div key={b.row} className="text-fog">Row {b.row}: {b.name||'no name'} · {b.reason}</div>)}</div>}

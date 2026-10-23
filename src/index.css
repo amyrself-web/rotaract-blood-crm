@@ -1,27 +1,47 @@
 @tailwind base;@tailwind components;@tailwind utilities;
 @layer base{
-html{color-scheme:dark}
-body{@apply bg-ink-950 font-sans text-fog antialiased;font-feature-settings:"tnum" 0;
-  background-image:radial-gradient(1100px 520px at 100% -15%,rgba(76,141,255,.13),transparent 60%),radial-gradient(800px 420px at -10% 115%,rgba(240,67,90,.08),transparent 60%);background-attachment:fixed}
+:root{color-scheme:dark;
+  --ink-950:7 13 26;--ink-900:11 19 36;--ink-800:14 23 41;--ink-750:18 29 51;--ink-700:26 40 67;--ink-600:43 61 99;--ink-500:62 82 124;
+  --fg:255 255 255;--fog:231 237 248;--fog-muted:141 157 186;--fog-faint:93 110 143;
+  --brand:76 141 255;--brand-deep:44 95 214;--brand-soft:157 192 255;
+  --shadow-panel:0 1px 0 rgba(255,255,255,.04) inset,0 20px 40px -24px rgba(0,0,0,.7);
+  --glow-a:.13;--glow-b:.08}
+:root[data-theme=light]{color-scheme:light;
+  --ink-950:243 246 251;--ink-900:255 255 255;--ink-800:255 255 255;--ink-750:241 244 250;--ink-700:226 232 242;--ink-600:205 214 229;--ink-500:160 174 199;
+  --fg:15 23 42;--fog:30 41 59;--fog-muted:71 85 105;--fog-faint:110 124 148;
+  --shadow-panel:0 1px 2px rgba(15,23,42,.05),0 12px 32px -18px rgba(15,23,42,.18);
+  --glow-a:.10;--glow-b:.06}
+html{transition:background-color .3s}
+body{@apply bg-ink-950 font-sans text-fog antialiased;transition:background-color .3s,color .3s;
+  background-image:radial-gradient(1100px 520px at 100% -15%,rgb(var(--brand) / var(--glow-a)),transparent 60%),radial-gradient(800px 420px at -10% 115%,rgb(240 67 90 / var(--glow-b)),transparent 60%);background-attachment:fixed}
 h1,h2,h3{@apply font-display tracking-tight}
 :focus-visible{@apply outline-none ring-2 ring-brand/70 ring-offset-2 ring-offset-ink-950}
-::selection{background:rgba(76,141,255,.35)}
-*{scrollbar-width:thin;scrollbar-color:#2B3D63 transparent}
-input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-calendar-picker-indicator{filter:invert(.75)}}
+::selection{background:rgb(var(--brand) / .3)}
+*{scrollbar-width:thin;scrollbar-color:rgb(var(--ink-600)) transparent}
+:root:not([data-theme=light]) input[type=date]::-webkit-calendar-picker-indicator,:root:not([data-theme=light]) input[type=time]::-webkit-calendar-picker-indicator{filter:invert(.75)}}
 @layer components{
-.card{@apply rounded-panel border border-ink-700 bg-ink-800/80 p-5 shadow-panel backdrop-blur-sm}
-.h1{@apply mb-5 font-display text-[26px] font-semibold text-white}
-.btn{@apply inline-flex select-none items-center justify-center gap-2 rounded-[10px] bg-brand px-4 py-2 text-sm font-semibold text-white transition duration-150 hover:bg-brand-soft hover:text-ink-950 active:scale-[.97] disabled:pointer-events-none disabled:opacity-45}
+.card{@apply rounded-panel border border-ink-700 bg-ink-800/80 p-5 shadow-panel backdrop-blur-sm transition-colors duration-300}
+.h1{@apply mb-5 font-display text-[26px] font-semibold text-fg}
+.btn{@apply inline-flex select-none items-center justify-center gap-2 rounded-[10px] bg-brand px-4 py-2 text-sm font-semibold text-white shadow-[0_6px_18px_-8px_rgb(var(--brand)/.8)] transition duration-150 hover:bg-brand-deep active:scale-[.97] disabled:pointer-events-none disabled:opacity-45}
 .btn-quiet{@apply inline-flex select-none items-center justify-center gap-2 rounded-[10px] border border-ink-600 bg-ink-750 px-3.5 py-2 text-sm font-medium text-fog transition duration-150 hover:border-ink-500 hover:bg-ink-700 active:scale-[.97] disabled:opacity-45}
 .btn-danger{@apply inline-flex select-none items-center justify-center gap-2 rounded-[10px] bg-blood px-4 py-2 text-sm font-semibold text-white transition duration-150 hover:bg-blood-deep active:scale-[.97] disabled:opacity-45}
-.btn-ghost{@apply inline-flex items-center justify-center rounded-[10px] p-2 text-fog-muted transition duration-150 hover:bg-ink-700 hover:text-white active:scale-95}
-.input{@apply w-full rounded-[10px] border border-ink-600 bg-ink-900/80 px-3 py-2 text-sm text-white transition duration-150 placeholder:text-fog-faint hover:border-ink-500 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15 disabled:opacity-60}
+.btn-ghost{@apply inline-flex items-center justify-center rounded-[10px] p-2 text-fog-muted transition duration-150 hover:bg-ink-700 hover:text-fg active:scale-95}
+.input{@apply w-full rounded-[10px] border border-ink-600 bg-ink-900/80 px-3 py-2 text-sm text-fg transition duration-150 placeholder:text-fog-faint hover:border-ink-500 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15 disabled:opacity-60}
+.input:user-invalid{@apply border-blood/70 ring-4 ring-blood/10}
 .label{@apply mb-1.5 block text-[13px] font-medium text-fog-muted}
-.skeleton{@apply rounded-md bg-ink-700;background-image:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent);background-size:400px 100%;background-repeat:no-repeat;animation:shimmer 1.3s linear infinite}
+.skeleton{@apply rounded-md bg-ink-700;background-image:linear-gradient(90deg,transparent,rgb(var(--fg) / .06),transparent);background-size:400px 100%;background-repeat:no-repeat;animation:shimmer 1.3s linear infinite}
 .tile{@apply rounded-xl border border-ink-600/80 bg-ink-900/50}
 .chip{@apply inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-750 px-2.5 py-0.5 text-xs font-medium text-fog-muted}
+.code{@apply rounded-md bg-ink-750 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-fog-muted}
 .table{@apply w-full text-sm}
 .table thead th{@apply whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-fog-faint}
 .table tbody tr{@apply border-t border-ink-700/80 transition-colors hover:bg-brand/[.04]}
-.table tbody td{@apply px-4 py-3 align-middle}}
+.table tbody td{@apply px-4 py-3 align-middle}
+.flash{animation:flash 1.6s ease-out}}
+/* blood-level fill for stock tiles: a soft wave on top of a red gradient */
+.liquid{background:linear-gradient(180deg,rgb(240 67 90 / .22),rgb(180 35 58 / .32));}
+.liquid::before{content:"";position:absolute;left:-50%;top:-9px;width:200%;height:18px;
+  background:radial-gradient(12px 9px at 12px 9px,rgb(240 67 90 / .22) 98%,transparent) 0 0/24px 18px repeat-x;animation:wave 3.2s linear infinite}
+@keyframes wave{to{transform:translateX(24px)}}
+@keyframes flash{0%{background:rgb(var(--brand) / .18)}100%{background:transparent}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-delay:0s!important;transition-duration:.001ms!important;scroll-behavior:auto!important}}

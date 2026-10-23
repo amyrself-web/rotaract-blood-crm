@@ -5,13 +5,14 @@ import {supabase,hasSupabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
 import {BLOOD,fmt} from '../lib/util'
 import CountUp from '../components/CountUp'
+import {useLive} from '../components/ui'
 
 const count=async(t,f)=>{let q=supabase.from(t).select('*',{count:'exact',head:true});if(f)q=f(q);const {count:n,error}=await q;return error?null:n}
 
 function Kpi({icon:I,label,value,tone='brand',to}){
   const body=<div className="card group flex items-center gap-4">
     <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl transition-transform duration-300 group-hover:scale-110 ${tone==='blood'?'bg-blood/15 text-blood':'bg-brand/15 text-brand'}`}><I size={20}/></span>
-    <div className="min-w-0"><div className="text-2xl font-semibold tabular-nums text-white">{value===undefined?<span className="skeleton inline-block h-7 w-14 align-middle"/>:value===null?'-':<CountUp value={value}/>}</div>
+    <div className="min-w-0"><div className="text-2xl font-semibold tabular-nums text-fg">{value===undefined?<span className="skeleton inline-block h-7 w-14 align-middle"/>:value===null?'-':<CountUp value={value}/>}</div>
       <div className="truncate text-xs text-fog-muted">{label}</div></div></div>
   return to?<Link to={to} className="block">{body}</Link>:body
 }
@@ -25,6 +26,8 @@ export default function Dashboard(){
   const {profile,can}=useAuth(),role=profile.role,staff=can('donors')||can('camps'),stockRole=can('stock')
   const [k,setK]=useState({}),[camp,setCamp]=useState(undefined),[stock,setStock]=useState(null),[reqs,setReqs]=useState(null),[now,setNow]=useState(Date.now())
   const today=new Date().toLocaleDateString('en-CA')
+  const [tick,setTick]=useState(0)
+  useLive(['donors','camps','registrations','donations','blood_units','emergency_requests'],()=>setTick(x=>x+1))
   useEffect(()=>{if(!hasSupabase)return
     (async()=>{
       const c=await supabase.from('camps').select('*, registrations(count)').gte('camp_date',today).not('status','in','(closed,completed)').order('camp_date').limit(1)
@@ -38,7 +41,7 @@ export default function Dashboard(){
         if(can('emergency')){const r=await supabase.from('emergency_requests').select('id,blood_group,units_needed,hospital,created_at').eq('status','open').order('created_at',{ascending:false}).limit(3)
         if(!r.error)setReqs(r.data)}}
     })()
-    const t=setInterval(()=>setNow(Date.now()),60000);return()=>clearInterval(t)},[])
+    const t=setInterval(()=>setNow(Date.now()),60000);return()=>clearInterval(t)},[tick])
 
   const hour=new Date().getHours(),greet=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening'
   const reg=camp?.registrations?.[0]?.count??0,ms=camp?new Date(`${camp.camp_date}T${(camp.start_time||'09:00').slice(0,5)}`)-now:0
@@ -61,15 +64,15 @@ export default function Dashboard(){
       <section className="card relative overflow-hidden lg:col-span-3">
         <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-brand/10 blur-2xl"/>
         <div className="relative">
-          <div className="mb-3 font-display text-sm font-semibold text-white">Next camp</div>
+          <div className="mb-3 font-display text-sm font-semibold text-fg">Next camp</div>
           {camp===undefined?<div className="space-y-2"><div className="skeleton h-6 w-2/3"/><div className="skeleton h-4 w-1/2"/><div className="skeleton h-2 w-full"/></div>
           :!camp?<div className="text-fog-muted">No upcoming camp. {staff&&<Link to="/camps" className="text-brand hover:underline">Create one</Link>}</div>
           :<>
             <div className="flex flex-wrap items-start justify-between gap-3"><div>
-              <div className="text-xl font-semibold text-white">{camp.name}</div>
+              <div className="text-xl font-semibold text-fg">{camp.name}</div>
               <div className="mt-1 text-sm text-fog-muted">{fmt(camp.camp_date)}{camp.start_time&&`, ${camp.start_time.slice(0,5)}`}{camp.venue&&` · ${camp.venue}`}</div></div>
-              <div className="rounded-lg bg-ink-900/70 px-3 py-2 text-center"><div className="text-lg font-semibold text-white">{until}</div><div className="text-xs text-fog-faint">{camp.status==='live'?'Live now':ms<=0?'Camp day':'To go'}</div></div></div>
-            <div className="mt-5 flex items-baseline justify-between text-sm"><span className="text-fog"><span className="text-lg font-semibold tabular-nums text-white"><CountUp value={reg}/></span> registered</span>
+              <div className="rounded-lg bg-ink-900/70 px-3 py-2 text-center"><div className="text-lg font-semibold text-fg">{until}</div><div className="text-xs text-fog-faint">{camp.status==='live'?'Live now':ms<=0?'Camp day':'To go'}</div></div></div>
+            <div className="mt-5 flex items-baseline justify-between text-sm"><span className="text-fog"><span className="text-lg font-semibold tabular-nums text-fg"><CountUp value={reg}/></span> registered</span>
               {camp.target_donors&&<span className="text-fog-faint">target {camp.target_donors}</span>}</div>
             {camp.target_donors&&<div className="mt-2 h-2 overflow-hidden rounded-full bg-ink-700"><div className="h-full origin-left animate-grow rounded-full bg-gradient-to-r from-brand-deep to-brand" style={{width:Math.min(100,reg/camp.target_donors*100)+'%'}}/></div>}
             <div className="mt-5 flex flex-wrap gap-2">
@@ -78,25 +81,25 @@ export default function Dashboard(){
         </div></section>
 
       {stockRole&&<section className="card lg:col-span-2">
-        <div className="mb-4 flex items-center justify-between"><div className="font-display text-sm font-semibold text-white">Blood stock available</div>
+        <div className="mb-4 flex items-center justify-between"><div className="font-display text-sm font-semibold text-fg">Blood stock available</div>
           <Link to="/stock" className="text-xs text-brand hover:underline">Details</Link></div>
         {!stock?<div className="skeleton h-28 w-full"/>:<>
           <div className="flex h-28 items-end gap-2">{BLOOD.map((g,i)=><div key={g} className="flex flex-1 flex-col items-center gap-1">
             <span className="text-xs tabular-nums text-fog">{stock[g]}</span>
             <div className="w-full origin-bottom animate-growY rounded-t bg-gradient-to-t from-rose-800 to-blood" style={{height:Math.max(4,stock[g]/max*80)+'px',animationDelay:i*50+'ms'}}/>
             <span className="text-[11px] font-semibold text-blood">{g}</span></div>)}</div>
-          <div className="mt-3 text-sm text-fog-muted"><span className="font-semibold tabular-nums text-white"><CountUp value={total}/></span> units ready to issue</div></>}
+          <div className="mt-3 text-sm text-fog-muted"><span className="font-semibold tabular-nums text-fg"><CountUp value={total}/></span> units ready to issue</div></>}
       </section>}
     </div>
 
     {can('emergency')&&reqs&&reqs.length>0&&<section className="card mb-5 border-blood/40">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white"><AlertTriangle size={16} className="text-blood"/>Open emergency requests</div>
+      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-fg"><AlertTriangle size={16} className="text-blood"/>Open emergency requests</div>
       {reqs.map(r=><div key={r.id} className="flex items-center justify-between border-t border-ink-700 py-2 text-sm first:border-0">
         <span><span className="font-semibold text-blood">{r.blood_group}</span> x {r.units_needed} · {r.hospital}</span><span className="text-fog-faint">{fmt(r.created_at)}</span></div>)}
       <Link to="/stock" className="mt-2 inline-block text-sm text-brand hover:underline">Find donors</Link></section>}
 
     <section className="card">
-      <div className="mb-3 font-display text-sm font-semibold text-white">Quick actions</div>
+      <div className="mb-3 font-display text-sm font-semibold text-fg">Quick actions</div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {can('donors')&&<Action to="/donors" icon={UserPlus} label="Add a donor"/>}
         {can('camps')&&<Action to="/camps" icon={CalendarDays} label="Create or open a camp"/>}

@@ -1,4 +1,4 @@
-import {LayoutDashboard,Users,CalendarDays,ClipboardCheck,MessageCircle,Droplets,BarChart3,ShieldCheck,Upload,ClipboardList,CalendarRange,History,Settings2,Tent} from 'lucide-react'
+import {LayoutDashboard,Users,CalendarDays,ClipboardCheck,MessageCircle,Droplets,BarChart3,ShieldCheck,Upload,ClipboardList,CalendarRange,History,Settings2,Tent,Trash2} from 'lucide-react'
 // perm: module needed to see the page (null = everyone signed in)
 export const NAV=[
  {group:'Overview',items:[
@@ -17,6 +17,7 @@ export const NAV=[
   {to:'/reports',label:'Reports',icon:BarChart3,perm:['reports']},
   {to:'/users',label:'Users and roles',icon:ShieldCheck,perm:['users']},
   {to:'/audit',label:'Audit log',icon:History,perm:['audit']},
+  {to:'/trash',label:'Recycle bin',icon:Trash2,perm:['donors','camps','emergency']},
   {to:'/settings',label:'Settings',icon:Settings2,perm:['settings']}]}]
 export const ALL_NAV=NAV.flatMap(g=>g.items)
 export const allowed=(item,can)=>!item.perm||item.perm.some(can)

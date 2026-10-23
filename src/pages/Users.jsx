@@ -4,7 +4,7 @@ import {UserPlus,Search,ShieldCheck,KeyRound,Trash2,RotateCcw,Wand2,Users as Use
 import {supabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
 import {MODULES,ROLE_DEFAULTS,ROLE_LABEL,ROLE_HINT,DESIGNATIONS,effectivePerms} from '../lib/access'
-import {PageHeader,Drawer,Field,Badge,Tabs,Toggle,Empty,useConfirm,errText} from '../components/ui'
+import {PageHeader,Drawer,Field,Badge,Tabs,Toggle,Empty,useConfirm,errText,useLive,code} from '../components/ui'
 import {normPhone,fmt} from '../lib/util'
 
 const ROLES=['admin','coordinator','medical','volunteer','donor']
@@ -19,7 +19,7 @@ function RolePicker({value,onChange,isAdmin}){
   return <div className="grid gap-2 sm:grid-cols-2">{ROLES.map(r=>{const off=r==='admin'&&!isAdmin
     return <button type="button" key={r} disabled={off} onClick={()=>onChange(r)}
       className={`rounded-xl border p-3 text-left transition ${value===r?'border-brand bg-brand/10 ring-1 ring-brand/40':'border-ink-600 hover:border-ink-500'} disabled:opacity-40`}>
-      <div className="flex items-center justify-between"><span className="font-semibold text-white">{ROLE_LABEL[r]}</span>{value===r&&<span className="h-2 w-2 rounded-full bg-brand"/>}</div>
+      <div className="flex items-center justify-between"><span className="font-semibold text-fg">{ROLE_LABEL[r]}</span>{value===r&&<span className="h-2 w-2 rounded-full bg-brand"/>}</div>
       <div className="mt-0.5 text-xs text-fog-muted">{ROLE_HINT[r]}</div></button>})}</div>
 }
 
@@ -28,7 +28,7 @@ function PermGrid({role,overrides,setOverrides}){
   if(role==='admin')return <p className="rounded-xl border border-ink-600 bg-ink-800 p-4 text-sm text-fog-muted">Admins always have every module.</p>
   return <div className="space-y-1">{MODULES.map(([m,label,desc])=>{const def=ROLE_DEFAULTS[role]?.includes(m),changed=m in overrides
     return <div key={m} className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-ink-800">
-      <div className="min-w-0 flex-1"><div className="flex items-center gap-2 text-sm font-medium text-white">{label}{changed&&<Badge tone="amber">Custom</Badge>}</div>
+      <div className="min-w-0 flex-1"><div className="flex items-center gap-2 text-sm font-medium text-fg">{label}{changed&&<Badge tone="amber">Custom</Badge>}</div>
         <div className="text-xs text-fog-faint">{desc}{` · role default: ${def?'on':'off'}`}</div></div>
       <Toggle label={label} checked={eff[m]} onChange={v=>{const o={...overrides};if(v===def)delete o[m];else o[m]=v;setOverrides(o)}}/></div>})}</div>
 }
@@ -40,13 +40,19 @@ export default function UsersPage(){
   const [rows,setRows]=useState(null),[q,setQ]=useState(''),[rf,setRf]=useState(''),[edit,setEdit]=useState(null),[tab,setTab]=useState('profile'),[busy,setBusy]=useState(false),[pw,setPw]=useState('')
   const load=()=>supabase.from('profiles').select('*').order('created_at').then(({data,error})=>error?toast.error(error.message):setRows(data))
   useEffect(()=>{load()},[])
+  useLive(['profiles'],load)
   const list=useMemo(()=>(rows||[]).filter(r=>(!rf||r.role===rf)&&(!q||`${r.full_name} ${r.email} ${r.phone} ${r.designation}`.toLowerCase().includes(q.toLowerCase()))),[rows,q,rf])
   const counts=Object.fromEntries(ROLES.map(r=>[r,(rows||[]).filter(x=>x.role===r).length]))
   const set=k=>e=>setEdit({...edit,[k]:e.target.value})
   const open=r=>{setTab('profile');setPw('');setEdit(r?{...r,permissions:r.permissions||{},_orig:r}:{...blank,password:genPw(),_new:true})}
   const locked=edit&&!edit._new&&edit._orig?.role==='admin'&&!isAdmin
 
-  const save=async()=>{setBusy(true)
+  const save=async()=>{
+    if((edit.full_name||'').trim().length<2)return toast.error('Enter the full name')
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test((edit.email||'').trim()))return toast.error('Enter a valid email')
+    if((edit._new||edit.phone)&&!/^[6-9]\d{9}$/.test(normPhone(edit.phone)))return toast.error('Enter a 10-digit mobile number')
+    if(edit._new&&!(edit.designation||'').trim())return toast.error('Give a title, like Treasurer or Screening desk')
+setBusy(true)
     try{
       if(edit._new){
         await callAdmin({action:'create',email:edit.email,password:edit.password,full_name:edit.full_name,phone:normPhone(edit.phone)||null,role:edit.role,designation:edit.designation||null,permissions:edit.permissions})
@@ -73,8 +79,8 @@ export default function UsersPage(){
     <PageHeader title="Users and roles" description="Create logins, give each person a role and title, and switch individual modules on or off."
       actions={<button className="btn" onClick={()=>open(null)}><UserPlus size={16}/>Add user</button>}/>
     <div className="mb-4 flex flex-wrap gap-2">
-      <button onClick={()=>setRf('')} className={`chip ${!rf?'border-brand/50 text-white':''}`}>All {(rows||[]).length}</button>
-      {ROLES.map(r=><button key={r} onClick={()=>setRf(rf===r?'':r)} className={`chip ${rf===r?'border-brand/50 text-white':''}`}>{ROLE_LABEL[r]} {counts[r]}</button>)}</div>
+      <button onClick={()=>setRf('')} className={`chip ${!rf?'border-brand/50 text-fg':''}`}>All {(rows||[]).length}</button>
+      {ROLES.map(r=><button key={r} onClick={()=>setRf(rf===r?'':r)} className={`chip ${rf===r?'border-brand/50 text-fg':''}`}>{ROLE_LABEL[r]} {counts[r]}</button>)}</div>
     <div className="card overflow-hidden p-0">
       <div className="border-b border-ink-700 p-3"><div className="relative max-w-sm"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-fog-faint"/>
         <input className="input pl-9" placeholder="Search name, email, phone, title" value={q} onChange={e=>setQ(e.target.value)}/></div></div>
@@ -82,8 +88,8 @@ export default function UsersPage(){
         <tbody>{rows===null?[0,1,2].map(i=><tr key={i}><td colSpan="6"><div className="skeleton h-8 w-full"/></td></tr>)
         :list.map(r=>{const custom=Object.keys(r.permissions||{}).length
           return <tr key={r.id} className="cursor-pointer" onClick={()=>open(r)}>
-          <td><div className="flex items-center gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-ink-700 text-sm font-semibold text-white">{(r.full_name||r.email||'?')[0].toUpperCase()}</span>
-            <div className="min-w-0"><div className="truncate font-medium text-white">{r.full_name||'No name'}{r.id===user.id&&<span className="ml-2 text-xs text-fog-faint">you</span>}</div><div className="truncate text-xs text-fog-faint">{r.email||'-'}</div></div></div></td>
+          <td><div className="flex items-center gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-ink-700 text-sm font-semibold text-fg">{(r.full_name||r.email||'?')[0].toUpperCase()}</span>
+            <div className="min-w-0"><div className="truncate font-medium text-fg">{r.full_name||'No name'}{r.id===user.id&&<span className="ml-2 text-xs text-fog-faint">you</span>}</div><div className="truncate text-xs text-fog-faint"><span className="code mr-1.5">{code('U',r.member_no,3)}</span>{r.email||'-'}</div></div></div></td>
           <td><Badge tone={TONE[r.role]}>{ROLE_LABEL[r.role]}</Badge></td><td className="text-fog-muted">{r.designation||'-'}</td>
           <td className="text-fog-muted">{r.role==='admin'?'Everything':custom?`${custom} custom`:'Role default'}</td>
           <td onClick={e=>e.stopPropagation()}><Toggle label="Active" checked={r.active} disabled={r.id===user.id||(r.role==='admin'&&!isAdmin)} onChange={()=>toggleActive(r)}/></td>
@@ -98,11 +104,11 @@ export default function UsersPage(){
       {edit&&<>
         {!edit._new&&<Tabs id="user-tabs" value={tab} onChange={setTab} tabs={[['profile','Profile'],['access','Role and access'],['security','Security']]}/>}
         {(edit._new||tab==='profile')&&<div className="space-y-4">
-          <Field label="Full name"><input className="input" value={edit.full_name||''} onChange={set('full_name')} disabled={locked}/></Field>
-          <Field label="Email" hint={edit._new?'Used to sign in.':'Changing it changes their sign-in email.'}><input className="input" type="email" value={edit.email||''} onChange={set('email')} disabled={locked}/></Field>
-          <Field label="Mobile"><input className="input" value={edit.phone||''} onChange={set('phone')} disabled={locked}/></Field>
-          <Field label="Title (sub-role)" hint="Pick one or type your own, like Treasurer or Screening desk.">
-            <input className="input" list="designations" value={edit.designation||''} onChange={set('designation')} disabled={locked}/>
+          <Field label="Full name" required><input required className="input" value={edit.full_name||''} onChange={set('full_name')} disabled={locked}/></Field>
+          <Field label="Email" hint={edit._new?'Used to sign in.':'Changing it changes their sign-in email.'} required><input required className="input" type="email" value={edit.email||''} onChange={set('email')} disabled={locked}/></Field>
+          <Field label="Mobile" required={edit._new}><input required={edit._new} className="input" value={edit.phone||''} onChange={set('phone')} disabled={locked}/></Field>
+          <Field label="Title (sub-role)" hint="Pick one or type your own, like Treasurer or Screening desk." required>
+            <input required className="input" list="designations" value={edit.designation||''} onChange={set('designation')} disabled={locked}/>
             <datalist id="designations">{(DESIGNATIONS[edit.role]||[]).map(d=><option key={d} value={d}/>)}</datalist></Field>
           {edit._new&&<><Field label="Role"><RolePicker value={edit.role} isAdmin={isAdmin} onChange={r=>setEdit({...edit,role:r,permissions:{}})}/></Field>
             <Field label="Password" hint="At least 8 characters. Share it privately; they can change it in My profile.">
@@ -115,14 +121,14 @@ export default function UsersPage(){
             <PermGrid role={edit.role} overrides={edit.permissions} setOverrides={p=>setEdit({...edit,permissions:p})}/></div>
         </div>}
         {!edit._new&&tab==='security'&&<div className="space-y-6">
-          <div className="rounded-xl border border-ink-600 p-4"><div className="mb-3 flex items-center gap-2 font-semibold text-white"><KeyRound size={16}/>Set a new password</div>
+          <div className="rounded-xl border border-ink-600 p-4"><div className="mb-3 flex items-center gap-2 font-semibold text-fg"><KeyRound size={16}/>Set a new password</div>
             <div className="flex gap-2"><input className="input font-mono" placeholder="New password" value={pw} onChange={e=>setPw(e.target.value)} disabled={locked}/>
               <button className="btn-quiet" title="Generate" onClick={()=>setPw(genPw())} disabled={locked}><Wand2 size={15}/></button></div>
             <button className="btn mt-3" disabled={busy||locked||pw.length<8} onClick={resetPw}>Change password</button></div>
-          <div className="flex items-center justify-between rounded-xl border border-ink-600 p-4"><div><div className="font-semibold text-white">Can sign in</div><div className="text-sm text-fog-muted">Switch off to block access without deleting.</div></div>
+          <div className="flex items-center justify-between rounded-xl border border-ink-600 p-4"><div><div className="font-semibold text-fg">Can sign in</div><div className="text-sm text-fog-muted">Switch off to block access without deleting.</div></div>
             <Toggle label="Can sign in" checked={edit.active} disabled={edit.id===user.id||locked} onChange={v=>setEdit({...edit,active:v})}/></div>
           {edit.active!==edit._orig.active&&<button className="btn" onClick={save} disabled={busy}>Save</button>}
-          <div className="rounded-xl border border-blood/35 bg-blood/5 p-4"><div className="flex items-center gap-2 font-semibold text-white"><Trash2 size={16} className="text-blood"/>Delete user</div>
+          <div className="rounded-xl border border-blood/35 bg-blood/5 p-4"><div className="flex items-center gap-2 font-semibold text-fg"><Trash2 size={16} className="text-blood"/>Delete user</div>
             <p className="mt-1 text-sm text-fog-muted">Removes their login. Donor records and history stay.</p>
             <button className="btn-danger mt-3" disabled={busy||edit.id===user.id||locked} onClick={remove}>Delete user</button></div>
           {edit.id===user.id&&<p className="flex items-center gap-2 text-xs text-fog-faint"><ShieldCheck size={13}/>You cannot block or delete your own account.</p>}
