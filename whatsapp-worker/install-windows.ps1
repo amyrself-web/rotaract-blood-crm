@@ -106,7 +106,10 @@ if($Engine -eq 'openwa'){
   foreach($step in @('install --no-audit --no-fund','run dashboard:install','run build:all')){
     Say "  npm $step"
     # through cmd so npm's warnings on stderr do not stop PowerShell (Windows PowerShell 5.1 treats them as errors)
-    cmd.exe /s /c "`"`"$Npm`" $step >> build.log 2>&1`""
+    # (a small .cmd file avoids PowerShell's quoting of paths with spaces)
+    $bat=Join-Path $OwaDir 'crm-build.cmd'
+    Set-Content -Path $bat -Encoding ascii -Value "@call `"$Npm`" $step >> build.log 2>&1`r`n@exit /b %errorlevel%"
+    cmd.exe /c $bat
     if($LASTEXITCODE -ne 0){Pop-Location
       Say "OpenWA build failed at 'npm $step'. The full output is in $OwaDir\build.log" Red
       Say "Quick way out: .\install-windows.ps1 -Uninstall ; then .\install-windows.ps1   (built-in engine, no build needed)" Yellow; exit 1}}
