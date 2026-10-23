@@ -53,10 +53,10 @@ export default function Members(){
     if(r.error)return toast.error(r.error.message);toast.success(`Receipt ${code('RC',r.data.receipt_no,4)} saved`);setPay(null);loadProfile(form.id);load()}
   const delPay=async d=>{if(!await confirm({title:`Delete receipt ${code('RC',d.receipt_no,4)}?`,body:`${rs(d.amount)} for ${d.period}. You can undo this from the Audit log.`,action:'Delete'}))return
     const r=await supabase.from('member_dues').delete().eq('id',d.id);if(r.error)return toast.error(r.error.message);loadProfile(form.id);load()}
-  const receipt=d=>buildPdf({title:'Receipt',docNo:pad('RC',d.receipt_no,4),brand,footer:'Membership dues receipt',filename:`receipt-${pad('RC',d.receipt_no,4)}.pdf`,blocks:[
+  const receipt=d=>buildPdf({title:'Receipt',heading:`Membership dues, ${d.period}`,subtitle:`Received ${rs(d.amount)} from ${form.full_name} by ${d.mode}`,docNo:pad('RC',d.receipt_no,4),brand,footer:'Membership dues receipt',filename:`receipt-${pad('RC',d.receipt_no,4)}.pdf`,blocks:[
     {type:'boxes',boxes:[{title:'RECEIVED FROM',rows:[['Member',form.full_name],['Member ID',pad('M',form.member_no)],['Position',form.position]]},{title:'PAYMENT',rows:[['Date',fmt(d.paid_on)],['Mode',d.mode],['Reference',d.reference||'-']]}]},
     {type:'table',heading:'Details',columns:['#','Description','Amount'],rows:[[1,`Membership dues for ${d.period}`,rs(d.amount)]],opts:{columnStyles:{0:{cellWidth:10},2:{halign:'right'}},foot:[['','Total received',rs(d.amount)]]}},
-    {type:'signatures',items:[['','Member'],[brand.signatory2_name,'Treasurer']]}]})
+    {type:'signatures',items:[['','Member'],['','Treasurer']]}]})
   const linkDonor=async()=>{if(!form.phone)return toast.error('Add the member\'s mobile number first')
     let {data:d}=await supabase.from('donors').select('id,donor_no').eq('phone',normPhone(form.phone)).maybeSingle()
     if(!d){if(!form.blood_group||!form.dob||!form.gender)return toast.error('Add blood group, gender and date of birth to create a donor record')

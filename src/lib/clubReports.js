@@ -15,7 +15,7 @@ const stamp=()=>new Date().toISOString().slice(2,10).replace(/-/g,'')
 export async function memberDirectoryPdf(brand){
   const m=must(await supabase.from('members').select('*').is('deleted_at',null).order('member_no'))
   const act=m.filter(x=>x.status==='active')
-  return buildPdf({title:'Member directory',docNo:`MD-${stamp()}`,brand,footer:'Member directory',filename:`member-directory-${stamp()}.pdf`,landscape:true,blocks:[
+  return buildPdf({title:'Member directory',heading:'Club member directory',subtitle:`${m.length} members on record, ${act.length} active`,docNo:`MD-${stamp()}`,brand,footer:'Member directory',filename:`member-directory-${stamp()}.pdf`,landscape:true,blocks:[
     {type:'stats',items:[['Members',m.length],['Active',act.length],['Prospective',m.filter(x=>x.membership_type==='Prospective').length],['Honorary / Alumni',m.filter(x=>['Honorary','Alumni'].includes(x.membership_type)).length],['Blood donors linked',m.filter(x=>x.donor_id).length,'blood']]},
     {type:'table',heading:'Members',columns:['ID','Name','Position','Type','Status','Mobile','Email','Blood','Joined','Occupation'],
       rows:m.map(x=>[pad('M',x.member_no),x.full_name,x.position,x.membership_type,x.status,x.phone||'',x.email||'',x.blood_group||'',fmt(x.joined_on),[x.occupation,x.organisation].filter(Boolean).join(', ')]),
@@ -27,7 +27,7 @@ export async function duesPdf(brand,{from,to,label}){
   const [m,d]=await Promise.all([supabase.from('members').select('id,member_no,full_name,position,status').is('deleted_at',null).order('member_no'),
     supabase.from('member_dues').select('*').gte('paid_on',from).lte('paid_on',to).order('receipt_no')]).then(x=>x.map(must))
   const by=Object.fromEntries(m.map(x=>[x.id,x])),total=d.reduce((a,x)=>a+Number(x.amount),0),paid=new Set(d.map(x=>x.member_id))
-  return buildPdf({title:'Dues collection',docNo:`DU-${stamp()}`,brand,footer:`Dues ${label}`,filename:`dues-${slug(label)}.pdf`,blocks:[
+  return buildPdf({title:'Dues collection',heading:`Membership dues ${label}`,subtitle:`Receipts from ${fmt(from)} to ${fmt(to)}`,docNo:`DU-${stamp()}`,brand,footer:`Dues ${label}`,filename:`dues-${slug(label)}.pdf`,blocks:[
     {type:'boxes',boxes:[{title:'PERIOD',rows:[['From',fmt(from)],['To',fmt(to)],['Receipts',d.length]]},{title:'COLLECTION',rows:[['Total',rs(total)],['Members paid',paid.size],['Not paid',m.filter(x=>x.status==='active'&&!paid.has(x.id)).length]]}]},
     {type:'table',heading:'Receipts',columns:['Receipt','Date','Member','Period','Mode','Reference','Amount'],
       rows:d.map(x=>[pad('RC',x.receipt_no,4),fmt(x.paid_on),`${by[x.member_id]?.full_name||'-'} (${pad('M',by[x.member_id]?.member_no)})`,x.period,x.mode,x.reference||'',rs(x.amount)]),
@@ -40,7 +40,7 @@ export async function duesPdf(brand,{from,to,label}){
 export async function attendancePdf(brand,{from,to,label}){
   const s=must(await supabase.rpc('attendance_summary',{p_from:from,p_to:to}))
   const pct=x=>x.held?Math.round(x.present/x.held*100):0,avg=s.members.length?Math.round(s.members.reduce((a,x)=>a+pct(x),0)/s.members.length):0
-  return buildPdf({title:'Attendance register',docNo:`AT-${stamp()}`,brand,footer:`Attendance ${label}`,filename:`attendance-${slug(label)}.pdf`,blocks:[
+  return buildPdf({title:'Attendance register',heading:`Meeting attendance, ${label}`,subtitle:`${s.meetings.length} meetings held from ${fmt(from)} to ${fmt(to)}`,docNo:`AT-${stamp()}`,brand,footer:`Attendance ${label}`,filename:`attendance-${slug(label)}.pdf`,blocks:[
     {type:'stats',items:[['Meetings held',s.meetings.length],['Active members',s.members.length],['Average attendance',avg+'%'],['Guests',s.meetings.reduce((a,x)=>a+(x.guests||0),0)]]},
     {type:'table',heading:'Member attendance',columns:['ID','Member','Position','Held','Present','Leave','Attendance'],
       rows:[...s.members].sort((a,b)=>pct(b)-pct(a)).map(x=>[pad('M',x.no),x.name,x.position,x.held,x.present,x.leave,pct(x)+'%']),
@@ -53,7 +53,7 @@ export async function minutesPdf(brand,mt,attendance,members,actions){
   const st={present:'Present',late:'Late',leave:'On leave',absent:'Absent'},byId=Object.fromEntries(members.map(m=>[m.id,m]))
   const rows=members.map(m=>[pad('M',m.member_no),m.full_name,m.position,st[attendance[m.id]||'absent']])
   const present=members.filter(m=>['present','late'].includes(attendance[m.id])).length
-  return buildPdf({title:'Minutes of meeting',docNo:pad('MT',mt.meeting_no),brand,footer:`${mt.title}, ${fmt(mt.meeting_date)}`,filename:`minutes-${pad('MT',mt.meeting_no)}.pdf`,blocks:[
+  return buildPdf({title:'Minutes of meeting',heading:mt.title,subtitle:`${mt.kind} meeting  ·  ${fmt(mt.meeting_date)}${mt.start_time?`, ${mt.start_time.slice(0,5)}`:''}  ·  ${mt.mode==='Online'?'Online':mt.venue||''}`,docNo:pad('MT',mt.meeting_no),brand,footer:`${mt.title}, ${fmt(mt.meeting_date)}`,filename:`minutes-${pad('MT',mt.meeting_no)}.pdf`,blocks:[
     {type:'boxes',boxes:[{title:'MEETING',rows:[['Title',mt.title],['Type',mt.kind],['Date',`${fmt(mt.meeting_date)}${mt.start_time?`, ${mt.start_time.slice(0,5)}${mt.end_time?'-'+mt.end_time.slice(0,5):''}`:''}`],['Venue',mt.mode==='Online'?'Online':mt.venue||'-']]},
       {title:'ATTENDANCE',rows:[['Chaired by',mt.chaired_by||'-'],['Minutes by',mt.minutes_by||'-'],['Present',`${present} of ${members.length}`],['Guests',`${mt.guests||0}${mt.chief_guest?` (chief guest: ${mt.chief_guest})`:''}`]]}]},
     {type:'text',heading:'Agenda',text:mt.agenda},{type:'text',heading:'Minutes',text:mt.minutes},{type:'text',heading:'Decisions',text:mt.decisions},
@@ -69,7 +69,7 @@ export async function afterlifePdf(brand,{from,to,label}){
     supabase.from('afterlife_cases').select('*').is('deleted_at',null).gte('died_on',from).lte('died_on',to).order('case_no'),
     supabase.from('pledges').select('*').is('deleted_at',null).gte('pledged_on',from).lte('pledged_on',to).order('pledge_no')]).then(x=>x.map(must))
   const hrs=x=>x.collected_at&&x.died_at?((new Date(x.collected_at)-new Date(`${x.died_on}T${x.died_at}+05:30`))/36e5).toFixed(1)+' h':''
-  return buildPdf({title:'Eye and body donation',docNo:`ED-${stamp()}`,brand,footer:`Eye and body donation ${label}`,filename:`eye-body-donation-${slug(label)}.pdf`,landscape:true,blocks:[
+  return buildPdf({title:'Eye and body donation',heading:`Eye and body donation register ${label}`,subtitle:`From ${fmt(from)} to ${fmt(to)}`,docNo:`ED-${stamp()}`,brand,footer:`Eye and body donation ${label}`,filename:`eye-body-donation-${slug(label)}.pdf`,landscape:true,blocks:[
     {type:'stats',items:[['Eye donations',s.eye,'blood'],['Corneas',s.corneas,'blood'],['Body donations',s.body],['Organ / skin',s.organ+s.skin],['New pledges',s.pledges],['Active pledges',s.pledges_total]]},
     {type:'table',heading:`Donations after death (${c.length})`,columns:['Case','Name','Age','Died on','Donated','Institution','Collected','Time','Corneas','Family contact','Status'],
       rows:c.map(x=>[pad('ED',x.case_no,4),x.deceased_name,x.age??'',fmt(x.died_on),x.kinds.map(k=>KIND_LABEL[k]).join(', '),x.institution||'',x.collected_at?new Date(x.collected_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'',hrs(x),x.corneas??'',`${x.family_contact}${x.family_relation?` (${x.family_relation})`:''}`,x.status])},
@@ -85,7 +85,7 @@ export const timelineText=t=>t.type==='camp'?`${t.camp}: ${STEP[t.status]||t.sta
   :t.type==='message'?`WhatsApp ${String(t.kind||'').replace(/_/g,' ')}${t.ref?` (${t.ref})`:''}`:`Added to the CRM${t.source?` from ${t.source}`:''}`
 export async function donorHistoryPdf(brand,donor,h){
   const s=h.stats
-  return buildPdf({title:'Donor history',docNo:pad('D',donor.donor_no,4),brand,footer:`${donor.full_name} donor history`,filename:`donor-history-${pad('D',donor.donor_no,4)}.pdf`,blocks:[
+  return buildPdf({title:'Donor history',heading:donor.full_name,subtitle:`${pad('D',donor.donor_no,4)}  ·  Blood group ${donor.blood_group||'not recorded'}  ·  ${donor.phone}`,docNo:pad('D',donor.donor_no,4),brand,footer:`${donor.full_name} donor history`,filename:`donor-history-${pad('D',donor.donor_no,4)}.pdf`,blocks:[
     {type:'boxes',boxes:[{title:'DONOR',rows:[['Name',donor.full_name],['Donor ID',pad('D',donor.donor_no,4)],['Blood group',donor.blood_group||'-'],['Mobile',donor.phone]]},
       {title:'SUMMARY',rows:[['Donations',s.donations],['Collected',`${s.ml} ml at camps`],['First',fmt(s.first)],['Last',fmt(s.last)]]}]},
     {type:'stats',items:[['Donations',s.donations,'blood'],['Camps registered',s.camps],['Deferred',s.deferred],['Did not come',s.no_show],['Messages',s.messages]]},
