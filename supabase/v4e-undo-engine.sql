@@ -7,7 +7,7 @@ begin
   if exists(select 1 from audit_logs where txid=p_txid and reverted_at is null and table_name not in
      ('donors','camps','registrations','screenings','donations','blood_units','handovers','emergency_requests','tasks','camp_volunteers','sponsors','expenses',
       'settings','message_templates','stock_thresholds','profiles',
-      'members','member_dues','meetings','meeting_actions','pledges','afterlife_cases','donor_events')) then raise exception 'This change cannot be undone'; end if;
+      'members','member_dues','meetings','meeting_actions','pledges','afterlife_cases','donor_events','contributions','club_expenses')) then raise exception 'This change cannot be undone'; end if;
   if exists(select 1 from audit_logs where txid=p_txid and reverted_at is null and table_name in ('profiles','settings') and action<>'update') then
     raise exception 'Adding or removing users and settings cannot be undone here'; end if;
   perform set_config('app.reverting','1',true);
@@ -23,7 +23,7 @@ begin
   -- 2. set changed columns back to their old values, newest first
   for r in select * from audit_logs where txid=p_txid and reverted_at is null and action='update' order by id desc loop
     pk := _pk(r.table_name);
-    select string_agg(quote_ident(k),',') into cols from jsonb_object_keys(r.changes) k where k not in ('id','created_at','donor_no','camp_no','member_no','req_no','token_no','cert_no','handover_no','sponsor_no','expense_no','volunteer_no','member_no','receipt_no','meeting_no','action_no','pledge_no','case_no','event_no','verify_code');
+    select string_agg(quote_ident(k),',') into cols from jsonb_object_keys(r.changes) k where k not in ('id','created_at','donor_no','camp_no','member_no','req_no','token_no','cert_no','handover_no','sponsor_no','expense_no','volunteer_no','member_no','receipt_no','meeting_no','action_no','pledge_no','case_no','event_no','verify_code','voucher_no');
     if cols is null then continue; end if;
     execute format('update %I set (%s) = (select %s from jsonb_populate_record(null::%I, $1)) where %I::text = $2', r.table_name, cols, cols, r.table_name, pk)
       using r.snapshot, r.snapshot->>pk; n:=n+1;

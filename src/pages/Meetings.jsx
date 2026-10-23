@@ -50,10 +50,12 @@ export default function Meetings(){
     load()}
   const mark=async(mid,s)=>{const prev=att[mid];setAtt(a=>({...a,[mid]:s}))
     const r=await supabase.from('meeting_attendance').upsert({meeting_id:form.id,member_id:mid,status:s,noted_at:new Date().toISOString()});if(r.error){setAtt(a=>({...a,[mid]:prev}));toast.error(r.error.message)}}
-  const markAll=async()=>{const list=eligible(form).filter(m=>!att[m.id]);if(!list.length)return
-    const r=await supabase.from('meeting_attendance').upsert(list.map(m=>({meeting_id:form.id,member_id:m.id,status:'present'})));if(r.error)return toast.error(r.error.message)
-    setAtt(a=>({...a,...Object.fromEntries(list.map(m=>[m.id,'present']))}));toast.success(`${list.length} marked present`)}
+  const markAll=async(st='present')=>{const list=eligible(form).filter(m=>!att[m.id]);if(!list.length)return toast('Everyone is already marked')
+    const r=await supabase.from('meeting_attendance').upsert(list.map(m=>({meeting_id:form.id,member_id:m.id,status:st})));if(r.error)return toast.error(r.error.message)
+    setAtt(a=>({...a,...Object.fromEntries(list.map(m=>[m.id,st]))}));toast.success(`${list.length} marked ${st}`);return list.length}
   const held=async()=>{if(form.meeting_date>todayIso())return toast.error('A future meeting cannot be marked as held')
+    const left=eligible(form).filter(m=>!att[m.id]).length
+    if(left&&await confirm({title:`${left} member${left>1?'s are':' is'} not marked`,body:'Mark them absent before closing the meeting? Unmarked members already count as absent in attendance %.',action:'Mark absent',danger:false}))await markAll('absent')
     const r=await supabase.from('meetings').update({status:'held'}).eq('id',form.id);if(r.error)return toast.error(r.error.message);setForm({...form,status:'held'});toast.success('Marked as held');load()}
   const addAct=async e=>{e.preventDefault();const r=await supabase.from('meeting_actions').insert({meeting_id:form.id,task:newAct.task,owner_member:newAct.owner_member||null,due:newAct.due||null}).select().single()
     if(r.error)return toast.error(r.error.message);setActs([...acts,r.data]);setNewAct({task:'',owner_member:'',due:''});load()}
@@ -146,7 +148,7 @@ export default function Meetings(){
           <div className="flex-1"><div className="text-xs text-fog-muted">Members check in themselves with this code</div><div className="font-mono text-2xl font-bold tracking-[.3em] text-fg">{form.checkin_code||'------'}</div></div>
           <button className="btn-quiet" onClick={newCode}><RefreshCw size={14}/>New code</button><button className="btn" onClick={()=>setQr(true)}><Maximize2 size={15}/>Show QR on screen</button></div>}
         <div className="mb-3 flex flex-wrap items-center gap-2"><span className="text-sm text-fog-muted">{Object.values(att).filter(s=>['present','late'].includes(s)).length} of {eligible(form).length} present</span><div className="flex-1"/>
-          <button className="btn-quiet" onClick={markAll}>Mark the rest present</button>{form.status!=='held'&&<button className="btn" onClick={held}>Mark meeting as held</button>}</div>
+          <button className="btn-quiet" onClick={()=>markAll('present')}>Mark the rest present</button><button className="btn-quiet" onClick={()=>markAll('absent')}>Mark the rest absent</button>{form.status!=='held'&&<button className="btn" onClick={held}>Mark meeting as held</button>}</div>
         {!eligible(form).length?<Empty icon={Users} title="No active members">Add members on the Members page.</Empty>:
         <ul className="divide-y divide-ink-700 rounded-xl border border-ink-700">{eligible(form).map(m=><li key={m.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
           <span className="code">{code('M',m.member_no,3)}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-fg">{m.full_name}</span><span className="block truncate text-xs text-fog-faint">{m.position}{meta[m.id]?.self_marked&&<span className="ml-1.5 text-brand">· {att[m.id]==='leave'?'applied leave':'checked in self'}</span>}{meta[m.id]?.note&&<span className="ml-1 text-warn">· {meta[m.id].note}</span>}</span></span>

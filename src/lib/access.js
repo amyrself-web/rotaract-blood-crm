@@ -16,10 +16,11 @@ export const MODULES=[
   ['settings','Settings','Club details, rules, templates'],
   ['members','Club members','Member records, dues and history'],
   ['meetings','Meetings','Weekly and monthly meetings, attendance, minutes'],
-  ['afterlife','Eye and body donation','Pledges and donations after death']]
+  ['afterlife','Eye and body donation','Pledges and donations after death'],
+  ['funds','Money and accounts','Donation receipts, club expenses, accounts']]
 export const ROLE_DEFAULTS={
   admin:MODULES.map(m=>m[0]),
-  coordinator:['donors','camps','import','planning','campday','messages','stock','emergency','reports','members','meetings','afterlife'],
+  coordinator:['donors','camps','import','planning','campday','messages','stock','emergency','reports','members','meetings','afterlife','funds'],
   medical:['campday','screening','stock','stock_edit','emergency','afterlife'],
   volunteer:['campday'],donor:[],member:[]}
 export const ROLE_LABEL={admin:'Admin',coordinator:'Coordinator',medical:'Medical',volunteer:'Volunteer',member:'Club member',donor:'Donor'}

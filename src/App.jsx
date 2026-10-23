@@ -29,6 +29,8 @@ import Meetings from './pages/Meetings'
 import Afterlife from './pages/Afterlife'
 import MyClub from './pages/MyClub'
 import CheckIn from './pages/CheckIn'
+import Certificates from './pages/Certificates'
+import Funds from './pages/Funds'
 import {ALL_NAV,allowed} from './nav'
 import {Lock} from 'lucide-react'
 
@@ -40,7 +42,7 @@ function Guard(){const {user,profile,loading}=useAuth(),loc=useLocation()
   if(!(user&&profile)&&!loading&&loc.pathname!=='/'){try{sessionStorage.setItem('after-login',loc.pathname+loc.search)}catch{}}
   return user&&profile?<Layout/>:<Navigate to="/login" replace/>}
 const PAGES=[['/donors',Donors],['/camps',Camps],['/import',Import],['/camp-day',CampDay],['/messages',Messages],['/stock',Stock],['/planning',Planning],
-  ['/reports',Reports],['/users',UsersPage],['/calendar',Calendar],['/audit',Audit],['/settings',SettingsPage],['/trash',Trash],['/members',Members],['/meetings',Meetings],['/afterlife',Afterlife]]
+  ['/reports',Reports],['/users',UsersPage],['/calendar',Calendar],['/audit',Audit],['/settings',SettingsPage],['/trash',Trash],['/members',Members],['/meetings',Meetings],['/afterlife',Afterlife],['/certificates',Certificates],['/funds',Funds]]
 function Toasts(){const {mode}=useBrand()
   return <Toaster position="top-center" offset={14} theme={mode} toastOptions={{style:{background:'rgb(var(--ink-800))',border:'1px solid rgb(var(--ink-600))',color:'rgb(var(--fg))',fontFamily:'Manrope, system-ui, sans-serif'}}}/>}
 export default function App(){return <BrandProvider><AuthProvider><ConfirmProvider><HashRouter><Routes>

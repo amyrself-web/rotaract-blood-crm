@@ -42,8 +42,8 @@ export async function makeCertificate({name,camp,date,venue,bloodGroup,volume,ce
   <div style="position:absolute;left:150px;top:0;bottom:0;width:7px;background:linear-gradient(180deg,#F0435A,#B4233A)"></div>
   <svg style="position:absolute;left:0;top:0" width="150" height="794" xmlns="http://www.w3.org/2000/svg">
     <text transform="translate(82 730) rotate(-90)" font-family="Sora, sans-serif" font-size="15" font-weight="700" letter-spacing="6" fill="#ffffff" fill-opacity=".92">CERTIFICATE OF APPRECIATION</text>
-    <rect x="52" y="190" width="46" height="3" rx="1.5" fill="${accent}"/>
-    <text transform="translate(82 150) rotate(-90)" font-family="Manrope, sans-serif" font-size="12" font-weight="600" letter-spacing="3" fill="#9DB0D3" text-anchor="middle">${esc(certificate)}</text></svg>
+    <text transform="translate(82 56) rotate(-90)" font-family="Manrope, sans-serif" font-size="12" font-weight="600" letter-spacing="3" fill="#9DB0D3" text-anchor="end">${esc(certificate)}</text>
+    <circle cx="77" cy="268" r="3" fill="${accent}"/><circle cx="77" cy="284" r="3" fill="#F0435A"/></svg>
   <div style="position:absolute;inset:26px 26px 26px 183px;border:1.5px solid #0B1324;border-radius:6px;opacity:.85"></div>
   <div style="position:absolute;inset:32px 32px 32px 189px;border:1px solid ${accent};border-radius:4px;opacity:.55"></div>
   <div style="position:absolute;left:215px;right:60px;top:62px;bottom:56px;display:flex;flex-direction:column">

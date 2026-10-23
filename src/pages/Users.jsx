@@ -35,8 +35,35 @@ function PermGrid({role,overrides,setOverrides}){
 
 const blank={full_name:'',email:'',phone:'',role:'volunteer',designation:'',password:'',permissions:{}}
 
+// Which donor record and member record this login is linked to. Donors see their donations; members see My club.
+function LinkedRecords({pid,phone,can}){
+  const [d,setD]=useState(undefined),[m,setM]=useState(undefined),[ph,setPh]=useState({donor:phone||'',member:phone||''})
+  const load=async()=>{const [a,b]=await Promise.all([can('donors')?supabase.from('donors').select('id,donor_no,full_name,phone,blood_group').eq('user_id',pid).is('deleted_at',null).maybeSingle():{data:null},
+    can('members')?supabase.from('members').select('id,member_no,full_name,phone,position').eq('profile_id',pid).is('deleted_at',null).maybeSingle():{data:null}]);setD(a.data);setM(b.data)}
+  useEffect(()=>{load()},[pid])
+  const link=async kind=>{const t=kind==='donor'?'donors':'members',col=kind==='donor'?'user_id':'profile_id',p=normPhone(ph[kind])
+    if(!/^[6-9]\d{9}$/.test(p))return toast.error('Enter a 10-digit mobile number')
+    const {data:row}=await supabase.from(t).select(`id,${col},full_name`).eq('phone',p).is('deleted_at',null).maybeSingle()
+    if(!row)return toast.error(`No ${kind} record with this mobile number`)
+    if(row[col]&&row[col]!==pid)return toast.error(`That ${kind} record is already linked to another login`)
+    const r=await supabase.from(t).update({[col]:pid}).eq('id',row.id);if(r.error)return toast.error(r.error.message);toast.success(`Linked to ${row.full_name}`);load()}
+  const unlink=async kind=>{const t=kind==='donor'?'donors':'members',col=kind==='donor'?'user_id':'profile_id',rec=kind==='donor'?d:m
+    const r=await supabase.from(t).update({[col]:null}).eq('id',rec.id);if(r.error)return toast.error(r.error.message);toast.success('Unlinked');load()}
+  const Box=({kind,rec,label,codeTxt,sub,perm})=><div className="rounded-xl border border-ink-600 p-4">
+    <div className="mb-1 font-semibold text-fg">{label}</div>
+    {!can(perm)?<p className="text-sm text-fog-faint">You need the {perm} permission to see this.</p>
+    :rec===undefined?<div className="skeleton h-8"/>
+    :rec?<div className="flex items-center gap-3"><span className="code">{codeTxt}</span><span className="flex-1 text-sm text-fg">{rec.full_name}<span className="block text-xs text-fog-faint">{sub}</span></span><button className="btn-quiet px-3 py-1.5 text-xs" onClick={()=>unlink(kind)}>Unlink</button></div>
+    :<div className="flex gap-2"><input className="input" aria-label={`${label} mobile`} placeholder="Mobile number on the record" value={ph[kind]} onChange={e=>setPh({...ph,[kind]:e.target.value})}/><button className="btn-quiet" onClick={()=>link(kind)}>Link</button></div>}</div>
+  return <div className="space-y-4">
+    <p className="text-sm text-fog-muted">A login is separate from the donor list and the member list. Link it so the person sees their own records after signing in.</p>
+    <Box kind="donor" rec={d} label="Donor record" codeTxt={d?code('D',d.donor_no):''} sub={d?`${d.blood_group||'-'} · ${d.phone}`:''} perm="donors"/>
+    <Box kind="member" rec={m} label="Club member record" codeTxt={m?code('M',m.member_no,3):''} sub={m?`${m.position} · ${m.phone||''}`:''} perm="members"/>
+  </div>
+}
+
 export default function UsersPage(){
-  const {user,profile,refresh}=useAuth(),confirm=useConfirm(),isAdmin=profile.role==='admin'
+  const {user,profile,refresh,can}=useAuth(),confirm=useConfirm(),isAdmin=profile.role==='admin'
   const [rows,setRows]=useState(null),[q,setQ]=useState(''),[rf,setRf]=useState(''),[edit,setEdit]=useState(null),[tab,setTab]=useState('profile'),[busy,setBusy]=useState(false),[pw,setPw]=useState('')
   const load=()=>supabase.from('profiles').select('*').order('member_no').then(({data,error})=>error?toast.error(error.message):setRows(data))
   useEffect(()=>{load()},[])
@@ -55,7 +82,12 @@ export default function UsersPage(){
 setBusy(true)
     try{
       if(edit._new){
-        await callAdmin({action:'create',email:edit.email,password:edit.password,full_name:edit.full_name,phone:normPhone(edit.phone)||null,role:edit.role,designation:edit.designation||null,permissions:edit.permissions})
+        const res=await callAdmin({action:'create',email:edit.email,password:edit.password,full_name:edit.full_name,phone:normPhone(edit.phone)||null,role:edit.role,designation:edit.designation||null,permissions:edit.permissions})
+        // link the new login to the donor / member record with the same mobile number, if there is one free
+        const p=normPhone(edit.phone),linked=[]
+        if(res?.id&&p){if(can('donors')){const {data}=await supabase.from('donors').update({user_id:res.id}).eq('phone',p).is('user_id',null).is('deleted_at',null).select('donor_no');if(data?.length)linked.push(code('D',data[0].donor_no))}
+          if(can('members')){const {data}=await supabase.from('members').update({profile_id:res.id}).eq('phone',p).is('profile_id',null).is('deleted_at',null).select('member_no');if(data?.length)linked.push(code('M',data[0].member_no,3))}}
+        if(linked.length)toast.success(`Linked to ${linked.join(' and ')} by mobile number`)
         toast.success(`${edit.full_name||edit.email} added`,{description:'Share the email and password with them privately.'})
       }else{
         const o=edit._orig
@@ -102,7 +134,7 @@ setBusy(true)
       footer={edit&&<>{!edit._new&&tab==='security'?null:<><button className="btn-quiet" onClick={()=>setEdit(null)}>Cancel</button>
         <button className="btn" disabled={busy||locked||(edit._new&&(!edit.email||edit.password.length<8))} onClick={save}>{busy?'Saving…':edit._new?'Create user':'Save changes'}</button></>}</>}>
       {edit&&<>
-        {!edit._new&&<Tabs id="user-tabs" value={tab} onChange={setTab} tabs={[['profile','Profile'],['access','Role and access'],['security','Security']]}/>}
+        {!edit._new&&<Tabs id="user-tabs" value={tab} onChange={setTab} tabs={[['profile','Profile'],['access','Role and access'],['links','Linked records'],['security','Security']]}/>}
         {(edit._new||tab==='profile')&&<div className="space-y-4">
           <Field label="Full name" required><input required className="input" value={edit.full_name||''} onChange={set('full_name')} disabled={locked}/></Field>
           <Field label="Email" hint={edit._new?'Used to sign in.':'Changing it changes their sign-in email.'} required><input required className="input" type="email" value={edit.email||''} onChange={set('email')} disabled={locked}/></Field>
@@ -120,6 +152,7 @@ setBusy(true)
             {Object.keys(edit.permissions).length>0&&<button className="flex items-center gap-1 text-xs text-brand" onClick={()=>setEdit({...edit,permissions:{}})}><RotateCcw size={12}/>Back to role defaults</button>}</div>
             <PermGrid role={edit.role} overrides={edit.permissions} setOverrides={p=>setEdit({...edit,permissions:p})}/></div>
         </div>}
+        {!edit._new&&tab==='links'&&<LinkedRecords pid={edit.id} phone={edit.phone} can={can}/>}
         {!edit._new&&tab==='security'&&<div className="space-y-6">
           <div className="rounded-xl border border-ink-600 p-4"><div className="mb-3 flex items-center gap-2 font-semibold text-fg"><KeyRound size={16}/>Set a new password</div>
             <div className="flex gap-2"><input className="input font-mono" placeholder="New password" value={pw} onChange={e=>setPw(e.target.value)} disabled={locked}/>

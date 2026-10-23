@@ -1,4 +1,4 @@
-import {LayoutDashboard,Users,CalendarDays,ClipboardCheck,MessageCircle,Droplets,BarChart3,ShieldCheck,Upload,ClipboardList,CalendarRange,History,Settings2,Tent,Trash2,IdCard,Presentation,Eye,UserRoundCheck} from 'lucide-react'
+import {LayoutDashboard,Users,CalendarDays,ClipboardCheck,MessageCircle,Droplets,BarChart3,ShieldCheck,Upload,ClipboardList,CalendarRange,History,Settings2,Tent,Trash2,IdCard,Presentation,Eye,UserRoundCheck,Award,HandCoins} from 'lucide-react'
 // perm: module needed to see the page (null = everyone signed in)
 export const NAV=[
  {group:'Overview',items:[
@@ -9,6 +9,7 @@ export const NAV=[
   {to:'/camps',label:'Camps',desc:'Create camps and share QR',icon:Tent,perm:['camps']},
   {to:'/camp-day',label:'Camp day',desc:'Check-in, screening, bags',icon:ClipboardCheck,perm:['campday','screening']},
   {to:'/planning',label:'Camp planning',desc:'Tasks, team and money',icon:ClipboardList,perm:['planning']},
+  {to:'/certificates',label:'Certificates',desc:'Who got which certificate',icon:Award,perm:['reports','campday','screening']},
   {to:'/stock',label:'Blood stock',desc:'Units, issues, emergencies',icon:Droplets,perm:['stock','emergency']}]},
  {group:'People',items:[
   {to:'/donors',label:'Donors',desc:'Everyone in the CRM',icon:Users,perm:['donors']},
@@ -17,7 +18,8 @@ export const NAV=[
   {to:'/afterlife',label:'Eye and body donation',desc:'Pledges and donations after death',icon:Eye,perm:['afterlife']}]},
  {group:'Club',items:[
   {to:'/members',label:'Members',desc:'Member records, dues, history',icon:IdCard,perm:['members']},
-  {to:'/meetings',label:'Meetings',desc:'Weekly and monthly, attendance, minutes',icon:Presentation,perm:['meetings']}]},
+  {to:'/meetings',label:'Meetings',desc:'Weekly and monthly, attendance, minutes',icon:Presentation,perm:['meetings']},
+  {to:'/funds',label:'Money and accounts',desc:'Donation receipts, expenses, accounts',icon:HandCoins,perm:['funds']}]},
  {group:'Admin',items:[
   {to:'/reports',label:'Reports',desc:'PDF report, receipts, CSV',icon:BarChart3,perm:['reports']},
   {to:'/users',label:'Users and roles',desc:'Logins and permissions',icon:ShieldCheck,perm:['users']},
