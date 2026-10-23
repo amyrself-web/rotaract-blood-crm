@@ -145,7 +145,7 @@ export default function MyClub(){
 export function ClaimMember({onDone,compact}){
   const [f,setF]=useState({phone:'',dob:''}),[busy,setBusy]=useState(false),[err,setErr]=useState('')
   const go=async e=>{e.preventDefault();setBusy(true);setErr('');const {data,error}=await supabase.rpc('claim_member',{p_phone:normPhone(f.phone),p_dob:f.dob});setBusy(false)
-    if(error)return setErr(error.message);celebrate();toast.success(`Welcome ${data.name}. Your login is linked to member ${code('M',data.member_no,3)}.`);onDone?.()}
+    if(error)return setErr(error.message);if(data?.error)return setErr(data.error);celebrate();toast.success(`Welcome ${data.name}. Your login is linked to member ${code('M',data.member_no,3)}.`);onDone?.()}
   const form=<form onSubmit={go} className="card space-y-3">
     {compact&&<h2 className="flex items-center gap-2 font-semibold text-fg"><PartyPopper size={17} className="text-brand"/>Club member? Link your member record</h2>}
     <p className="text-sm text-fog-muted">Enter the mobile number and date of birth the club secretary has for you.</p>

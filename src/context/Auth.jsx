@@ -5,7 +5,7 @@ const Ctx=createContext(null)
 export const useAuth=()=>useContext(Ctx)
 export const ROLES=['admin','coordinator','medical','volunteer','member','donor']
 export function AuthProvider({children}){
-  const [user,setUser]=useState(null),[profile,setProfile]=useState(null),[perms,setPerms]=useState({}),[settings,setSettings]=useState(DEFAULT_SETTINGS),[loading,setLoading]=useState(hasSupabase)
+  const [recovery,setRecovery_]=useState(()=>{try{return sessionStorage.getItem('recovery')==='1'}catch{return false}}),setRecovery=v=>{try{v?sessionStorage.setItem('recovery','1'):sessionStorage.removeItem('recovery')}catch{};setRecovery_(v)},[user,setUser]=useState(null),[profile,setProfile]=useState(null),[perms,setPerms]=useState({}),[settings,setSettings]=useState(DEFAULT_SETTINGS),[loading,setLoading]=useState(hasSupabase)
   const load=useCallback(async u=>{
     if(!u){setProfile(null);setPerms({});return}
     const key='auth-cache-'+u.id,cached=()=>{try{return JSON.parse(localStorage.getItem(key)||'null')}catch{return null}}
@@ -21,7 +21,7 @@ export function AuthProvider({children}){
     try{if(data)localStorage.setItem(key,JSON.stringify({profile:data,perms,settings:s.data||{}}))}catch{}},[])
   useEffect(()=>{if(!hasSupabase)return
     supabase.auth.getSession().then(async({data})=>{const u=data.session?.user??null;setUser(u);await load(u);setLoading(false)})
-    const {data:sub}=supabase.auth.onAuthStateChange((e,s)=>{const u=s?.user??null;setUser(u);if(e!=='TOKEN_REFRESHED')setTimeout(()=>load(u),0)})
+    const {data:sub}=supabase.auth.onAuthStateChange((e,s)=>{const u=s?.user??null;setUser(u);if(e==='PASSWORD_RECOVERY')setRecovery(true);if(e!=='TOKEN_REFRESHED')setTimeout(()=>load(u),0)})
     return()=>sub.subscription.unsubscribe()},[load])
   useEffect(()=>{if(!hasSupabase||!user?.id||user.id==='demo')return
     const ch=supabase.channel('me-'+user.id).on('postgres_changes',{event:'UPDATE',schema:'public',table:'profiles',filter:'id=eq.'+user.id},()=>load(user))
@@ -32,5 +32,5 @@ export function AuthProvider({children}){
   const signOut=()=>{if(hasSupabase)return supabase.auth.signOut();setUser(null);setProfile(null)}
   const demo=role=>{setUser({id:'demo'});setProfile({full_name:'Demo '+role,role,active:true});setPerms(effectivePerms(role))}
   const can=useCallback(m=>!!perms[m],[perms])
-  return <Ctx.Provider value={{user,profile,perms,can,settings,setSettings,loading,signIn,signUp,signOut,demo,refresh:()=>load(user)}}>{children}</Ctx.Provider>
+  return <Ctx.Provider value={{recovery,setRecovery,user,profile,perms,can,settings,setSettings,loading,signIn,signUp,signOut,demo,refresh:()=>load(user)}}>{children}</Ctx.Provider>
 }

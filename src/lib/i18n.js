@@ -53,6 +53,18 @@ const TA={
   'Our impact':'எங்கள் சேவை','Units of blood collected':'சேகரித்த இரத்த அலகுகள்','Lives touched':'தொட்ட உயிர்கள்','Registered donors':'பதிவு செய்த கொடையாளர்கள்','Blood camps held':'நடத்திய முகாம்கள்',
   'Eye donations':'கண் தானங்கள்','Body donations':'உடல் தானங்கள்','Pledges':'உறுதிமொழிகள்','Service projects done':'முடிந்த சேவைத் திட்டங்கள்','People helped':'பயன்பெற்றோர்','Volunteer hours':'தன்னார்வ மணிநேரம்',
   'Active members':'செயலில் உள்ள உறுப்பினர்கள்','Blood collected, by group':'வகை வாரியாக இரத்தம்','Last 12 months':'கடந்த 12 மாதங்கள்','Next camp':'அடுத்த முகாம்','Every unit can save up to three lives.':'ஒவ்வொரு அலகும் மூன்று உயிர்களைக் காக்கும்.',
+  'Gave blood at our camp before? Enter the mobile number and date of birth you gave then.':'முன்பு எங்கள் முகாமில் இரத்தம் கொடுத்தீர்களா? அப்போது கொடுத்த கைபேசி எண், பிறந்த தேதியை உள்ளிடுங்கள்.',
+  'I am a new donor':'நான் புதிய கொடையாளர்','Create my donor record':'என் கொடையாளர் பதிவை உருவாக்கு','Welcome':'வரவேற்கிறோம்','Gender':'பாலினம்','Male':'ஆண்','Female':'பெண்','Other':'மற்றவை','Please wait…':'காத்திருங்கள்…',
+  'Your blood group is needed now':'உங்கள் இரத்த வகை இப்போது தேவை','You cannot donate yet, but you can share this with friends of the same group.':'நீங்கள் இன்னும் தானம் செய்ய முடியாது; அதே வகை நண்பர்களுடன் பகிருங்கள்.',
+  'units at':'அலகுகள்,','Call':'அழை','Saved':'சேமிக்கப்பட்டது','My contact details':'என் தொடர்பு விவரங்கள்','Email':'மின்னஞ்சல்',
+  'To change your name, mobile, date of birth or blood group, use "Correct my details" below.':'பெயர், கைபேசி, பிறந்த தேதி அல்லது இரத்த வகையை மாற்ற கீழே "என் விவரங்களைத் திருத்து" பயன்படுத்துங்கள்.',
+  // login
+  'Sign in':'உள்நுழை','Create a donor account':'கொடையாளர் கணக்கை உருவாக்கு','Club members and donors use the same sign-in.':'சங்க உறுப்பினர்களும் கொடையாளர்களும் ஒரே உள்நுழைவைப் பயன்படுத்துகிறார்கள்.',
+  'See your donations and download certificates.':'உங்கள் தானங்களைப் பார்த்து சான்றிதழ்களைப் பதிவிறக்குங்கள்.','Password':'கடவுச்சொல்','Create donor account':'கொடையாளர் கணக்கை உருவாக்கு',
+  'New donor or club member? Create an account':'புதிய கொடையாளரா அல்லது உறுப்பினரா? கணக்கை உருவாக்குங்கள்','Have an account? Sign in':'கணக்கு உள்ளதா? உள்நுழையுங்கள்','Forgot password?':'கடவுச்சொல் மறந்துவிட்டதா?',
+  'Send reset link':'மீட்டமைப்பு இணைப்பை அனுப்பு','Back to sign in':'உள்நுழைவுக்குத் திரும்பு','Reset your password':'கடவுச்சொல்லை மீட்டமை',
+  'We will email you a link to set a new password.':'புதிய கடவுச்சொல் அமைக்க மின்னஞ்சலில் இணைப்பு அனுப்புவோம்.','Caps Lock is on':'Caps Lock இயக்கத்தில் உள்ளது',
+  'At least 8 characters':'குறைந்தது 8 எழுத்துகள்','Set a new password':'புதிய கடவுச்சொல் அமை','New password':'புதிய கடவுச்சொல்','Save password':'கடவுச்சொல்லைச் சேமி',
   'Share':'பகிர்','Link copied':'இணைப்பு நகலெடுக்கப்பட்டது',
 }
 
