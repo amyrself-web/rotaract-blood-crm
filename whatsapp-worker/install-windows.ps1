@@ -33,6 +33,23 @@ if((NodeMajor) -lt $need -or -not (Get-Command git -ErrorAction SilentlyContinue
     if(-not (Get-Command git -ErrorAction SilentlyContinue)){winget install --id Git.Git -e --accept-package-agreements --accept-source-agreements}
     $env:Path=[Environment]::GetEnvironmentVariable('Path','Machine')+';'+[Environment]::GetEnvironmentVariable('Path','User')
   }
+  # no winget (common on Windows Server): download the official installers directly
+  [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
+  $ProgressPreference='SilentlyContinue'
+  if((NodeMajor) -lt $need){
+    Say 'Downloading Node.js LTS...'
+    $v=((Invoke-RestMethod 'https://nodejs.org/dist/index.json') | Where-Object { $_.lts -and $_.version -like 'v22.*' } | Select-Object -First 1).version
+    $msi=Join-Path $env:TEMP "node-$v-x64.msi"
+    Invoke-WebRequest "https://nodejs.org/dist/$v/node-$v-x64.msi" -OutFile $msi
+    Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn /norestart" -Wait}
+  if(-not (Get-Command git -ErrorAction SilentlyContinue)){
+    Say 'Downloading Git for Windows...'
+    $rel=Invoke-RestMethod 'https://api.github.com/repos/git-for-windows/git/releases/latest' -Headers @{'User-Agent'='crm-installer'}
+    $url=($rel.assets | Where-Object { $_.name -match '^Git-.*-64-bit\.exe$' } | Select-Object -First 1).browser_download_url
+    $exe=Join-Path $env:TEMP 'git-setup.exe'
+    Invoke-WebRequest $url -OutFile $exe
+    Start-Process $exe -ArgumentList '/VERYSILENT /NORESTART /NOCANCEL /SP-' -Wait}
+  $env:Path=[Environment]::GetEnvironmentVariable('Path','Machine')+';'+[Environment]::GetEnvironmentVariable('Path','User')
   if((NodeMajor) -lt $need -or -not (Get-Command git -ErrorAction SilentlyContinue)){
     Say "Please install these first, then run this script again:" Yellow
     Say "  Node.js $need or newer (LTS, Windows Installer .msi): https://nodejs.org/en/download" Yellow
