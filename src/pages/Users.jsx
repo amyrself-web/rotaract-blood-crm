@@ -7,8 +7,8 @@ import {MODULES,ROLE_DEFAULTS,ROLE_LABEL,ROLE_HINT,DESIGNATIONS,effectivePerms} 
 import {PageHeader,Drawer,Field,Badge,Tabs,Toggle,Empty,useConfirm,errText,useLive,code} from '../components/ui'
 import {normPhone,fmt} from '../lib/util'
 
-const ROLES=['admin','coordinator','medical','volunteer','donor']
-const TONE={admin:'red',coordinator:'blue',medical:'green',volunteer:'amber',donor:'neutral'}
+const ROLES=['admin','coordinator','medical','volunteer','member','donor']
+const TONE={admin:'red',coordinator:'blue',medical:'green',volunteer:'amber',member:'blue',donor:'neutral'}
 const genPw=()=>{const a='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';const r=crypto.getRandomValues(new Uint32Array(10));return 'Rc-'+[...r].map(x=>a[x%a.length]).join('')}
 async function callAdmin(body){
   const {data,error}=await supabase.functions.invoke('admin-users',{body})

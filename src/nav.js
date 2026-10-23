@@ -1,8 +1,9 @@
-import {LayoutDashboard,Users,CalendarDays,ClipboardCheck,MessageCircle,Droplets,BarChart3,ShieldCheck,Upload,ClipboardList,CalendarRange,History,Settings2,Tent,Trash2,IdCard,Presentation,Eye} from 'lucide-react'
+import {LayoutDashboard,Users,CalendarDays,ClipboardCheck,MessageCircle,Droplets,BarChart3,ShieldCheck,Upload,ClipboardList,CalendarRange,History,Settings2,Tent,Trash2,IdCard,Presentation,Eye,UserRoundCheck} from 'lucide-react'
 // perm: module needed to see the page (null = everyone signed in)
 export const NAV=[
  {group:'Overview',items:[
   {to:'/',label:'Dashboard',desc:'Today at a glance',icon:LayoutDashboard,perm:null},
+  {to:'/my-club',label:'My club',desc:'Your meetings, attendance and dues',icon:UserRoundCheck,perm:['_myclub']},
   {to:'/calendar',label:'Calendar',desc:'Camps, birthdays and tasks',icon:CalendarRange,perm:['camps','campday','planning','meetings']}]},
  {group:'Camp work',items:[
   {to:'/camps',label:'Camps',desc:'Create camps and share QR',icon:Tent,perm:['camps']},

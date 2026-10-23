@@ -3,14 +3,15 @@ import {supabase,hasSupabase} from '../lib/supabase'
 import {effectivePerms,DEFAULT_SETTINGS} from '../lib/access'
 const Ctx=createContext(null)
 export const useAuth=()=>useContext(Ctx)
-export const ROLES=['admin','coordinator','medical','volunteer','donor']
+export const ROLES=['admin','coordinator','medical','volunteer','member','donor']
 export function AuthProvider({children}){
   const [user,setUser]=useState(null),[profile,setProfile]=useState(null),[perms,setPerms]=useState({}),[settings,setSettings]=useState(DEFAULT_SETTINGS),[loading,setLoading]=useState(hasSupabase)
   const load=useCallback(async u=>{
     if(!u){setProfile(null);setPerms({});return}
     const {data}=await supabase.from('profiles').select('*').eq('id',u.id).single();setProfile(data)
     const acc=await supabase.rpc('my_access')
-    setPerms(!acc.error&&acc.data?.perms?acc.data.perms:effectivePerms(data?.role,data?.permissions))
+    const base=!acc.error&&acc.data?.perms?acc.data.perms:effectivePerms(data?.role,data?.permissions),linked=!!acc.data?.member
+    setPerms({...base,_member:linked,_myclub:linked&&data?.role!=='member'})
     const s=await supabase.from('settings').select('*').eq('id',1).maybeSingle()
     if(!s.error&&s.data)setSettings({...DEFAULT_SETTINGS,...s.data})},[])
   useEffect(()=>{if(!hasSupabase)return

@@ -1,7 +1,8 @@
 import {useEffect,useMemo,useState} from 'react'
 import {toast} from 'sonner'
 import {motion} from 'framer-motion'
-import {Plus,Presentation,FileText,Download,CalendarDays,MapPin,Users,CheckCircle2,Circle,Trash2,Clock,Video} from 'lucide-react'
+import {Plus,Presentation,FileText,Download,CalendarDays,MapPin,Users,CheckCircle2,Circle,Trash2,Clock,Video,QrCode,RefreshCw,Maximize2,X} from 'lucide-react'
+import {createPortal} from 'react-dom'
 import {supabase} from '../lib/supabase'
 import {useBrand} from '../context/Brand'
 import {fmt} from '../lib/util'
@@ -19,7 +20,7 @@ const periods=()=>{const ry=rotaryYear(),d=new Date(),m0=new Date(d.getFullYear(
 export default function Meetings(){
   const {brand}=useBrand(),confirm=useConfirm()
   const [view,setView]=useState('meetings'),[rows,setRows]=useState(null),[members,setMembers]=useState([]),[counts,setCounts]=useState({}),[actions,setActions]=useState([])
-  const [form,setForm]=useState(null),[tab,setTab]=useState('details'),[att,setAtt]=useState({}),[acts,setActs]=useState([]),[busy,setBusy]=useState(false),[newAct,setNewAct]=useState({task:'',owner_member:'',due:''})
+  const [form,setForm]=useState(null),[tab,setTab]=useState('details'),[att,setAtt]=useState({}),[acts,setActs]=useState([]),[busy,setBusy]=useState(false),[meta,setMeta]=useState({}),[qr,setQr]=useState(false),[newAct,setNewAct]=useState({task:'',owner_member:'',due:''})
   const [period,setPeriod]=useState('year'),[sum,setSum]=useState(null),[pdf,setPdf]=useState(''),[kind,setKind]=useState('')
   const P=periods()[period]
   const load=async()=>{try{const [m,b,a,x]=await Promise.all([supabase.from('meetings').select('*').is('deleted_at',null).order('meeting_date',{ascending:false}),
@@ -29,13 +30,15 @@ export default function Meetings(){
     const c={};(a.data||[]).forEach(r=>{if(['present','late'].includes(r.status))c[r.meeting_id]=(c[r.meeting_id]||0)+1});setCounts(c)}catch(e){toast.error(errText(e))}}
   const loadSum=()=>supabase.rpc('attendance_summary',{p_from:P.from,p_to:P.to}).then(({data,error})=>error?toast.error(error.message):setSum(data))
   useEffect(()=>{load()},[]);useEffect(()=>{loadSum()},[period,view])
-  useLive(['meetings','meeting_attendance','meeting_actions','members'],()=>{load();loadSum()})
+  useLive(['meetings','meeting_attendance','meeting_actions','members'],()=>{load();loadSum();if(form?.id)loadAtt(form.id)})
   const eligible=mt=>members.filter(m=>m.status==='active'&&(!m.joined_on||m.joined_on<=mt.meeting_date))
   const open=async r=>{setTab('details');setNewAct({task:'',owner_member:'',due:''})
     if(!r){setForm(empty());setAtt({});setActs([]);return}
     setForm({...empty(),...Object.fromEntries(Object.entries(r).map(([k,v])=>[k,v??''])),start_time:r.start_time?.slice(0,5)||'',end_time:r.end_time?.slice(0,5)||'',_orig:r})
-    const [a,x]=await Promise.all([supabase.from('meeting_attendance').select('member_id,status').eq('meeting_id',r.id),supabase.from('meeting_actions').select('*').eq('meeting_id',r.id).order('action_no')])
-    setAtt(Object.fromEntries((a.data||[]).map(z=>[z.member_id,z.status])));setActs(x.data||[])}
+    const [a,x]=await Promise.all([loadAtt(r.id),supabase.from('meeting_actions').select('*').eq('meeting_id',r.id).order('action_no')]);setActs(x.data||[])}
+  const loadAtt=async id=>{const a=await supabase.from('meeting_attendance').select('member_id,status,note,self_marked').eq('meeting_id',id)
+    setAtt(Object.fromEntries((a.data||[]).map(z=>[z.member_id,z.status])));setMeta(Object.fromEntries((a.data||[]).map(z=>[z.member_id,z])))}
+  const newCode=async()=>{const c=String(Math.floor(Math.random()*1e6)).padStart(6,'0');const r=await supabase.from('meetings').update({checkin_code:c}).eq('id',form.id);if(r.error)return toast.error(r.error.message);setForm({...form,checkin_code:c});toast.success('New check-in code made')}
   const set=k=>e=>setForm({...form,[k]:e.target.value})
   const save=async e=>{e?.preventDefault();setBusy(true);const {id,meeting_no,created_at,created_by,deleted_at,deleted_by,_orig,...rest}=form
     const row=Object.fromEntries(Object.entries(rest).map(([k,v])=>[k,v===''?null:v]));row.guests=Number(row.guests||0)
@@ -139,11 +142,14 @@ export default function Meetings(){
         <Field label="Minutes" hint="What was discussed"><textarea form="meet-form" className="input min-h-[200px]" value={form.minutes} onChange={set('minutes')}/></Field>
         <Field label="Decisions"><textarea form="meet-form" className="input min-h-[100px]" value={form.decisions} onChange={set('decisions')}/></Field></div>}
       {tab==='attendance'&&<div>
+        {form.status!=='cancelled'&&<div className="tile mb-4 flex flex-wrap items-center gap-3 p-3"><QrCode size={20} className="text-brand"/>
+          <div className="flex-1"><div className="text-xs text-fog-muted">Members check in themselves with this code</div><div className="font-mono text-2xl font-bold tracking-[.3em] text-fg">{form.checkin_code||'------'}</div></div>
+          <button className="btn-quiet" onClick={newCode}><RefreshCw size={14}/>New code</button><button className="btn" onClick={()=>setQr(true)}><Maximize2 size={15}/>Show QR on screen</button></div>}
         <div className="mb-3 flex flex-wrap items-center gap-2"><span className="text-sm text-fog-muted">{Object.values(att).filter(s=>['present','late'].includes(s)).length} of {eligible(form).length} present</span><div className="flex-1"/>
           <button className="btn-quiet" onClick={markAll}>Mark the rest present</button>{form.status!=='held'&&<button className="btn" onClick={held}>Mark meeting as held</button>}</div>
         {!eligible(form).length?<Empty icon={Users} title="No active members">Add members on the Members page.</Empty>:
         <ul className="divide-y divide-ink-700 rounded-xl border border-ink-700">{eligible(form).map(m=><li key={m.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
-          <span className="code">{code('M',m.member_no,3)}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-fg">{m.full_name}</span><span className="block truncate text-xs text-fog-faint">{m.position}</span></span>
+          <span className="code">{code('M',m.member_no,3)}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-fg">{m.full_name}</span><span className="block truncate text-xs text-fog-faint">{m.position}{meta[m.id]?.self_marked&&<span className="ml-1.5 text-brand">· {att[m.id]==='leave'?'applied leave':'checked in self'}</span>}{meta[m.id]?.note&&<span className="ml-1 text-warn">· {meta[m.id].note}</span>}</span></span>
           <div className="flex gap-1" role="radiogroup" aria-label={`Attendance for ${m.full_name}`}>{Object.entries(ST).map(([k,[l,c]])=><button key={k} role="radio" aria-checked={att[m.id]===k} onClick={()=>mark(m.id,k)}
             className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${att[m.id]===k?c:'bg-ink-750 text-fog-muted hover:text-fg'}`}>{l}</button>)}</div></li>)}</ul>}</div>}
       {tab==='actions'&&<div>
@@ -158,5 +164,23 @@ export default function Meetings(){
           {!acts.length&&<li className="text-sm text-fog-faint">No action items yet.</li>}</ul></div>}
       </>}
     </Drawer>
+    {qr&&form&&<QrScreen meeting={form} present={Object.values(att).filter(s=>['present','late'].includes(s)).length} total={eligible(form).length} onClose={()=>setQr(false)}/>}
   </div>
+}
+
+// Full-screen QR for the projector or a phone held up at the meeting
+function QrScreen({meeting,present,total,onClose}){
+  const [src,setSrc]=useState('')
+  const url=`${location.origin}${location.pathname}#/checkin/${meeting.id}?c=${meeting.checkin_code}`
+  useEffect(()=>{import('qrcode').then(Q=>Q.toDataURL(url,{margin:1,width:520,color:{dark:'#0B1324',light:'#ffffff'}})).then(setSrc)},[url])
+  useEffect(()=>{const k=e=>e.key==='Escape'&&onClose();window.addEventListener('keydown',k);return()=>window.removeEventListener('keydown',k)},[onClose])
+  return createPortal(<motion.div initial={{opacity:0}} animate={{opacity:1}} className="fixed inset-0 z-[70] grid place-items-center bg-[#081224]/95 p-6 text-center backdrop-blur" role="dialog" aria-label="Check-in QR">
+    <button className="btn-ghost absolute right-4 top-4 text-white/70" aria-label="Close" onClick={onClose}><X size={22}/></button>
+    <div><div className="text-sm font-semibold uppercase tracking-[.2em] text-brand-soft">Scan to mark attendance</div>
+      <h2 className="mt-2 font-display text-3xl font-semibold text-white">{meeting.title}</h2>
+      <motion.div initial={{scale:.9}} animate={{scale:1}} transition={{type:'spring',stiffness:200,damping:18}} className="mx-auto mt-6 w-fit rounded-3xl bg-white p-4 shadow-[0_30px_80px_-20px_rgba(76,141,255,.6)]">{src?<img src={src} alt="Check-in QR code" className="h-[min(60vh,420px)] w-[min(60vh,420px)]"/>:<div className="h-[320px] w-[320px]"/>}</motion.div>
+      <div className="mt-6 text-white/60">or open the CRM and type the code</div>
+      <div className="mt-1 font-mono text-5xl font-bold tracking-[.35em] text-white">{meeting.checkin_code}</div>
+      <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-white"><span className="h-2 w-2 animate-pulse rounded-full bg-ok"/><b className="tabular-nums">{present}</b> of {total} checked in</div></div>
+  </motion.div>,document.body)
 }

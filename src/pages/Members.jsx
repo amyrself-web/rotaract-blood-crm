@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useState} from 'react'
 import {Link} from 'react-router-dom'
 import {toast} from 'sonner'
-import {Plus,Search,IdCard,Download,FileText,ChevronRight,Trash2,Wallet,Droplet,UserPlus,Receipt} from 'lucide-react'
+import {Plus,Search,IdCard,Download,FileText,ChevronRight,Trash2,Wallet,Droplet,UserPlus,Receipt,KeyRound,ShieldCheck,Copy,Share2} from 'lucide-react'
 import {supabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
 import {useBrand} from '../context/Brand'
@@ -11,6 +11,7 @@ import {rotaryYear,memberDirectoryPdf,duesPdf,csv} from '../lib/clubReports'
 import {buildPdf,rs,pad} from '../lib/docpdf'
 import CountUp from '../components/CountUp'
 
+const genPw=()=>{const a='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';return 'Rc-'+[...crypto.getRandomValues(new Uint32Array(10))].map(x=>a[x%a.length]).join('')}
 export const POSITIONS=['President','Vice President','Secretary','Joint Secretary','Treasurer','Sergeant-at-Arms','Club Service Director','Community Service Director',
   'International Service Director','Professional Development Director','Public Relations Director','Blood Donation Chair','IT and Media','Board member','Member']
 const TYPES=['Active','Prospective','Honorary','Alumni']
@@ -23,7 +24,7 @@ const Bar=({v})=><div className="flex items-center gap-2"><div className="h-1.5 
 export default function Members(){
   const {can}=useAuth(),{brand}=useBrand(),confirm=useConfirm(),ry=rotaryYear()
   const [rows,setRows]=useState(null),[dues,setDues]=useState([]),[att,setAtt]=useState({}),[q,setQ]=useState(''),[st,setSt]=useState('active'),[type,setType]=useState('')
-  const [form,setForm]=useState(null),[tab,setTab]=useState('details'),[busy,setBusy]=useState(false),[prof,setProf]=useState(null),[pay,setPay]=useState(null),[pdf,setPdf]=useState('')
+  const [form,setForm]=useState(null),[tab,setTab]=useState('details'),[busy,setBusy]=useState(false),[prof,setProf]=useState(null),[pay,setPay]=useState(null),[pdf,setPdf]=useState(''),[login,setLogin]=useState(null),[loginInfo,setLoginInfo]=useState(null)
   const load=async()=>{try{
     const [m,d,a]=await Promise.all([supabase.from('members').select('*').is('deleted_at',null).order('member_no'),supabase.from('member_dues').select('member_id,amount,paid_on').gte('paid_on',ry.from).lte('paid_on',ry.to),
       supabase.rpc('attendance_summary',{p_from:ry.from,p_to:ry.to})])
@@ -35,7 +36,7 @@ export default function Members(){
   const list=(rows||[]).filter(r=>(!st||r.status===st)&&(!type||r.membership_type===type)&&(!q||`${code('M',r.member_no,3)} ${r.full_name} ${r.phone||''} ${r.email||''} ${r.position}`.toLowerCase().includes(q.toLowerCase())))
   const active=(rows||[]).filter(r=>r.status==='active'),pcts=active.map(r=>pct(r.id)).filter(v=>v!=null)
   const loadProfile=id=>supabase.rpc('member_profile',{p_member:id}).then(({data})=>setProf(data))
-  const open=r=>{setTab('details');setProf(null);setPay(null);setForm(r?{...empty,...Object.fromEntries(Object.entries(r).map(([k,v])=>[k,v??''])),_orig:r}:{...empty});if(r)loadProfile(r.id)}
+  const open=r=>{setTab('details');setProf(null);setPay(null);setLogin(null);setLoginInfo(null);if(r?.profile_id)supabase.from('profiles').select('email,role,active').eq('id',r.profile_id).maybeSingle().then(({data})=>setLoginInfo(data||{}));setForm(r?{...empty,...Object.fromEntries(Object.entries(r).map(([k,v])=>[k,v??''])),_orig:r}:{...empty});if(r)loadProfile(r.id)}
   const set=k=>e=>setForm({...form,[k]:e.target.value})
   const save=async e=>{e.preventDefault();const phone=form.phone?normPhone(form.phone):''
     if(phone&&!/^[6-9]\d{9}$/.test(phone))return toast.error('Mobile number must be 10 digits and start with 6, 7, 8 or 9')
@@ -90,7 +91,7 @@ export default function Members(){
           <td><span className="code">{code('M',r.member_no,3)}</span></td>
           <td className="truncate"><div className="flex items-center gap-2"><span className="truncate font-medium text-fg">{r.full_name}</span>{r.status!=='active'&&<Badge tone={tone[r.status]}>{r.status}</Badge>}{r.membership_type!=='Active'&&<Badge tone="blue">{r.membership_type}</Badge>}</div><div className="truncate text-xs text-fog-faint">{r.phone||r.email||'-'}</div></td>
           <td className="truncate text-fog-muted">{r.position}</td>
-          <td><span className="font-display font-semibold text-blood">{r.blood_group||'-'}</span>{r.donor_id&&<Droplet size={12} className="ml-1 inline text-blood" fill="currentColor" aria-label="Linked donor"/>}</td>
+          <td><span className="font-display font-semibold text-blood">{r.blood_group||'-'}</span>{r.profile_id&&<KeyRound size={12} className="ml-1 inline text-brand" aria-label="Has login"/>}{r.donor_id&&<Droplet size={12} className="ml-1 inline text-blood" fill="currentColor" aria-label="Linked donor"/>}</td>
           <td className="whitespace-nowrap tabular-nums text-fog-muted">{fmt(r.joined_on)}</td>
           <td>{pct(r.id)==null?<span className="text-xs text-fog-faint">No meetings</span>:<Bar v={pct(r.id)}/>}</td>
           <td className="text-right tabular-nums">{paid[r.id]?<span className="text-ok">{rs(paid[r.id])}</span>:<span className="text-fog-faint">Not paid</span>}</td>
@@ -106,7 +107,7 @@ export default function Members(){
     <Drawer open={!!form} onClose={()=>setForm(null)} width="max-w-2xl" title={form?.id?`${form.full_name} · ${code('M',form.member_no,3)}`:'Add member'} description={form?.id?`${form.position} · joined ${fmt(form.joined_on)}`:'Fields marked * are required.'}
       footer={form&&tab==='details'&&<>{form.id&&<button className="btn-quiet mr-auto text-blood" onClick={remove}><Trash2 size={15}/>Move to Recycle bin</button>}
         <button className="btn-quiet" onClick={()=>setForm(null)}>Cancel</button><button className="btn" form="member-form" disabled={busy}>{busy?'Saving…':form.id?'Save changes':'Add member'}</button></>}>
-      {form&&<>{form.id&&<Tabs id="mem-tabs" value={tab} onChange={setTab} tabs={[['details','Details'],['dues','Dues'],['attendance','Attendance'],['blood','Blood donations']]}/>}
+      {form&&<>{form.id&&<Tabs id="mem-tabs" value={tab} onChange={setTab} tabs={[['details','Details'],['dues','Dues'],['attendance','Attendance'],['blood','Blood donations'],['login','Login']]}/>}
       {tab==='details'&&<form id="member-form" onSubmit={save} className="grid gap-4 sm:grid-cols-2">
         <Field label="Full name" required className="sm:col-span-2"><input className="input" required minLength={2} value={form.full_name} onChange={set('full_name')}/></Field>
         <Field label="Mobile" required hint="10 digits"><input className="input" required inputMode="numeric" value={form.phone} onChange={set('phone')}/></Field>
@@ -149,6 +150,21 @@ export default function Members(){
         <ul className="divide-y divide-ink-700 rounded-xl border border-ink-700">{prof.meetings.map((m,i)=><li key={i} className="flex items-center gap-3 px-3 py-2 text-sm"><span className="code">{code('MT',m.no,3)}</span><span className="flex-1 truncate text-fg">{m.title}<span className="block text-xs text-fog-faint">{fmt(m.date)} · {m.kind}</span></span>
           <Badge tone={{present:'green',late:'blue',leave:'amber',absent:'red'}[m.status]}>{{present:'Present',late:'Late',leave:'Leave',absent:'Absent'}[m.status]}</Badge></li>)}
           {!prof.meetings.length&&<li className="p-4 text-sm text-fog-faint">No meetings held since this member joined.</li>}</ul></div>)}
+      {tab==='login'&&<div className="space-y-4">
+        {form.profile_id?<div className="tile flex items-center gap-4 p-4"><span className="grid h-12 w-12 place-items-center rounded-xl bg-ok/15 text-ok"><ShieldCheck size={22}/></span>
+          <div className="min-w-0 flex-1"><div className="font-semibold text-fg">Has a login</div><div className="truncate text-sm text-fog-muted">{loginInfo?.email||form.email||'-'}{loginInfo?.role&&loginInfo.role!=='member'?` · team account (${loginInfo.role})`:''}</div></div></div>
+        :<div className="tile p-4 text-sm text-fog-muted">No login yet. Create one below, or ask the member to sign up with their own email and use <b className="text-fg">Link my member record</b> with this mobile number and date of birth{form.dob?'':' (add the date of birth first)'}.</div>}
+        {!login?<button className="btn" onClick={()=>setLogin({email:form.email||'',password:genPw()})}><KeyRound size={15}/>{form.profile_id?'Reset password':'Create login'}</button>
+        :<form onSubmit={async e=>{e.preventDefault();setBusy(true);const {data,error}=await supabase.functions.invoke('admin-users',{body:{action:form.profile_id?'reset_member_password':'create_member_login',member_id:form.id,email:login.email,password:login.password}});setBusy(false)
+            const msg=error?(await error.context?.json?.().catch(()=>null))?.error||error.message:data?.error;if(msg)return toast.error(msg)
+            toast.success(form.profile_id?'Password changed':'Login created. Share the details with the member.');setLogin({...login,done:true});if(!form.profile_id){setForm({...form,profile_id:data.id,email:login.email});load()}}} className="tile grid gap-3 p-4">
+          {!form.profile_id&&<Field label="Email" required><input className="input" type="email" required value={login.email} disabled={login.done} onChange={e=>setLogin({...login,email:e.target.value})}/></Field>}
+          <Field label={form.profile_id?'New password':'Password'} required hint="At least 8 characters. The member can change it later from My profile."><input className="input font-mono" required minLength={8} value={login.password} disabled={login.done} onChange={e=>setLogin({...login,password:e.target.value})}/></Field>
+          {!login.done?<div className="flex gap-2"><button className="btn" disabled={busy}>{busy?'Saving…':form.profile_id?'Change password':'Create login'}</button><button type="button" className="btn-quiet" onClick={()=>setLogin(null)}>Cancel</button></div>
+          :(()=>{const txt=`Hi ${form.full_name.split(' ')[0]}, your ${brand.club_name} member login is ready.\nLink: ${location.origin}${location.pathname}\nEmail: ${form.email||login.email}\nPassword: ${login.password}\nPlease change your password after signing in.`
+            return <div className="flex flex-wrap gap-2"><button type="button" className="btn-quiet" onClick={()=>{navigator.clipboard?.writeText(txt);toast.success('Copied')}}><Copy size={15}/>Copy details</button>
+              {form.phone&&<a className="btn" target="_blank" rel="noreferrer" href={`https://wa.me/91${form.phone}?text=${encodeURIComponent(txt)}`}><Share2 size={15}/>Send on WhatsApp</a>}</div>})()}
+        </form>}</div>}
       {tab==='blood'&&(!prof?<div className="skeleton h-20"/>:form.donor_id?<div className="tile flex items-center gap-4 p-4">
           <span className="grid h-12 w-12 place-items-center rounded-xl bg-blood/10 text-blood"><Droplet size={22} fill="currentColor"/></span>
           <div className="flex-1"><div className="font-semibold text-fg">Donor {code('D',prof.donor_no)}</div><div className="text-sm text-fog-muted">{prof.donations} donation{prof.donations===1?'':'s'} recorded</div></div>

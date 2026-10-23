@@ -1,4 +1,4 @@
-import {HashRouter,Routes,Route,Navigate} from 'react-router-dom'
+import {HashRouter,Routes,Route,Navigate,useLocation} from 'react-router-dom'
 import {Toaster} from 'sonner'
 import {AuthProvider,useAuth} from './context/Auth'
 import {BrandProvider,useBrand} from './context/Brand'
@@ -27,14 +27,17 @@ import Profile from './pages/Profile'
 import Members from './pages/Members'
 import Meetings from './pages/Meetings'
 import Afterlife from './pages/Afterlife'
+import MyClub from './pages/MyClub'
+import CheckIn from './pages/CheckIn'
 import {ALL_NAV,allowed} from './nav'
 import {Lock} from 'lucide-react'
 
-function Home(){const {profile}=useAuth();return profile.role==='donor'?<Portal/>:<Dashboard/>}
+function Home(){const {profile}=useAuth();return profile.role==='donor'?<Portal/>:profile.role==='member'?<MyClub/>:<Dashboard/>}
 function Need({to,children}){const {can}=useAuth(),item=ALL_NAV.find(n=>n.to===to)
   return allowed(item,can)?children:<div className="card"><Empty icon={Lock} title="You do not have access to this page">Ask an admin to give you this permission on the Users page.</Empty></div>}
-function Guard(){const {user,profile,loading}=useAuth()
+function Guard(){const {user,profile,loading}=useAuth(),loc=useLocation()
   if(loading)return <div className="grid min-h-screen place-items-center"><div className="h-10 w-10 animate-spin rounded-full border-2 border-ink-600 border-t-blood"/></div>
+  if(!(user&&profile)&&!loading&&loc.pathname!=='/'){try{sessionStorage.setItem('after-login',loc.pathname+loc.search)}catch{}}
   return user&&profile?<Layout/>:<Navigate to="/login" replace/>}
 const PAGES=[['/donors',Donors],['/camps',Camps],['/import',Import],['/camp-day',CampDay],['/messages',Messages],['/stock',Stock],['/planning',Planning],
   ['/reports',Reports],['/users',UsersPage],['/calendar',Calendar],['/audit',Audit],['/settings',SettingsPage],['/trash',Trash],['/members',Members],['/meetings',Meetings],['/afterlife',Afterlife]]
@@ -45,7 +48,7 @@ export default function App(){return <BrandProvider><AuthProvider><ConfirmProvid
   <Route path="/register/:campId" element={<Register/>}/>
   <Route path="/home" element={<Landing/>}/><Route path="/verify" element={<Verify/>}/><Route path="/verify/:code" element={<Verify/>}/>
   <Route element={<Guard/>}>
-    <Route index element={<Home/>}/><Route path="profile" element={<Profile/>}/>
+    <Route index element={<Home/>}/><Route path="profile" element={<Profile/>}/><Route path="my-club" element={<MyClub/>}/><Route path="checkin/:id" element={<CheckIn/>}/>
     {PAGES.map(([to,P])=><Route key={to} path={to.slice(1)} element={<Need to={to}><P/></Need>}/>)}
   </Route><Route path="*" element={<Navigate to="/" replace/>}/></Routes></HashRouter>
   <Toasts/>

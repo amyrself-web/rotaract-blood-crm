@@ -19,7 +19,7 @@ function Pulse(){
 export default function Login(){
   const {signIn,signUp,demo,user,profile}=useAuth(),nav=useNavigate()
   const [mode,setMode]=useState('in'),[f,setF]=useState({name:'',email:'',password:''}),[msg,setMsg]=useState(''),[busy,setBusy]=useState(false),[show,setShow]=useState(false),[camp,setCamp]=useState(null)
-  useEffect(()=>{if(user&&profile)nav('/',{replace:true})},[user,profile])
+  useEffect(()=>{if(user&&profile){let to='/';try{to=sessionStorage.getItem('after-login')||'/';sessionStorage.removeItem('after-login')}catch{}nav(to,{replace:true})}},[user,profile])
   useEffect(()=>{if(hasSupabase)supabase.rpc('public_camp_info').then(({data})=>setCamp(data))},[])
   const set=k=>e=>setF({...f,[k]:e.target.value})
   const submit=async e=>{e.preventDefault();setBusy(true);setMsg('')
@@ -56,7 +56,7 @@ export default function Login(){
           <button className="btn w-full py-2.5" disabled={busy||!hasSupabase}>{busy?'Please wait…':mode==='in'?'Sign in':'Create donor account'}</button>
         </form>
         <button type="button" className="mt-5 w-full text-sm text-fog-muted hover:text-fg" onClick={()=>{setMode(mode==='in'?'up':'in');setMsg('')}}>
-          {mode==='in'?'New donor? Create an account':'Have an account? Sign in'}</button>
+          {mode==='in'?'New donor or club member? Create an account':'Have an account? Sign in'}</button>
         <a href="#/home" className="mt-2 block text-center text-sm text-fog-faint hover:text-fg">See the next camp</a>
         {!hasSupabase&&<div className="card mt-6"><p className="mb-3 text-sm text-fog-muted">Database not connected yet. Preview the CRM as a role:</p>
           <div className="flex flex-wrap gap-2">{ROLES.map(r=><button key={r} className="chip capitalize hover:border-brand" onClick={()=>demo(r)}>{r}</button>)}</div></div>}

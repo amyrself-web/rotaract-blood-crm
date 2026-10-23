@@ -21,14 +21,15 @@ export const ROLE_DEFAULTS={
   admin:MODULES.map(m=>m[0]),
   coordinator:['donors','camps','import','planning','campday','messages','stock','emergency','reports','members','meetings','afterlife'],
   medical:['campday','screening','stock','stock_edit','emergency','afterlife'],
-  volunteer:['campday'],donor:[]}
-export const ROLE_LABEL={admin:'Admin',coordinator:'Coordinator',medical:'Medical',volunteer:'Volunteer',donor:'Donor'}
-export const ROLE_HINT={admin:'Everything, including users and settings',coordinator:'Runs camps, donors and messages',medical:'Screening, donations and stock',volunteer:'Camp day desk only',donor:'Own donor portal only'}
+  volunteer:['campday'],donor:[],member:[]}
+export const ROLE_LABEL={admin:'Admin',coordinator:'Coordinator',medical:'Medical',volunteer:'Volunteer',member:'Club member',donor:'Donor'}
+export const ROLE_HINT={admin:'Everything, including users and settings',coordinator:'Runs camps, donors and messages',medical:'Screening, donations and stock',volunteer:'Camp day desk only',member:'Own page: meetings, attendance, dues',donor:'Own donor portal only'}
 export const DESIGNATIONS={
   admin:['President','Secretary','IT admin'],
   coordinator:['Vice President','Treasurer','Camp coordinator','Joint secretary','PR and media','Club service director','Community service director'],
   medical:['Doctor','Medical officer','Nurse','Lab technician','Counsellor'],
   volunteer:['Registration desk','Screening desk','Refreshment desk','Certificate desk','Crowd control','Volunteer lead'],
+  member:['Member','Board member','Prospective member'],
   donor:['Donor','Regular donor']}
 export const effectivePerms=(role,overrides={})=>Object.fromEntries(MODULES.map(([m])=>[m,role==='admin'?true:(m in (overrides||{})?!!overrides[m]:ROLE_DEFAULTS[role]?.includes(m))]))
 export const DEFAULT_SETTINGS={club_name:'Sankari Rotaract Club',min_hb:12.5,min_weight:45,gap_male:90,gap_female:120,expiry_days:35,default_slot_capacity:null}

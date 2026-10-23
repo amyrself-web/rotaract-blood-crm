@@ -6,9 +6,11 @@ import {makeCertificate,certNo} from '../lib/certificate'
 import {useBrand} from '../context/Brand'
 import {code,useLive,PageHeader} from '../components/ui'
 import CountUp from '../components/CountUp'
+import {ClaimMember} from './MyClub'
+import {useAuth} from '../context/Auth'
 const badge=n=>n>=10?'Life saver':n>=5?'Regular donor':n>=2?'Repeat donor':n===1?'First donation done':'Ready to donate'
 export default function Portal(){
-  const {brand}=useBrand(),[busy,setBusy]=useState(null)
+  const {brand}=useBrand(),{refresh}=useAuth(),[busy,setBusy]=useState(null)
   const [p,setP]=useState(null),[err,setErr]=useState(''),[f,setF]=useState({phone:'',dob:'',consent:false}),[slot,setSlot]=useState({})
   const load=()=>supabase.rpc('my_portal').then(({data,error})=>error?setErr(error.message):setP(data))
   useEffect(()=>{load()},[])
@@ -21,7 +23,8 @@ export default function Portal(){
       <input className="input" placeholder="Mobile number" required value={f.phone} onChange={e=>setF({...f,phone:e.target.value})}/>
       <label className="block text-sm text-fog-muted">Date of birth<input type="date" className="input mt-1" required value={f.dob} onChange={e=>setF({...f,dob:e.target.value})}/></label>
       <label className="flex gap-2 text-sm text-fog"><input type="checkbox" required checked={f.consent} onChange={e=>setF({...f,consent:e.target.checked})}/>I agree to be contacted about camps and blood donation drives.</label>
-      {err&&<p className="text-sm text-blood">{err}</p>}<button className="btn w-full">Link my record</button></form></div>
+      {err&&<p className="text-sm text-blood">{err}</p>}<button className="btn w-full">Link my record</button></form>
+    <div className="mt-5"><ClaimMember compact onDone={refresh}/></div></div>
   const d=p.donor,out=p.outside||[],n=p.history.length+out.reduce((x,o)=>x+(o.units||1),0),ne=nextEligible(d.last_donation,d.gender),regIds=new Set(p.upcoming.map(u=>u.camp_id)),gave=new Set(p.history.map(h=>h.camp+'|'+h.date))
   return <div><PageHeader eyebrow={d.donor_no?code('D',d.donor_no):undefined} title={`Hello, ${d.name}`} description="Thank you for being a blood donor"/>
     {err&&<p className="mb-3 text-sm text-blood">{err}</p>}
@@ -38,5 +41,6 @@ export default function Portal(){
       {p.history.map(h=><div key={h.code} className="flex items-center justify-between border-t border-ink-700 py-2 first:border-0"><div><div className="text-fg">{h.camp}</div><div className="text-sm text-fog-muted">{fmt(h.date)}</div></div>
         <button className="btn" disabled={busy===h.cert_no} onClick={async()=>{setBusy(h.cert_no);try{await makeCertificate({name:d.name,camp:h.camp,venue:h.venue,date:fmt(h.date),bloodGroup:d.blood_group,volume:h.volume,certificate:h.cert_no?certNo(h.cert_no):h.code,verifyCode:h.verify_code,donorNo:code('D',d.donor_no),brand})}finally{setBusy(null)}}}><Award size={16}/>{busy===h.cert_no?'Preparing…':'Certificate'}</button></div>)}
       {out.map((o,i)=><div key={'o'+i} className="flex items-center justify-between border-t border-ink-700 py-2 first:border-0"><div><div className="text-fg">{o.kind==='emergency_donation'?'Emergency donation':'Donation'} at {o.place}</div><div className="text-sm text-fog-muted">{fmt(o.date)}</div></div><span className="text-xs text-fog-faint">Recorded by the club</span></div>)}
-      {!n&&<p className="text-sm text-fog-faint">Your donations will appear here after your first camp.</p>}</div></div>
+      {!n&&<p className="text-sm text-fog-faint">Your donations will appear here after your first camp.</p>}</div>
+    <details className="mt-5"><summary className="cursor-pointer text-sm text-fog-muted hover:text-fg">Are you a member of the club? Link your member record</summary><div className="mt-3 max-w-md"><ClaimMember compact onDone={refresh}/></div></details></div>
 }
