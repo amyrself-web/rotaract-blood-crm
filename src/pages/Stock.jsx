@@ -6,6 +6,7 @@ import {supabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
 import {BLOOD,fmt,wa} from '../lib/util'
 import CountUp from '../components/CountUp'
+import {enqueue} from '../lib/wa'
 import {PageHeader,Drawer,Field,Tabs,Badge,Empty,useConfirm,errText,useLive,undoToast,code,todayIso} from '../components/ui'
 
 const ST=['collected','in_transit','testing','available','issued','discarded']
@@ -16,7 +17,7 @@ const EREQ={patient_ref:'',blood_group:'',units_needed:'1',hospital:'',contact_n
 async function all(){let out=[],from=0;for(;;){const {data,error}=await supabase.from('blood_units').select('*').order('id').range(from,from+999);if(error)throw error;out=out.concat(data);if(data.length<1000)return out;from+=1000}}
 
 function Req({r,units,onEdit,setStatus}){
-  const {settings}=useAuth(),[open,setOpen]=useState(false),[ds,setDs]=useState(null)
+  const {settings,can}=useAuth(),[open,setOpen]=useState(false),[ds,setDs]=useState(null),[alerting,setAlerting]=useState(false)
   const avail=units.filter(u=>u.blood_group===r.blood_group&&u.status==='available').length
   const show=async()=>{setOpen(!open);if(ds)return
     const {data}=await supabase.from('donors').select('id,full_name,phone,gender,last_donation,area,donor_no').is('deleted_at',null).eq('blood_group',r.blood_group).eq('consent',true).limit(300)
@@ -31,7 +32,10 @@ function Req({r,units,onEdit,setStatus}){
     <div className="flex gap-2">{r.status==='open'&&<><button className="btn" onClick={show}>{open?'Hide donors':'Find donors'}</button><button className="btn-quiet" onClick={()=>setStatus(r,'fulfilled')}>Fulfilled</button></>}
       <button className="btn-ghost" aria-label="Edit request" onClick={()=>onEdit(r)}><Pencil size={15}/></button></div></div>
     {open&&<motion.div initial={{height:0,opacity:0}} animate={{height:'auto',opacity:1}} className="overflow-hidden"><div className="mt-4 border-t border-ink-700 pt-3">{!ds?<div className="skeleton h-8"/>:<>
-      <p className="mb-2 text-sm text-fog-muted">{ds.length} eligible {r.blood_group} donors who agreed to be contacted (exact blood group match only).</p>
+      <div className="mb-2 flex flex-wrap items-center gap-3"><p className="flex-1 text-sm text-fog-muted">{ds.length} eligible {r.blood_group} donors who agreed to be contacted (exact blood group match only).</p>
+        {can('messages')&&ds.length>0&&<button className="btn bg-blood text-white hover:bg-blood/90" disabled={alerting} onClick={async()=>{setAlerting(true)
+          try{const x=await enqueue(`Emergency ${r.blood_group} at ${r.hospital}`,'emergency',ds.map(d=>({phone:d.phone,name:d.full_name,donor_id:d.id,ref:r.id,body:msg,vars:{name:d.full_name,group:r.blood_group,hospital:r.hospital,contact:`${r.contact_name||''} ${r.contact_phone||''}`.trim(),club:settings.club_name}})))
+            toast.success(`${x.queued} donors will get the alert on WhatsApp`)}catch(e){toast.error(errText(e))}setAlerting(false)}}><Send size={15}/>{alerting?'Sending…':`Alert all ${ds.length}`}</button>}</div>
       {ds.slice(0,30).map(d=><div key={d.id} className="flex items-center justify-between py-1.5 text-sm"><span className="text-fg">{d.full_name} <span className="text-fog-faint">{d.area}</span></span>
         <a className="btn-quiet px-3 py-1 text-xs" target="_blank" rel="noreferrer" href={wa(d.phone,msg)}><Send size={13}/>WhatsApp</a></div>)}</>}</div></motion.div>}</div>
 }

@@ -1,0 +1,15 @@
+{
+  "name": "crm-whatsapp-worker",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Sends the CRM's WhatsApp outbox from the club's own number, linked by QR code",
+  "scripts": { "start": "node worker.mjs" },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@supabase/supabase-js": "2.45.4",
+    "@whiskeysockets/baileys": "6.7.24",
+    "pino": "9.6.0",
+    "qrcode-terminal": "0.12.0"
+  }
+}

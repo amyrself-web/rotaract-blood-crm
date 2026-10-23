@@ -9,6 +9,8 @@ import {PageHeader,Badge,Empty,useLive,code,errText} from '../components/ui'
 import {makeCertificate,certNo,verifyUrl,fmtCode} from '../lib/certificate'
 import {rotaryYear,csv} from '../lib/clubReports'
 import CountUp from '../components/CountUp'
+import {enqueue,certLink} from '../lib/wa'
+import {Send} from 'lucide-react'
 
 // Register of every blood donation certificate: who got one, when it was downloaded or sent, and the check code.
 export default function Certificates(){
@@ -23,17 +25,22 @@ export default function Certificates(){
   const one=async r=>{await makeCertificate({name:r.name,camp:r.camp,venue:r.venue,date:fmt(r.date),bloodGroup:r.blood_group,volume:r.volume,certificate:certNo(r.cert_no),verifyCode:r.verify_code,donorNo:code('D',r.donor_no),brand})
     await supabase.rpc('log_certificate',{p_reg:r.reg_id,p_kind:'download'})}
   const download=async r=>{setBusy(r.reg_id);try{await one(r);load()}catch(e){toast.error(errText(e))}setBusy('')}
-  const whatsapp=async r=>{const link=verifyUrl(fmtCode(r.verify_code))
-    const text=`Dear ${r.name.split(' ')[0]}, thank you for donating blood at ${r.camp} on ${fmt(r.date)}. Your certificate number is ${certNo(r.cert_no)}.\nCheck it here: ${link}\n${r.has_login?'You can download your certificate after signing in to the club portal.':'Collect your certificate from the club, or ask us to send the PDF.'}\n- ${settings.club_name||brand.club_name}`
+  const whatsapp=async r=>{const link=certLink(r.verify_code)
+    const text=`Dear ${r.name.split(' ')[0]}, thank you for donating blood at ${r.camp} on ${fmt(r.date)}. 🩸\nYour certificate ${certNo(r.cert_no)}: download it here ${link}\n- ${brand.club_name||settings.club_name||''}`
     window.open(`https://wa.me/91${r.phone}?text=${encodeURIComponent(text)}`,'_blank');await supabase.rpc('log_certificate',{p_reg:r.reg_id,p_kind:'whatsapp'});load()}
   const all=async()=>{const todo=list;if(!todo.length)return;setBulk({done:0,total:todo.length})
     for(let i=0;i<todo.length;i++){try{await one(todo[i])}catch(e){toast.error(`${todo[i].name}: ${errText(e)}`)}setBulk({done:i+1,total:todo.length})}
     setBulk(null);toast.success(`${todo.length} certificates downloaded`);load()}
+  const sendAll=async()=>{const todo=list.filter(r=>r.phone&&!r.sent_at);if(!todo.length)return toast.error('Everyone in this list has already been sent their certificate')
+    try{const club=brand.club_name||settings.club_name||'',x=await enqueue(`Certificates${camp?` · ${camps.find(c=>c.id===camp)?.name||''}`:''}`,'certificate',todo.map(r=>{const v={name:r.name,camp:r.camp,date:fmt(r.date),link:certLink(r.verify_code),club}
+      return {phone:r.phone,name:r.name,ref:r.reg_id,vars:v,body:`Dear ${r.name.split(' ')[0]}, thank you for donating blood at ${r.camp} on ${fmt(r.date)}. 🩸\nDownload your certificate here: ${v.link}\n- ${club}`}}))
+      toast.success(`${x.queued} certificates queued in WhatsApp Outbox`)}catch(e){toast.error(errText(e))}}
   const st=rows||[],issued=st.filter(r=>r.issued_at).length,sent=st.filter(r=>r.sent_at).length
   return <div>
     <PageHeader title="Certificates" description="Every blood donation certificate: who received one, downloads, WhatsApp messages and the check code."
       actions={<><button className="btn-quiet" disabled={!list.length} onClick={()=>csv(list.map(r=>({certificate:certNo(r.cert_no),check_code:fmtCode(r.verify_code),donor_id:code('D',r.donor_no),name:r.name,blood_group:r.blood_group,phone:r.phone,camp:r.camp,date:r.date,ml:r.volume,
           issued:r.issued_at?fmt(r.issued_at):'',downloads:r.downloads,whatsapp_sent:r.sent_at?fmt(r.sent_at):''})),'certificates.csv')}><Download size={15}/>CSV</button>
+        <button className="btn-quiet" disabled={!list.length} onClick={sendAll}><Send size={15}/>Send all on WhatsApp</button>
         <button className="btn" disabled={!list.length||!!bulk} onClick={all}><FileDown size={15}/>{bulk?`Preparing ${bulk.done} of ${bulk.total}…`:`Download ${list.length} PDFs`}</button></>}/>
     <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
       {[['Certificates',st.length,'One for every donation'],['Given or downloaded',issued,`${st.length-issued} not yet given`],['Sent on WhatsApp',sent,'With the check link'],['Total downloads',st.reduce((a,r)=>a+r.downloads,0),'By staff and donors']].map(([l,v,s])=>

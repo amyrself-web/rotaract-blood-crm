@@ -1,10 +1,17 @@
 import {useEffect,useMemo,useState} from 'react'
-import {Send,Check} from 'lucide-react'
+import {Send,Check,ListPlus} from 'lucide-react'
+import {toast} from 'sonner'
+import {useNavigate,useSearchParams} from 'react-router-dom'
 import {supabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
 import {BLOOD,nextEligible,fmt,wa} from '../lib/util'
 import CountUp from '../components/CountUp'
-import {useLive,PageHeader} from '../components/ui'
+import {useLive,PageHeader,Tabs,errText} from '../components/ui'
+import Outbox from '../components/wa/Outbox'
+import Broadcast from '../components/wa/Broadcast'
+import AutoRules from '../components/wa/AutoRules'
+import Connect from '../components/wa/Connect'
+import {enqueue,useWaStatus,PROVIDERS} from '../lib/wa'
 const SIGN=' - {club}'
 const DEFAULTS={
   birthday:'Happy Birthday {name}! Wishing you good health and happiness.'+SIGN,
@@ -18,7 +25,7 @@ const NAMES={birthday:'Birthday',reminder_early:'Reminder, early',reminder_1d:'R
 const TABS=[['birthday','Birthdays'],['reminder','Camp reminders'],['thanks','Thank-you'],['eligible','Eligible again'],['invite','Invite donors'],['templates','Templates']]
 let CLUB='';const fill=(b,v)=>b.replace(/\{(\w+)\}/g,(_,k)=>k==='club'?(v.club||CLUB):v[k]??'')
 async function allDonors(){let out=[],from=0;for(;;){const {data,error}=await supabase.from('donors').select('id,full_name,phone,dob,blood_group,gender,last_donation,consent,donor_no').is('deleted_at',null).order('id').range(from,from+999);if(error)throw error;out=out.concat(data);if(data.length<1000)return out;from+=1000}}
-export default function Messages(){
+function Lists({onQueued}){
   const {user,can,settings}=useAuth(),admin=can('settings');CLUB=settings.club_name||''
   const [donors,setDonors]=useState([]),[camps,setCamps]=useState([]),[tpl,setTpl]=useState(DEFAULTS),[tab,setTab]=useState('birthday'),[cid,setCid]=useState(''),[stage,setStage]=useState('early'),[grp,setGrp]=useState(''),[regs,setRegs]=useState([]),[sent,setSent]=useState(new Set()),[err,setErr]=useState(''),[draft,setDraft]=useState({})
   const today=new Date().toLocaleDateString('en-CA')
@@ -50,7 +57,11 @@ export default function Messages(){
   const saveTpl=async k=>{const {error}=await supabase.from('message_templates').upsert({kind:k,body:draft[k],updated_at:new Date().toISOString()});error?setErr(error.message):(setTpl({...tpl,[k]:draft[k]}),setDraft({...draft,[k]:undefined}))}
   const next=camps.filter(c=>c.camp_date>=today&&!['closed','completed'].includes(c.status)).sort((a,b)=>a.camp_date.localeCompare(b.camp_date))[0]
   const pending=donors.filter(d=>!d.consent).length
-  return <div><PageHeader eyebrow="People" title="WhatsApp and alerts" description="Camp invites, birthday wishes and eligibility reminders"/>
+  const [queuing,setQueuing]=useState(false)
+  const queueAll=async()=>{const todo=items.filter(i=>!i.done);if(!todo.length)return;setQueuing(true)
+    try{const r=await enqueue(`${NAMES[Q.kind]||Q.kind}${camp&&Q.ref===cid?` · ${camp.name}`:''}`,Q.kind,todo.map(it=>({phone:it.d.phone,name:it.d.full_name,donor_id:it.d.id,ref:String(it.ref||''),body:fill(tpl[Q.kind],it.v),vars:{...it.v,club:CLUB}})))
+      toast.success(`${r.queued} messages added to the Outbox${r.skipped?` (${r.skipped} already queued or stopped)`:''}`);onQueued?.()}catch(e){toast.error(errText(e))}setQueuing(false)}
+  return <div>
     {err&&<p className="mb-3 text-sm text-blood">{err}</p>}
     <div className="card mb-5"><h2 className="mb-3 font-semibold text-fg">Today, {fmt(today)}</h2>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">{[['Birthdays',bdays.length],['Camps today',camps.filter(c=>c.camp_date===today).length],['Eligible again',eligNow.length],['Consent pending',pending]].map(([l,n])=><div key={l}><div className="text-2xl font-semibold tabular-nums text-fg"><CountUp value={n}/></div><div className="text-xs text-fog-muted">{l}</div></div>)}</div>
@@ -65,11 +76,23 @@ export default function Messages(){
         <select className="input w-auto" value={cid} onChange={e=>setCid(e.target.value)}>{camps.map(c=><option key={c.id} value={c.id}>{c.name} ({fmt(c.camp_date)})</option>)}</select>
         {tab==='reminder'&&<select className="input w-auto" value={stage} onChange={e=>setStage(e.target.value)}><option value="early">Early reminder</option><option value="1d">Day before</option><option value="today">Camp morning</option></select>}
         {tab==='invite'&&<select className="input w-auto" value={grp} onChange={e=>setGrp(e.target.value)}><option value="">All blood groups</option>{BLOOD.map(b=><option key={b}>{b}</option>)}</select>}</div>}
-      <p className="mb-3 text-sm text-fog-muted">{todo} to send, {items.length-todo} sent. Each button opens WhatsApp with the message ready; press send there.</p>
+      <div className="mb-3 flex flex-wrap items-center gap-3"><p className="flex-1 text-sm text-fog-muted">{todo} to send, {items.length-todo} sent. Each button opens WhatsApp with the message ready; or put them all in the Outbox.</p>
+        {todo>0&&<button className="btn" disabled={queuing} onClick={queueAll}><ListPlus size={15}/>{queuing?'Adding…':`Send all ${todo}`}</button>}</div>
       {items[0]&&<div className="card mb-3 text-sm text-fog"><div className="mb-1 text-xs text-fog-faint">Message preview</div>{fill(tpl[Q.kind],items[0].v)}</div>}
       <div className="card overflow-x-auto p-0"><table className="w-full text-sm"><tbody>{items.map(it=><tr key={it.d.id+it.ref} className="border-t border-ink-700 first:border-0">
         <td className="p-3"><div className="text-fg">{it.d.full_name}</div><div className="text-xs text-fog-faint">{it.d.phone}</div></td><td className="font-semibold text-blood">{it.d.blood_group||''}</td>
         <td className="pr-3 text-right"><a className={`btn px-3 py-1 ${it.done?'bg-ink-700 text-fog hover:bg-ink-600':''}`} target="_blank" rel="noreferrer" onClick={()=>mark(it.d,it.ref)} href={wa(it.d.phone,fill(tpl[Q.kind],it.v))}>{it.done?<><Check size={14}/>Send again</>:<><Send size={14}/>WhatsApp</>}</a></td></tr>)}
         {!items.length&&<tr><td className="p-6 text-center text-fog-faint">{!camp&&tab!=='birthday'&&tab!=='eligible'?'Create a camp first.':'Nobody in this list right now.'}</td></tr>}</tbody></table></div></>}
+  </div>
+}
+
+export default function Messages(){
+  const {can}=useAuth(),st=useWaStatus(20000),[sp,setSp]=useSearchParams(),tab=sp.get('tab')||'outbox'
+  const setTab=t=>setSp(t==='outbox'?{}:{tab:t},{replace:true})
+  const tabs=[['outbox',`Outbox${st?.queued?` · ${st.queued}`:''}`],['broadcast','Broadcast'],['lists','Lists'],['auto','Automatic'],...(can('settings')?[['connect','Connect']]:[])]
+  return <div><PageHeader eyebrow="People" title="WhatsApp and alerts" description={st?`Sending by: ${PROVIDERS[st.provider]||st.provider}${st.provider==='qr'?` (${st.status==='connected'?'connected':'not connected'})`:''} · ${st.sent_today} sent today`:'Broadcasts, reminders, birthday wishes and certificates'}/>
+    <Tabs id="wa-tabs" value={tab} onChange={setTab} tabs={tabs}/>
+    {tab==='outbox'&&<Outbox/>}{tab==='broadcast'&&<Broadcast onQueued={()=>setTab('outbox')}/>}{tab==='lists'&&<Lists onQueued={()=>setTab('outbox')}/>}
+    {tab==='auto'&&<AutoRules/>}{tab==='connect'&&<Connect/>}
   </div>
 }
