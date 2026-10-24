@@ -11,6 +11,7 @@ import {rotaryYear,csv,iso} from '../lib/clubReports'
 import {buildPdf,rs,pad,GREEN} from '../lib/docpdf'
 import {inWords} from '../lib/money'
 import CountUp from '../components/CountUp'
+import WaSend from '../components/wa/WaSend'
 
 const PURPOSES=['General fund','Blood donation camp','Eye donation drive','Community service','Emergency medical help','Club events','Other']
 const MODES=['Cash','UPI','Bank transfer','Cheque','Card']
@@ -85,8 +86,7 @@ export default function Funds(){
   const doCancel=async e=>{e.preventDefault();const t=cancel.kind==='g'?'contributions':'club_expenses'
     const r=await supabase.from(t).update({status:'cancelled',cancel_reason:cancel.reason}).eq('id',cancel.row.id);if(r.error)return toast.error(r.error.message)
     toast.success(cancel.kind==='g'?'Receipt cancelled. It stays in the register, marked cancelled.':'Voucher cancelled');setCancel(null);setGf(null);setXf(null);load()}
-  const wa=g=>{const t=`Dear ${g.donor_name}, thank you for your donation of ${rs(g.amount)} to ${settings.club_name||brand.club_name} (receipt ${code('DR',g.receipt_no,4)}, ${fmt(g.received_on)}) towards ${g.purpose.toLowerCase()}. We are grateful for your support.`
-    window.open(`https://wa.me/91${g.phone}?text=${encodeURIComponent(t)}`,'_blank')}
+  const thanks=g=>`Dear ${g.donor_name}, thank you for your donation of ${rs(g.amount)} to ${settings.club_name||brand.club_name} (receipt ${code('DR',g.receipt_no,4)}, ${fmt(g.received_on)}) towards ${g.purpose.toLowerCase()}. We are grateful for your support.`
   const shownG=(gifts||[]).filter(g=>(!pf||g.purpose===pf)&&(!q||`${code('DR',g.receipt_no,4)} ${g.donor_name} ${g.phone||''} ${g.reference||''} ${g.purpose}`.toLowerCase().includes(q.toLowerCase())))
   const shownX=(exps||[]).filter(x=>!q||`${code('EV',x.voucher_no,4)} ${x.paid_to} ${x.category} ${x.description||''}`.toLowerCase().includes(q.toLowerCase()))
   const yearIn=(gifts||[]).filter(g=>g.status==='received'&&g.received_on>=ry.from&&g.received_on<=ry.to)
@@ -116,7 +116,7 @@ export default function Funds(){
         <div className="mt-0.5 truncate text-xs text-fog-faint">{fmt(g.received_on)} · {g.purpose} · {g.mode}{g.reference?` ${g.reference}`:''}</div></button>
       <span className={`font-display text-lg font-semibold tabular-nums ${g.status==='cancelled'?'text-fog-faint line-through':'text-fg'}`}>{rs(g.amount)}</span>
       <div className="flex gap-1"><button className="btn-ghost" title="Download receipt" aria-label={`Download receipt ${code('DR',g.receipt_no,4)}`} onClick={()=>run(g.id,()=>donationReceipt(g,brand,camps))} disabled={pdf===g.id}><FileText size={16}/></button>
-        {g.phone&&g.status==='received'&&<button className="btn-ghost" title="Thank on WhatsApp" aria-label="Thank on WhatsApp" onClick={()=>wa(g)}><MessageCircle size={16}/></button>}</div></motion.li>)}</ul></div>)}
+        {g.phone&&g.status==='received'&&<WaSend className="btn-ghost" title="Thank on WhatsApp" kind="donation_thanks" refId={g.id} phone={g.phone} name={g.donor_name} text={thanks(g)}><MessageCircle size={16}/></WaSend>}</div></motion.li>)}</ul></div>)}
 
     {view==='out'&&(exps===null?<div className="skeleton h-24"/>:!shownX.length?<div className="card"><Empty icon={Wallet} title="No club expenses yet" action={<button className="btn" onClick={()=>setXf(emptyExp())}><Plus size={16}/>Record expense</button>}>Camp expenses are on Camp planning. Record other club spending here.</Empty></div>
     :<div className="card overflow-hidden p-0"><ul className="divide-y divide-ink-700/80">{shownX.map(x=><li key={x.id} className="flex flex-wrap items-center gap-3 px-4 py-3">

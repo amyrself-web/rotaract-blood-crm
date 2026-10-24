@@ -11,6 +11,7 @@ import {rotaryYear,csv} from '../lib/clubReports'
 import CountUp from '../components/CountUp'
 import {enqueue,certLink} from '../lib/wa'
 import {Send} from 'lucide-react'
+import WaSend from '../components/wa/WaSend'
 
 // Register of every blood donation certificate: who got one, when it was downloaded or sent, and the check code.
 export default function Certificates(){
@@ -25,9 +26,9 @@ export default function Certificates(){
   const one=async r=>{await makeCertificate({name:r.name,camp:r.camp,venue:r.venue,date:fmt(r.date),bloodGroup:r.blood_group,volume:r.volume,certificate:certNo(r.cert_no),verifyCode:r.verify_code,donorNo:code('D',r.donor_no),brand})
     await supabase.rpc('log_certificate',{p_reg:r.reg_id,p_kind:'download'})}
   const download=async r=>{setBusy(r.reg_id);try{await one(r);load()}catch(e){toast.error(errText(e))}setBusy('')}
-  const whatsapp=async r=>{const link=certLink(r.verify_code)
-    const text=`Dear ${r.name.split(' ')[0]}, thank you for donating blood at ${r.camp} on ${fmt(r.date)}. 🩸\nYour certificate ${certNo(r.cert_no)}: download it here ${link}\n- ${brand.club_name||settings.club_name||''}`
-    window.open(`https://wa.me/91${r.phone}?text=${encodeURIComponent(text)}`,'_blank');await supabase.rpc('log_certificate',{p_reg:r.reg_id,p_kind:'whatsapp'});load()}
+  const certText=r=>{const link=certLink(r.verify_code)
+    return `Dear ${r.name.split(' ')[0]}, thank you for donating blood at ${r.camp} on ${fmt(r.date)}. 🩸\nYour certificate ${certNo(r.cert_no)}: download it here ${link}\n- ${brand.club_name||settings.club_name||''}`}
+  const whatsapp=async(r,mode)=>{if(mode==='manual')await supabase.rpc('log_certificate',{p_reg:r.reg_id,p_kind:'whatsapp'});load()}
   const all=async()=>{const todo=list;if(!todo.length)return;setBulk({done:0,total:todo.length})
     for(let i=0;i<todo.length;i++){try{await one(todo[i])}catch(e){toast.error(`${todo[i].name}: ${errText(e)}`)}setBulk({done:i+1,total:todo.length})}
     setBulk(null);toast.success(`${todo.length} certificates downloaded`);load()}
@@ -61,7 +62,7 @@ export default function Certificates(){
         <div className="flex flex-wrap items-center gap-1.5">{r.issued_at?<Badge tone="green"><CheckCircle2 size={12}/>Given {fmt(r.issued_at)}</Badge>:<Badge tone="amber"><Clock size={12}/>Not given</Badge>}
           {r.downloads>0&&<Badge>{r.downloads} download{r.downloads>1?'s':''}</Badge>}{r.sent_at&&<Badge tone="blue">WhatsApp {fmt(r.sent_at)}</Badge>}</div>
         <div className="flex gap-1"><button className="btn-ghost" title="Download certificate" aria-label={`Download certificate for ${r.name}`} disabled={busy===r.reg_id} onClick={()=>download(r)}><Download size={16}/></button>
-          {r.consent&&r.phone&&!r.phone.startsWith('X')&&<button className="btn-ghost" title="Send on WhatsApp" aria-label={`WhatsApp ${r.name}`} onClick={()=>whatsapp(r)}><MessageCircle size={16}/></button>}
+          {r.consent&&r.phone&&!r.phone.startsWith('X')&&<WaSend className="btn-ghost" title={`WhatsApp ${r.name}`} kind="certificate" refId={r.reg_id} phone={r.phone} name={r.name} text={certText(r)} onSent={m=>whatsapp(r,m)}><MessageCircle size={16}/></WaSend>}
           <button className="btn-ghost" title="Copy check link" aria-label="Copy check link" onClick={()=>{navigator.clipboard?.writeText(verifyUrl(fmtCode(r.verify_code)));toast.success('Check link copied')}}><Link2 size={16}/></button></div>
       </li>)}</ul>}
     </div>

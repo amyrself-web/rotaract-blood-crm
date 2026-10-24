@@ -1,11 +1,11 @@
 import {useEffect,useMemo,useState} from 'react'
 import {toast} from 'sonner'
-import {Megaphone,Users,IdCard,ClipboardPaste,Send,CalendarClock,Smile} from 'lucide-react'
+import {Megaphone,Users,IdCard,ClipboardPaste,Send,CalendarClock,Smile,Zap,Smartphone} from 'lucide-react'
 import {supabase} from '../../lib/supabase'
 import {useAuth} from '../../context/Auth'
 import {BLOOD,nextEligible,normPhone,fmt} from '../../lib/util'
 import {Field,errText} from '../ui'
-import {enqueue,fill,siteUrl,useWaStatus,PROVIDERS} from '../../lib/wa'
+import {enqueue,fill,siteUrl,useWaStatus,getSendMode,setSendMode} from '../../lib/wa'
 import {celebrate} from '../../lib/fx'
 
 async function all(table,cols,f){let out=[],from=0;for(;;){let q=supabase.from(table).select(cols).is('deleted_at',null).order('id').range(from,from+999);if(f)q=f(q)
@@ -37,10 +37,11 @@ export default function Broadcast({onQueued}){
       .map(d=>({phone:d.phone,name:d.full_name,donor_id:d.id,bloodgroup:d.blood_group||'',area:d.area||''}))
   },[src,donors,members,regs,f])
   const vars=p=>({name:p.name||'Friend',club,bloodgroup:p.bloodgroup||'',area:p.area||'',camp:camp?.name||'',date:camp?fmt(camp.camp_date):'',venue:camp?.venue||'',link:camp?`${siteUrl()}#/register/${camp.id}`:siteUrl()})
-  const per=status?.provider&&status.provider!=='manual'?Math.max(1,Number(status.per_minute)||6):null
+  const ready=!!status?.ready,[how,setHow]=useState(null),mode=how||(ready&&getSendMode()!=='manual'?'auto':'manual'),manual=mode==='manual'||!ready
+  const per=!manual?Math.max(1,Number(status.per_minute)||6):null
   const send=async()=>{if(!people.length)return toast.error('Nobody matches. Change the filters.');if(msg.body.trim().length<5)return toast.error('Write the message first')
-    setBusy(true);try{const r=await enqueue(msg.title||msg.body.slice(0,40),'broadcast',people.map(p=>({phone:p.phone,name:p.name,donor_id:p.donor_id,member_id:p.member_id,body:fill(msg.body,vars(p)).trim(),vars:{...vars(p),message:fill(msg.body,vars(p)).trim()}})),msg.when?new Date(msg.when).toISOString():null)
-      celebrate();toast.success(`${r.queued} messages queued${r.skipped?`, ${r.skipped} skipped (stopped or wrong number)`:''}`);onQueued?.()}catch(e){toast.error(errText(e))}setBusy(false)}
+    setBusy(true);try{const r=await enqueue(msg.title||msg.body.slice(0,40),'broadcast',people.map(p=>({phone:p.phone,name:p.name,donor_id:p.donor_id,member_id:p.member_id,body:fill(msg.body,vars(p)).trim(),vars:{...vars(p),message:fill(msg.body,vars(p)).trim()}})),msg.when?new Date(msg.when).toISOString():null,manual)
+      setSendMode(manual?'manual':'auto');celebrate();toast.success(`${r.queued} messages ${manual?'ready to tap through':'going out from the club number'}${r.skipped?`, ${r.skipped} skipped (stopped or wrong number)`:''}`);onQueued?.(r)}catch(e){toast.error(errText(e))}setBusy(false)}
   const toggleGroup=g=>setF({...f,groups:f.groups.includes(g)?f.groups.filter(x=>x!==g):[...f.groups,g]})
   const ins=t=>setMsg({...msg,body:msg.body+t})
   return <div className="grid gap-5 lg:grid-cols-[1fr_380px]">
@@ -75,8 +76,13 @@ export default function Broadcast({onQueued}){
           <div className="ml-auto max-w-[88%] whitespace-pre-wrap rounded-2xl rounded-tr-sm bg-[#005C4B] px-3 py-2 text-[14px] leading-snug text-[#E9EDEF] shadow">{fill(msg.body,vars(people[0]||{name:'Priya'}))||' '}
             <div className="mt-1 text-right text-[10px] text-[#8696A0]">{new Date().toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit'})} ✓✓</div></div></div></div>
       <div className="card text-sm text-fog-muted">
-        <div>Sender: <b className="text-fg">{PROVIDERS[status?.provider||'manual']}</b></div>
-        {per?<div className="mt-1">About {Math.ceil(people.length/per)} minutes to send all, at {per} a minute.</div>:<div className="mt-1">Messages wait in the Outbox. Open it and use “Tap to send”.</div>}
+        <div className="mb-2 font-medium text-fg">How to send</div>
+        <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="How to send">
+          {[['auto',Zap,'Club number','Automatic',!ready],['manual',Smartphone,'Open WhatsApp','You tap send',false]].map(([k,I,l,h,off])=>
+            <button key={k} role="radio" aria-checked={(k==='manual')===manual} disabled={off} onClick={()=>setHow(k)} className={`tile flex flex-col items-center gap-1 px-2 py-3 text-center transition disabled:cursor-not-allowed disabled:opacity-45 ${(k==='manual')===manual?'border-brand/60 bg-brand/10 text-fg ring-2 ring-brand/20':'hover:text-fg'}`}>
+              <I size={18} className={k==='auto'?'text-brand':'text-[#25D366]'}/><span className="text-sm font-medium">{l}</span><span className="text-[11px] text-fog-faint">{h}</span></button>)}</div>
+        {!ready&&<div className="mt-2 text-xs text-fog-faint">Club number is off: the club phone is not connected (WhatsApp and alerts → Connect).</div>}
+        {per?<div className="mt-3">The club phone sends them, about {Math.ceil(people.length/per)} minutes for all at {per} a minute. Nothing to tap.</div>:<div className="mt-3">WhatsApp opens for each person with the message typed. You press send, then the next one is ready.</div>}
         <button className="btn mt-4 w-full py-3" disabled={busy||!people.length} onClick={send}>{msg.when?<CalendarClock size={16}/>:<Send size={16}/>}{busy?'Queuing…':msg.when?`Schedule for ${people.length}`:`Send to ${people.length}`}</button></div>
     </aside>
   </div>

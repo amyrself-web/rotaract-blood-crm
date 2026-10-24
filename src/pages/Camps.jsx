@@ -7,6 +7,7 @@ import {supabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
 import {fmt,wa,slots} from '../lib/util'
 import {PageHeader,Drawer,Field,Badge,Empty,Tabs,useConfirm,errText,useLive,undoToast,code,todayIso} from '../components/ui'
+import WaSend from '../components/wa/WaSend'
 
 const STATUS=[['planned','Planned'],['open','Registration open'],['live','Live today'],['completed','Completed'],['closed','Closed']]
 const TONE={planned:'neutral',open:'blue',live:'red',completed:'green',closed:'neutral'}
@@ -43,7 +44,7 @@ function Registrants({camp,onChanged}){
       <select className="input w-auto py-1.5 text-xs" value={r.slot||''} onChange={e=>upd(r,{slot:e.target.value||null})}><option value="">Any time</option>{s.map(x=><option key={x}>{x}</option>)}</select>
       <select className="input w-auto py-1.5 text-xs" value={r.status} onChange={e=>upd(r,{status:e.target.value})} disabled={['donated','screened','deferred'].includes(r.status)} title="Screening and donation steps are set on Camp day">
         {REG.map(x=><option key={x} value={x} disabled={['screened','donated','deferred'].includes(x)}>{x.replace('_',' ')}</option>)}</select>
-      {r.donors.consent&&<a className="btn-ghost" target="_blank" rel="noreferrer" title="Send reminder on WhatsApp" href={wa(r.donors.phone,`Hello ${r.donors.full_name}, reminder: ${camp.name} on ${fmt(camp.camp_date)}${r.slot?' at '+r.slot:''}${camp.venue?', '+camp.venue:''}. Thank you for donating blood. ${settings.club_name}`)}><MessageCircle size={15}/></a>}
+      {r.donors.consent&&<WaSend className="btn-ghost" title="Send reminder on WhatsApp" phone={r.donors.phone} name={r.donors.full_name} donorId={r.donor_id} text={`Hello ${r.donors.full_name}, reminder: ${camp.name} on ${fmt(camp.camp_date)}${r.slot?' at '+r.slot:''}${camp.venue?', '+camp.venue:''}. Thank you for donating blood. ${settings.club_name}`}><MessageCircle size={15}/></WaSend>}
       <button className="btn-ghost hover:text-blood" title="Remove from camp" onClick={()=>del(r)}><Trash2 size={15}/></button></div>)}
       {rows&&!list.length&&<div className="p-6 text-center text-sm text-fog-faint">No registrants yet.</div>}</div>
   </div>

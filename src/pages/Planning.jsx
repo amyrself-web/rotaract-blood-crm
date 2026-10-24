@@ -9,6 +9,7 @@ import {Materials,Passes} from '../components/CampKit'
 import {useBrand} from '../context/Brand'
 import {sponsorLetter} from '../lib/clubReports'
 import {Mail} from 'lucide-react'
+import WaSend from '../components/wa/WaSend'
 
 const DESKS=['Registration','Screening','Donation','Refreshment','Certificate','Crowd control']
 const CATS=['Refreshments','Printing','Banners','Transport','Sound system','Certificates','Other']
@@ -78,7 +79,7 @@ export default function Planning(){
         <input className="input w-36" placeholder="Shift, e.g. 8 to 12" required value={v('shift')} onChange={set('shift')}/><button className="btn">Add</button></form>
       {d.camp_volunteers.map(x=><div key={x.id} className="flex flex-wrap items-center gap-3 border-t border-ink-700 py-2.5 text-sm"><input type="checkbox" title="Present" checked={x.attended} onChange={e=>upd('camp_volunteers',x.id,{attended:e.target.checked})}/>
         <span className="code">{code('V',x.volunteer_no,3)}</span><span className="font-medium text-fg">{x.name}</span>{x.desk&&<Badge tone="blue">{x.desk}</Badge>}<span className="text-fog-faint">{x.shift}</span>
-        {x.phone&&<a className="btn-quiet px-3 py-1 text-xs" target="_blank" rel="noreferrer" href={wa(x.phone,`Hello ${x.name}, your duty for ${camp?.name} on ${fmt(camp?.camp_date)}: ${x.desk||'to be told'}${x.shift?', shift '+x.shift:''}${camp?.venue?', venue '+camp.venue:''}. Thank you for volunteering. ${settings.club_name}`)}><Send size={13}/>Duty slip</a>}
+        {x.phone&&<WaSend className="btn-quiet px-3 py-1 text-xs" title={`Send duty slip to ${x.name}`} kind="duty" phone={x.phone} name={x.name} text={`Hello ${x.name}, your duty for ${camp?.name} on ${fmt(camp?.camp_date)}: ${x.desk||'to be told'}${x.shift?', shift '+x.shift:''}${camp?.venue?', venue '+camp.venue:''}. Thank you for volunteering. ${settings.club_name}`}><Send size={13}/>Duty slip</WaSend>}
         <EditBtn t="camp_volunteers" row={x}/></div>)}
       {!d.camp_volunteers.length&&<p className="text-sm text-fog-faint">No volunteers added yet. Tick the box when a volunteer arrives.</p>}</div>}
     {tab==='money'&&<div className="space-y-4"><div className="card grid grid-cols-2 gap-4 sm:grid-cols-4">

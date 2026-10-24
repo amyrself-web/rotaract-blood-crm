@@ -8,6 +8,7 @@ import {BLOOD,fmt,wa} from '../lib/util'
 import CountUp from '../components/CountUp'
 import {enqueue} from '../lib/wa'
 import {PageHeader,Drawer,Field,Tabs,Badge,Empty,useConfirm,errText,useLive,undoToast,code,todayIso} from '../components/ui'
+import WaSend from '../components/wa/WaSend'
 
 const ST=['collected','in_transit','testing','available','issued','discarded']
 const LB={collected:'Collected',in_transit:'In transit',testing:'Testing',available:'Available',issued:'Issued',discarded:'Discarded'}
@@ -37,7 +38,7 @@ function Req({r,units,onEdit,setStatus}){
           try{const x=await enqueue(`Emergency ${r.blood_group} at ${r.hospital}`,'emergency',ds.map(d=>({phone:d.phone,name:d.full_name,donor_id:d.id,ref:r.id,body:msg,vars:{name:d.full_name,group:r.blood_group,hospital:r.hospital,contact:`${r.contact_name||''} ${r.contact_phone||''}`.trim(),club:settings.club_name}})))
             toast.success(`${x.queued} donors will get the alert on WhatsApp`)}catch(e){toast.error(errText(e))}setAlerting(false)}}><Send size={15}/>{alerting?'Sending…':`Alert all ${ds.length}`}</button>}</div>
       {ds.slice(0,30).map(d=><div key={d.id} className="flex items-center justify-between py-1.5 text-sm"><span className="text-fg">{d.full_name} <span className="text-fog-faint">{d.area}</span></span>
-        <a className="btn-quiet px-3 py-1 text-xs" target="_blank" rel="noreferrer" href={wa(d.phone,msg)}><Send size={13}/>WhatsApp</a></div>)}</>}</div></motion.div>}</div>
+        <WaSend className="btn-quiet px-3 py-1 text-xs" title={`Send the alert to ${d.full_name}`} kind="emergency" refId={r.id} donorId={d.id} phone={d.phone} name={d.full_name} text={msg}><Send size={13}/>WhatsApp</WaSend></div>)}</>}</div></motion.div>}</div>
 }
 
 export default function Stock(){

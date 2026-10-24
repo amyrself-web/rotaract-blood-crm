@@ -8,6 +8,7 @@ import {useAuth} from '../context/Auth'
 import {BLOOD,normPhone,fmt,wa} from '../lib/util'
 import {PageHeader,Drawer,Field,Badge,Empty,useConfirm,errText,useLive,undoToast,code,adultMax,adultMin,todayIso,Tabs} from '../components/ui'
 import DonorHistory from '../components/DonorHistory'
+import WaSend from '../components/wa/WaSend'
 
 const empty={full_name:'',phone:'',email:'',blood_group:'',gender:'',dob:'',area:'',last_donation:'',consent:false}
 const PAGE=25
@@ -75,7 +76,7 @@ export default function Donors(){
           <td className="truncate text-fog-muted">{r.area||'-'}</td>
           <td className="whitespace-nowrap tabular-nums text-fog-muted">{fmt(r.last_donation)}</td>
           <td className="whitespace-nowrap">{ok(r)?<Badge tone="green">Can donate</Badge>:<span className="tabular-nums text-fog-muted">{fmt(next(r))}</span>}</td>
-          <td className="text-right" onClick={e=>e.stopPropagation()}>{r.consent?<a className="btn-ghost" title="Message on WhatsApp" aria-label={`WhatsApp ${r.full_name}`} target="_blank" rel="noreferrer" href={wa(r.phone,`Hello ${r.full_name}, this is ${settings.club_name}.`)}><MessageCircle size={16}/></a>
+          <td className="text-right" onClick={e=>e.stopPropagation()}>{r.consent?<WaSend className="btn-ghost" title={`WhatsApp ${r.full_name}`} phone={r.phone} name={r.full_name} donorId={r.id} text={`Hello ${r.full_name}, this is ${settings.club_name}.`}><MessageCircle size={16}/></WaSend>
             :<span title="Consent pending" className="mr-2 inline-block h-2 w-2 rounded-full bg-warn"/>}</td></tr>)}
         </tbody></table></div>
       <ul className="divide-y divide-ink-700/80 md:hidden">{rows===null?[0,1,2,3].map(i=><li key={i} className="p-4"><div className="skeleton h-10"/></li>)

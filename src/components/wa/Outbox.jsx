@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useState} from 'react'
 import {toast} from 'sonner'
 import {motion,AnimatePresence} from 'framer-motion'
-import {Send,X,RotateCcw,Search,Play,SkipForward,CheckCircle2,Smartphone,Inbox} from 'lucide-react'
+import {Send,X,RotateCcw,Search,Play,SkipForward,CheckCircle2,Smartphone,Inbox,Zap} from 'lucide-react'
 import {supabase} from '../../lib/supabase'
 import {wa,fmt} from '../../lib/util'
 import {Badge,Empty,useLive,useConfirm,errText} from '../ui'
@@ -34,22 +34,27 @@ function TapToSend({rows,onClose,onDone}){
     </motion.div></div>
 }
 
-export default function Outbox(){
+export default function Outbox({tapId,onTapOpened}){
   const confirm=useConfirm(),status=useWaStatus()
   const [rows,setRows]=useState(null),[casts,setCasts]=useState([]),[f,setF]=useState('queued'),[q,setQ]=useState(''),[cast,setCast]=useState(''),[tap,setTap]=useState(null)
   const load=async()=>{
-    let s=supabase.from('wa_outbox').select('id,kind,phone,name,body,status,error,send_after,sent_at,created_at,broadcast_id,provider').order('created_at',{ascending:false}).limit(1000)
+    let s=supabase.from('wa_outbox').select('id,kind,phone,name,body,status,error,send_after,sent_at,created_at,broadcast_id,provider,manual').order('created_at',{ascending:false}).limit(1000)
     if(cast)s=s.eq('broadcast_id',cast)
-    const [o,b]=await Promise.all([s,supabase.from('wa_broadcasts').select('*').order('created_at',{ascending:false}).limit(12)])
+    const [o,b]=await Promise.all([s,supabase.from('wa_broadcasts').select('*').gt('total',1).order('created_at',{ascending:false}).limit(12)])
     if(o.error)return toast.error(o.error.message);setRows(o.data);setCasts(b.data||[])}
   useEffect(()=>{load()},[cast]);useLive(['wa_outbox'],load)
   const counts=useMemo(()=>Object.fromEntries(Object.keys(ST).map(k=>[k,(rows||[]).filter(r=>r.status===k).length])),[rows])
   const list=(rows||[]).filter(r=>(!f||r.status===f)&&(!q||`${r.name} ${r.phone} ${r.body}`.toLowerCase().includes(q.toLowerCase())))
-  const waiting=(rows||[]).filter(r=>r.status==='queued').sort((a,b)=>a.send_after.localeCompare(b.send_after))
+  const provider=status?.provider||'manual',auto=provider!=='manual'
+  // with an automatic sender, "Tap to send" only takes the messages you chose to send yourself, so nothing goes twice
+  const waiting=(rows||[]).filter(r=>r.status==='queued'&&(!auto||r.manual)).sort((a,b)=>a.send_after.localeCompare(b.send_after))
+  const autoWaiting=auto?(rows||[]).filter(r=>r.status==='queued'&&!r.manual).length:0
+  useEffect(()=>{if(!tapId)return;supabase.from('wa_outbox').select('id,kind,phone,name,body,status,send_after').eq('broadcast_id',tapId).eq('status','queued').order('created_at')
+    .then(({data})=>{onTapOpened?.();if(data?.length)setTap(data)})},[tapId])
+  const toManual=async ids=>{const {data,error}=await supabase.rpc('wa_set_manual',{p_ids:ids,p_manual:true});if(error)return toast.error(error.message);load();return data}
   const cancelAll=async()=>{if(!await confirm({title:`Cancel ${list.length} waiting messages?`,body:'They will not be sent. You can send them again from the Cancelled list.',action:'Cancel messages'}))return
     const {data,error}=await supabase.rpc('wa_cancel',{p_ids:list.map(r=>r.id)});error?toast.error(error.message):toast.success(`${data} cancelled`);load()}
   const retry=async ids=>{const {data,error}=await supabase.rpc('wa_retry',{p_ids:ids});error?toast.error(error.message):toast.success(`${data} back in the queue`);load()}
-  const provider=status?.provider||'manual'
   return <div className="space-y-5">
     {casts.length>0&&<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{casts.slice(0,6).map(b=>{const mine=(rows||[]).filter(r=>r.broadcast_id===b.id),sent=mine.filter(r=>r.status==='sent').length
       return <button key={b.id} onClick={()=>setCast(cast===b.id?'':b.id)} className={`card p-4 text-left transition hover:border-brand/40 ${cast===b.id?'border-brand/60 ring-2 ring-brand/20':''}`}>
@@ -58,11 +63,16 @@ export default function Outbox(){
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink-700"><div className="h-full rounded-full bg-ok" style={{width:`${b.total?sent/b.total*100:0}%`}}/></div>
         <div className="mt-1 text-xs tabular-nums text-fog-muted">{cast||mine.length?`${sent} of ${b.total} sent`:`${b.total} messages`}</div></button>})}</div>}
 
+    {autoWaiting>0&&<div className="card flex flex-wrap items-center gap-4 border-brand/40 bg-brand/[.06]">
+      <span className="grid h-11 w-11 place-items-center rounded-full bg-brand text-white"><Zap size={20}/></span>
+      <div className="min-w-0 flex-1"><div className="font-semibold text-fg">{autoWaiting} going out from the club number</div>
+        <div className="text-sm text-fog-muted">{status?.ready?`${PROVIDERS[provider]} sends these automatically${status?.next_at?`, next at ${when(status.next_at)}`:''}. Nothing to tap.`:'The club phone is not connected right now. They go out as soon as it is back, or send them yourself.'}</div></div>
+      <button className="btn-quiet" onClick={async()=>{const ids=(rows||[]).filter(r=>r.status==='queued'&&!r.manual).map(r=>r.id);const n=await toManual(ids);if(n){const {data}=await supabase.from('wa_outbox').select('id,kind,phone,name,body,status,send_after').in('id',ids).eq('status','queued');if(data?.length)setTap(data)}}}><Smartphone size={15}/>Send them myself</button></div>}
+
     {waiting.length>0&&<div className="card flex flex-wrap items-center gap-4 border-[#25D366]/40 bg-[#25D366]/[.06]">
       <span className="grid h-11 w-11 place-items-center rounded-full bg-[#25D366] text-white"><Send size={20}/></span>
-      <div className="min-w-0 flex-1"><div className="font-semibold text-fg">{waiting.length} message{waiting.length>1?'s':''} waiting</div>
-        <div className="text-sm text-fog-muted">{provider==='manual'?'Send them one by one from this phone or computer. Each tap opens WhatsApp with the message ready.'
-          :`${PROVIDERS[provider]} sends these automatically${status?.next_at?`, next at ${when(status.next_at)}`:''}. You can also send them yourself.`}</div></div>
+      <div className="min-w-0 flex-1"><div className="font-semibold text-fg">{waiting.length} message{waiting.length>1?'s':''} waiting for you</div>
+        <div className="text-sm text-fog-muted">Send them one by one from this phone or computer. Each tap opens WhatsApp with the message ready.</div></div>
       <button className="btn bg-[#25D366] text-white hover:bg-[#1EBE5A]" onClick={()=>setTap(waiting)}><Play size={15}/>Tap to send</button></div>}
 
     <div className="card overflow-hidden p-0">
@@ -75,7 +85,7 @@ export default function Outbox(){
       <ul className="divide-y divide-ink-700/80">{(rows===null?[]:list.slice(0,300)).map(r=><li key={r.id} className="flex items-start gap-3 px-4 py-3 text-sm">
         <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="font-medium text-fg">{r.name||r.phone}</span><span className="text-xs text-fog-faint">{r.phone}</span><Badge tone="blue">{KIND_LABEL[r.kind]||r.kind}</Badge></div>
           <div className="mt-0.5 line-clamp-2 text-fog-muted">{r.body}</div>
-          <div className="mt-0.5 text-xs text-fog-faint">{r.status==='sent'?`Sent ${when(r.sent_at)}${r.provider?` · ${PROVIDERS[r.provider]||r.provider}`:''}`:r.status==='queued'?`Sends after ${when(r.send_after)}`:when(r.created_at)}{r.error&&<span className="text-blood"> · {r.error.replace(/^retry: /,'')}</span>}</div></div>
+          <div className="mt-0.5 text-xs text-fog-faint">{r.status==='queued'&&auto&&<span className={r.manual?'text-[#25D366]':'text-brand'}>{r.manual?'You send · ':'Club number · '}</span>}{r.status==='sent'?`Sent ${when(r.sent_at)}${r.provider?` · ${PROVIDERS[r.provider]||r.provider}`:''}`:r.status==='queued'?`Sends after ${when(r.send_after)}`:when(r.created_at)}{r.error&&<span className="text-blood"> · {r.error.replace(/^retry: /,'')}</span>}</div></div>
         <Badge tone={ST[r.status][1]}>{ST[r.status][0]}</Badge>
         {r.status==='queued'&&<button className="btn-ghost text-fog-faint hover:text-blood" aria-label={`Cancel message to ${r.name||r.phone}`} onClick={async()=>{await supabase.rpc('wa_cancel',{p_ids:[r.id]});load()}}><X size={15}/></button>}
         {['failed','cancelled'].includes(r.status)&&<button className="btn-ghost text-fog-faint hover:text-fg" aria-label={`Send again to ${r.name||r.phone}`} onClick={()=>retry([r.id])}><RotateCcw size={15}/></button>}</li>)}
