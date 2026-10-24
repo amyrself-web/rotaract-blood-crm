@@ -5,7 +5,7 @@ import {Droplet,Eye,EyeOff} from 'lucide-react'
 import {useAuth,ROLES} from '../context/Auth'
 import {supabase,hasSupabase} from '../lib/supabase'
 import {fmt} from '../lib/util'
-import CountUp from '../components/CountUp'
+import Showcase from '../components/Showcase'
 import {useBrand} from '../context/Brand'
 import {Logo} from '../components/Brand'
 import LangToggle from '../components/LangToggle'
@@ -24,9 +24,8 @@ function Pulse(){
 export default function Login(){
   const {signIn,signUp,demo,user,profile}=useAuth(),{brand}=useBrand(),nav=useNavigate()
   const {t}=useLang(),[caps,setCaps]=useState(false),[resend,setResend]=useState(false),[note,setNote]=useState('')
-  const [mode,setMode]=useState('in'),[f,setF]=useState({name:'',email:'',password:''}),[msg,setMsg]=useState(''),[busy,setBusy]=useState(false),[show,setShow]=useState(false),[camp,setCamp]=useState(null)
+  const [mode,setMode]=useState('in'),[f,setF]=useState({name:'',email:'',password:''}),[msg,setMsg]=useState(''),[busy,setBusy]=useState(false),[show,setShow]=useState(false)
   useEffect(()=>{if(user&&profile){let to='/';try{to=sessionStorage.getItem('after-login')||'/';sessionStorage.removeItem('after-login')}catch{}nav(to,{replace:true})}},[user,profile])
-  useEffect(()=>{if(hasSupabase)supabase.rpc('public_camp_info').then(({data})=>setCamp(data))},[])
   const set=k=>e=>setF({...f,[k]:e.target.value})
   // plain-language messages for what Supabase Auth says
   const friendly=m=>/invalid login/i.test(m)?'That email and password do not match. Check both and try again, or use "Forgot password?".'
@@ -46,19 +45,18 @@ export default function Login(){
   const again=async()=>{const {error}=await supabase.auth.resend({type:'signup',email:f.email.trim(),options:{emailRedirectTo:siteUrl()}});error?setMsg(friendly(error.message)):(setResend(false),setMsg(''),setNote('Confirmation email sent again.'))}
   const caps_=e=>setCaps(!!e.getModifierState?.('CapsLock'))
   return <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
-    <section className="relative hidden flex-col justify-between overflow-hidden border-r border-ink-700 bg-ink-900/60 p-12 lg:flex">
+    <section className="relative hidden flex-col justify-between gap-8 overflow-hidden border-r border-ink-700 bg-ink-900/60 p-10 lg:flex xl:p-12">
       <div className="flex items-center gap-3"><Logo size={44}/>
         <div><div className="font-display font-semibold text-fg">{brand.club_name}</div><div className="text-sm text-fog-faint">{brand.brand_name}{brand.tagline?` · ${brand.tagline}`:''}</div></div></div>
       <div>
         <motion.div initial={{y:-140,opacity:0}} animate={{y:0,opacity:1}} transition={{type:'spring',stiffness:120,damping:14,delay:.15}}
-          className="mb-8 grid h-16 w-16 place-items-center rounded-[28px_28px_28px_4px] bg-blood text-white shadow-[0_20px_60px_-10px_rgba(240,67,90,.7)] [transform-origin:bottom_left]">
+          className="mb-6 grid h-14 w-14 place-items-center rounded-[28px_28px_28px_4px] bg-blood text-white shadow-[0_20px_60px_-10px_rgba(240,67,90,.7)] [transform-origin:bottom_left]">
           <Droplet size={28} fill="currentColor"/></motion.div>
-        <h1 className="max-w-md font-display text-5xl font-semibold leading-[1.05] text-fg">One bag of blood can help save three lives.</h1>
+        <h1 className="max-w-md font-display text-4xl font-semibold leading-[1.08] text-fg xl:text-5xl">One bag of blood can help save three lives.</h1>
         <p className="mt-4 max-w-md text-fog-muted">Plan camps, check donors in, record every bag and keep donors coming back.</p>
-        <div className="mt-8 -mx-2"><Pulse/></div>
+        <div className="mt-6 -mx-2"><Pulse/></div>
       </div>
-      {camp?<div className="flex items-end gap-10"><div><div className="text-sm text-fog-faint">Next camp</div><div className="mt-1 font-display text-lg font-semibold text-fg">{camp.name}</div><div className="text-sm text-fog-muted">{fmt(camp.date)}{camp.venue&&`, ${camp.venue}`}</div></div>
-        <div><div className="font-display text-3xl font-semibold text-fg"><CountUp value={camp.registered}/></div><div className="text-sm text-fog-faint">registered</div></div></div>:<div/>}
+      <Showcase/>
     </section>
     <section className="relative flex items-center justify-center p-6"><LangToggle className="absolute right-4 top-4"/>
       <motion.div className="w-full max-w-sm" initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} transition={{duration:.4,delay:.1}}>
@@ -78,6 +76,7 @@ export default function Login(){
         <button type="button" className="mt-5 w-full text-sm text-fog-muted hover:text-fg" onClick={()=>{setMode(mode==='in'?'up':'in');setMsg('');setNote('');setResend(false)}}>
           {t(mode==='in'?'New donor or club member? Create an account':mode==='up'?'Have an account? Sign in':'Back to sign in')}</button>
         <a href="#/home" className="mt-2 block text-center text-sm text-fog-faint hover:text-fg">{t('See the next camp')}</a>
+        <div className="mt-8 lg:hidden"><Showcase compact/></div>
         {!hasSupabase&&<div className="card mt-6"><p className="mb-3 text-sm text-fog-muted">Database not connected yet. Preview the CRM as a role:</p>
           <div className="flex flex-wrap gap-2">{ROLES.map(r=><button key={r} className="chip capitalize hover:border-brand" onClick={()=>demo(r)}>{r}</button>)}</div></div>}
       </motion.div></section>
