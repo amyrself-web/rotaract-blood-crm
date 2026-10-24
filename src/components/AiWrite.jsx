@@ -60,7 +60,7 @@ export default function AiWrite({kind='whatsapp',club,current,onText,className='
         :<div className="space-y-4">
           <div><label className="label" htmlFor="ai-ask">What should it say?</label>
             <textarea id="ai-ask" className="input min-h-[96px]" placeholder={'e.g. Invite O+ donors to Sunday camp at Rotary Hall, 9 am. Mention breakfast.\nஅல்லது தமிழில் சொல்லுங்கள்…'} value={f.instruction} onChange={e=>setF({...f,instruction:e.target.value})}/>
-            <p className="mt-1 text-xs text-fog-faint">Tap the round mic at the bottom right to speak instead of typing.</p></div>
+            <p className="mt-1 text-xs text-fog-faint">Tap the small mic inside any text box to speak instead of typing.</p></div>
           <div className="flex flex-wrap items-center gap-2">
             {rec?<button type="button" className="btn-quiet !border-blood/60 !text-blood" onClick={()=>rec.stop()}><Square size={14} fill="currentColor"/>Stop recording</button>
               :<button type="button" className="btn-quiet" onClick={startRec}><Mic size={15}/>Record a voice note</button>}
