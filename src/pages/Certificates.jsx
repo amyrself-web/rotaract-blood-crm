@@ -11,7 +11,7 @@ import {rotaryYear,csv} from '../lib/clubReports'
 import CountUp from '../components/CountUp'
 import {enqueue,certLink} from '../lib/wa'
 import {Send} from 'lucide-react'
-import WaSend from '../components/wa/WaSend'
+import WaSend,{WaBulk} from '../components/wa/WaSend'
 
 // Register of every blood donation certificate: who got one, when it was downloaded or sent, and the check code.
 export default function Certificates(){
@@ -32,16 +32,17 @@ export default function Certificates(){
   const all=async()=>{const todo=list;if(!todo.length)return;setBulk({done:0,total:todo.length})
     for(let i=0;i<todo.length;i++){try{await one(todo[i])}catch(e){toast.error(`${todo[i].name}: ${errText(e)}`)}setBulk({done:i+1,total:todo.length})}
     setBulk(null);toast.success(`${todo.length} certificates downloaded`);load()}
-  const sendAll=async()=>{const todo=list.filter(r=>r.phone&&!r.sent_at);if(!todo.length)return toast.error('Everyone in this list has already been sent their certificate')
-    try{const club=brand.club_name||settings.club_name||'',x=await enqueue(`Certificates${camp?` · ${camps.find(c=>c.id===camp)?.name||''}`:''}`,'certificate',todo.map(r=>{const v={name:r.name,camp:r.camp,date:fmt(r.date),link:certLink(r.verify_code),club}
-      return {phone:r.phone,name:r.name,ref:r.reg_id,vars:v,body:`Dear ${r.name.split(' ')[0]}, thank you for donating blood at ${r.camp} on ${fmt(r.date)}. 🩸\nDownload your certificate here: ${v.link}\n- ${club}`}}))
-      toast.success(`${x.queued} certificates queued in WhatsApp Outbox`)}catch(e){toast.error(errText(e))}}
+  const unsent=list.filter(r=>r.phone&&!r.phone.startsWith('X')&&!r.sent_at)
+  const sendAll=async manual=>{const todo=unsent;if(!todo.length){toast.error('Everyone in this list has already been sent their certificate');return null}
+    {const club=brand.club_name||settings.club_name||'',x=await enqueue(`Certificates${camp?` · ${camps.find(c=>c.id===camp)?.name||''}`:''}`,'certificate',todo.map(r=>{const v={name:r.name,camp:r.camp,date:fmt(r.date),link:certLink(r.verify_code),club}
+      return {phone:r.phone,name:r.name,ref:r.reg_id,vars:v,body:`Dear ${r.name.split(' ')[0]}, thank you for donating blood at ${r.camp} on ${fmt(r.date)}. 🩸\nDownload your certificate here: ${v.link}\n- ${club}`}}),null,manual)
+      load();return x}}
   const st=rows||[],issued=st.filter(r=>r.issued_at).length,sent=st.filter(r=>r.sent_at).length
   return <div>
     <PageHeader title="Certificates" description="Every blood donation certificate: who received one, downloads, WhatsApp messages and the check code."
       actions={<><button className="btn-quiet" disabled={!list.length} onClick={()=>csv(list.map(r=>({certificate:certNo(r.cert_no),check_code:fmtCode(r.verify_code),donor_id:code('D',r.donor_no),name:r.name,blood_group:r.blood_group,phone:r.phone,camp:r.camp,date:r.date,ml:r.volume,
           issued:r.issued_at?fmt(r.issued_at):'',downloads:r.downloads,whatsapp_sent:r.sent_at?fmt(r.sent_at):''})),'certificates.csv')}><Download size={15}/>CSV</button>
-        <button className="btn-quiet" disabled={!list.length} onClick={sendAll}><Send size={15}/>Send all on WhatsApp</button>
+        <WaBulk count={unsent.length} label={`Send ${unsent.length} on WhatsApp`} autoClass="btn-quiet" manualClass="btn-quiet" onQueue={sendAll}/>
         <button className="btn" disabled={!list.length||!!bulk} onClick={all}><FileDown size={15}/>{bulk?`Preparing ${bulk.done} of ${bulk.total}…`:`Download ${list.length} PDFs`}</button></>}/>
     <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
       {[['Certificates',st.length,'One for every donation'],['Given or downloaded',issued,`${st.length-issued} not yet given`],['Sent on WhatsApp',sent,'With the check link'],['Total downloads',st.reduce((a,r)=>a+r.downloads,0),'By staff and donors']].map(([l,v,s])=>

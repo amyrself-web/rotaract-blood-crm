@@ -6,7 +6,7 @@ export const siteUrl=()=>`${location.origin}${location.pathname}`
 export const certLink=code=>code?`${siteUrl()}#/certificate/${code.length===12?code.match(/.{4}/g).join('-'):code}`:''
 export const fill=(body,v)=>String(body||'').replace(/\{(\w+)\}/g,(_,k)=>v[k]??'')
 export const PROVIDERS={manual:'Tap to send',cloud:'Official WhatsApp API',qr:'Club phone linked by QR'}
-export const KIND_LABEL={broadcast:'Broadcast',direct:'Direct message',duty:'Duty slip',login:'Login details',donation_thanks:'Donation thanks',birthday:'Birthday',eligible_again:'Eligible again',reminder_early:'Camp reminder',reminder_1d:'Camp reminder, day before',
+export const KIND_LABEL={broadcast:'Broadcast',direct:'Direct message',duty:'Duty slip',event_pass:'Entry pass',notice:'Notice',login:'Login details',donation_thanks:'Donation thanks',birthday:'Birthday',eligible_again:'Eligible again',reminder_early:'Camp reminder',reminder_1d:'Camp reminder, day before',
   reminder_today:'Camp reminder, morning',thank_you:'Thank-you',followup:'Next-day thank-you',certificate:'Certificate',invite:'Camp invite',meeting_1d:'Meeting reminder',emergency:'Emergency',test:'Test'}
 
 // items: [{phone,name,body,donor_id?,member_id?,ref?,vars?}]

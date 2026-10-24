@@ -4,6 +4,9 @@ import {motion} from 'framer-motion'
 import {Megaphone,Pin,PinOff,Plus,Trash2,Vote,X,Lock,BarChart3} from 'lucide-react'
 import {supabase} from '../lib/supabase'
 import {fmt} from '../lib/util'
+import {useBrand} from '../context/Brand'
+import {enqueue} from '../lib/wa'
+import {WaBulk} from '../components/wa/WaSend'
 import {PageHeader,Drawer,Field,Badge,Empty,useLive,undoToast,errText,Toggle} from '../components/ui'
 
 const when=t=>new Date(t).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit'})
@@ -18,11 +21,12 @@ export function PollBars({poll,counts,mine,onVote,disabled}){
 }
 
 export default function Notices(){
-  const [notices,setNotices]=useState(null),[polls,setPolls]=useState(null),[res,setRes]=useState({}),[nf,setNf]=useState(null),[pf,setPf]=useState(null)
+  const {brand}=useBrand(),[mem,setMem]=useState([]),[notices,setNotices]=useState(null),[polls,setPolls]=useState(null),[res,setRes]=useState({}),[nf,setNf]=useState(null),[pf,setPf]=useState(null)
   const load=async()=>{const [n,p]=await Promise.all([supabase.from('notices').select('*').is('deleted_at',null).order('pinned',{ascending:false}).order('created_at',{ascending:false}),supabase.from('polls').select('*').is('deleted_at',null).order('created_at',{ascending:false})])
     if(n.error)return toast.error(n.error.message);setNotices(n.data);setPolls(p.data||[])
     const r={};await Promise.all((p.data||[]).map(async x=>{const {data}=await supabase.rpc('poll_results',{p_poll:x.id});r[x.id]=data}));setRes(r)}
-  useEffect(()=>{load()},[]);useLive(['notices','polls','poll_votes'],load)
+  useEffect(()=>{load();supabase.from('members').select('id,full_name,phone').is('deleted_at',null).eq('status','active').then(({data})=>setMem((data||[]).filter(m=>/^[6-9]\d{9}$/.test(m.phone||''))))},[]);useLive(['notices','polls','poll_votes'],load)
+  const sendNotice=(n,manual)=>enqueue(`Notice · ${n.title}`,'notice',mem.map(m=>({phone:m.phone,name:m.full_name,member_id:m.id,ref:n.id,body:`📢 ${n.title}${n.body?`\n\n${n.body}`:''}\n\n- ${brand.club_name||''}`})),null,manual)
   const saveN=async e=>{e.preventDefault();const {id,...row}=nf;const r=id?await supabase.from('notices').update({title:row.title,body:row.body||null,pinned:row.pinned,expires_on:row.expires_on||null}).eq('id',id):await supabase.from('notices').insert({title:row.title,body:row.body||null,pinned:row.pinned,expires_on:row.expires_on||null})
     if(r.error)return toast.error(r.error.message);toast.success('Notice posted. Members see it on their page.');setNf(null);load()}
   const pin=async n=>{await supabase.from('notices').update({pinned:!n.pinned}).eq('id',n.id);load()}
@@ -44,7 +48,8 @@ export default function Notices(){
             <button className="btn-ghost" aria-label={n.pinned?'Unpin':'Pin'} onClick={()=>pin(n)}>{n.pinned?<PinOff size={15}/>:<Pin size={15}/>}</button>
             <button className="btn-ghost" aria-label="Edit" onClick={()=>setNf({...n,body:n.body||'',expires_on:n.expires_on||''})}>Edit</button>
             <button className="btn-ghost text-fog-faint hover:text-blood" aria-label="Remove notice" onClick={()=>delN(n)}><Trash2 size={15}/></button></div>
-          {n.body&&<p className="mt-2 whitespace-pre-line text-sm text-fog">{n.body}</p>}</motion.article>)}</section>
+          {n.body&&<p className="mt-2 whitespace-pre-line text-sm text-fog">{n.body}</p>}
+          {mem.length>0&&<div className="mt-3 flex flex-wrap gap-2 border-t border-ink-700 pt-3"><WaBulk count={mem.length} label={`WhatsApp to ${mem.length} members`} size="px-3 py-1.5 text-xs" autoClass="btn-quiet" manualClass="btn-quiet" onQueue={m=>sendNotice(n,m)}/></div>}</motion.article>)}</section>
       <section className="space-y-3"><h2 className="flex items-center gap-2 font-semibold text-fg"><BarChart3 size={17} className="text-brand"/>Polls</h2>
         {polls&&!polls.length&&<div className="card"><Empty icon={Vote} title="No polls">Ask members: which project next, which date suits, which T-shirt colour.</Empty></div>}
         {(polls||[]).map(p=>{const open=!p.closes_at||new Date(p.closes_at)>new Date(),r=res[p.id]

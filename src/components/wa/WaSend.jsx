@@ -3,6 +3,7 @@
 //  2. Open WhatsApp: opens WhatsApp on this device with the message typed; you press send
 // Without the Messages permission the button simply opens WhatsApp. When the club phone is offline, that option is shown greyed out.
 import {useEffect,useRef,useState} from 'react'
+import {useNavigate} from 'react-router-dom'
 import {createPortal} from 'react-dom'
 import {toast} from 'sonner'
 import {Zap,Smartphone,Check} from 'lucide-react'
@@ -44,5 +45,23 @@ export default function WaSend({phone,text,name,kind='direct',refId,donorId,memb
           ['manual',Smartphone,'Open WhatsApp','Opens WhatsApp here with the message typed. You press send.',manual,'bg-[#25D366]/15 text-[#25D366]',false]]
           .sort((a,b)=>ready?(b[0]===pref)-(a[0]===pref):(a[0]==='auto')-(b[0]==='auto')).map(([k,i,l,h,f,t,o])=><Opt key={k} k={k} icon={i} label={l} hint={h} onClick={f} tone={t} off={o}/>)}
       </div></div>,document.body)}
+  </>
+}
+
+// Sending to many people at once, with the same two ways.
+// onQueue(manual) queues the messages (enqueue(..., manual)) and returns its result.
+// "Tap to send" then opens the Outbox with WhatsApp ready for each person in turn.
+export function WaBulk({count,label='Send all',onQueue,size='',autoClass='btn',manualClass}){
+  const st=useWaReady(),ready=!!st?.ready,nav=useNavigate(),[busy,setBusy]=useState('')
+  if(!st)return null   // this login cannot send messages
+  const go=async manual=>{if(!count)return;setBusy(manual?'m':'a');setSendMode(manual?'manual':'auto')
+    try{const r=await onQueue(manual);if(!r)return
+      if(!r.queued)toast.error('Nothing to send: everyone here already got it, or replied STOP.')
+      else if(manual&&r.broadcast_id)nav(`/messages?tap=${r.broadcast_id}`)
+      else toast.success(`${r.queued} ${manual?'messages ready in the Outbox: use Tap to send':'messages going out from the club number'}${r.skipped?` (${r.skipped} skipped: already sent or replied STOP)`:''}`)}
+    catch(e){toast.error(errText(e))}finally{setBusy('')}}
+  return <>
+    {ready&&<button type="button" className={`${autoClass} ${size}`} disabled={!count||!!busy} title="The club phone sends them automatically" onClick={()=>go(false)}><Zap size={15}/>{busy==='a'?'Queuing…':`${label} from club number`}</button>}
+    <button type="button" className={`${manualClass||(ready?'btn-quiet':autoClass)} ${size}`} disabled={!count||!!busy} title="Opens WhatsApp for each person; you press send" onClick={()=>go(true)}><Smartphone size={15}/>{busy==='m'?'Preparing…':ready?'Tap to send myself':`${label}: tap to send`}</button>
   </>
 }

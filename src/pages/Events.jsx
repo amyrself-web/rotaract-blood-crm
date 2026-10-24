@@ -1,13 +1,14 @@
 import {useEffect,useState} from 'react'
 import {toast} from 'sonner'
-import {Plus,PartyPopper,CalendarDays,MapPin,Users,QrCode,Printer,UserCheck,Trash2,Copy,Search,Link2} from 'lucide-react'
+import {Plus,PartyPopper,CalendarDays,MapPin,Users,QrCode,Printer,UserCheck,Trash2,Copy,Search,Link2,MessageCircle} from 'lucide-react'
 import {supabase} from '../lib/supabase'
 import {useBrand} from '../context/Brand'
 import {fmt} from '../lib/util'
 import {PageHeader,Drawer,Field,Tabs,Badge,Empty,useLive,undoToast,code,errText,todayIso,Toggle} from '../components/ui'
 import {entryPasses} from '../lib/cards'
 import {brandQr} from '../lib/qr'
-import {siteUrl} from '../lib/wa'
+import {siteUrl,enqueue} from '../lib/wa'
+import WaSend,{WaBulk} from '../components/wa/WaSend'
 
 const KINDS=['Installation','Fundraiser','Fellowship','Workshop','Awareness','Sports','Other']
 const ROLES=['Guest','Member','Volunteer','Speaker','Chief guest','Media','Organiser','Participant']
@@ -27,6 +28,9 @@ function People({ev}){
   const checkin=async p=>{const r=await supabase.from('event_people').update({checked_in_at:p.checked_in_at?null:new Date().toISOString()}).eq('id',p.id);if(r.error)toast.error(r.error.message);load()}
   const del=async p=>{const r=await supabase.from('event_people').delete().eq('id',p.id);if(r.error)return toast.error(r.error.message);load()
     undoToast(`${p.name} removed`,async()=>{await supabase.from('event_people').insert(p);load()})}
+  const passMsg=p=>`Hello ${p.name}, you are on the list for ${ev.title} on ${fmt(ev.event_date)}${ev.start_time?` at ${t5(ev.start_time)}`:''}${ev.venue?`, ${ev.venue}`:''}. Your entry pass number is ${code('E',p.pass_no,3)}. Please show it at the entry. - ${brand.club_name||''}`
+  const withPhone=(rows||[]).filter(p=>/^[6-9]\d{9}$/.test(p.phone||''))
+  const sendPasses=manual=>enqueue(`Passes · ${ev.title}`,'event_pass',withPhone.map(p=>({phone:p.phone,name:p.name,member_id:p.member_id||'',ref:`${ev.id}:${p.pass_no}`,body:passMsg(p)})),null,manual)
   const passes=async()=>{setBusy('p');try{await entryPasses(rows.map(p=>({role:p.role,name:p.name,desk:p.organisation,no:code('E',p.pass_no,3)})),{name:ev.title,date:ev.event_date,venue:ev.venue},brand,'sheet')}catch(e){toast.error(errText(e))}setBusy('')}
   const list=(rows||[]).filter(p=>!q||`${p.name} ${p.phone} ${p.pass_no}`.toLowerCase().includes(q.toLowerCase())),inN=(rows||[]).filter(p=>p.checked_in_at).length
   return <div className="space-y-4">
@@ -38,9 +42,11 @@ function People({ev}){
       <button className="btn"><Plus size={15}/>Add</button></form>
     <div className="flex flex-wrap gap-2"><button className="btn-quiet px-3 py-1.5 text-xs" onClick={members}><Users size={13}/>Add all members</button>
       <button className="btn-quiet px-3 py-1.5 text-xs" disabled={!rows?.length||!!busy} onClick={passes}><Printer size={13}/>{busy?'Preparing…':'Entry passes'}</button>
+      <WaBulk count={withPhone.length} label={`WhatsApp ${withPhone.length} pass${withPhone.length===1?"":"es"}`} size="px-3 py-1.5 text-xs" autoClass="btn-quiet" manualClass="btn-quiet" onQueue={sendPasses}/>
       <div className="relative ml-auto"><Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fog-faint"/><input className="input py-1.5 pl-8 text-sm" placeholder="Find" value={q} onChange={e=>setQ(e.target.value)}/></div></div>
     <ul className="divide-y divide-ink-700/80">{list.map(p=><li key={p.id} className="flex items-center gap-3 py-2 text-sm">
       <span className="code">{code('E',p.pass_no,3)}</span><span className="min-w-0 flex-1"><span className="block truncate font-medium text-fg">{p.name}</span><span className="block truncate text-xs text-fog-faint">{p.role}{p.phone?` · ${p.phone}`:''}{p.organisation?` · ${p.organisation}`:''}{p.self_registered?' · registered online':''}</span></span>
+      {/^[6-9]\d{9}$/.test(p.phone||'')&&<WaSend className="btn-ghost" title={`WhatsApp pass to ${p.name}`} kind="event_pass" refId={`${ev.id}:${p.pass_no}`} memberId={p.member_id} phone={p.phone} name={p.name} text={passMsg(p)}><MessageCircle size={14}/></WaSend>}
       <button className={`btn px-2.5 py-1 text-xs ${p.checked_in_at?'bg-ok hover:bg-ok/90':''}`} onClick={()=>checkin(p)}><UserCheck size={13}/>{p.checked_in_at?'In':'Check in'}</button>
       <button className="btn-ghost text-fog-faint hover:text-blood" aria-label={`Remove ${p.name}`} onClick={()=>del(p)}><Trash2 size={14}/></button></li>)}</ul></div>
 }
