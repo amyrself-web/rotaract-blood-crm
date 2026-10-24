@@ -38,14 +38,14 @@ export default function Outbox({tapId,onTapOpened}){
   const confirm=useConfirm(),status=useWaStatus()
   const [rows,setRows]=useState(null),[casts,setCasts]=useState([]),[f,setF]=useState('queued'),[q,setQ]=useState(''),[cast,setCast]=useState(''),[tap,setTap]=useState(null)
   const load=async()=>{
-    let s=supabase.from('wa_outbox').select('id,kind,phone,name,body,status,error,send_after,sent_at,created_at,broadcast_id,provider,manual').order('created_at',{ascending:false}).limit(1000)
+    let s=supabase.from('wa_outbox').select('*').order('created_at',{ascending:false}).limit(1000)
     if(cast)s=s.eq('broadcast_id',cast)
     const [o,b]=await Promise.all([s,supabase.from('wa_broadcasts').select('*').gt('total',1).order('created_at',{ascending:false}).limit(12)])
     if(o.error)return toast.error(o.error.message);setRows(o.data);setCasts(b.data||[])}
   useEffect(()=>{load()},[cast]);useLive(['wa_outbox'],load)
   const counts=useMemo(()=>Object.fromEntries(Object.keys(ST).map(k=>[k,(rows||[]).filter(r=>r.status===k).length])),[rows])
   const list=(rows||[]).filter(r=>(!f||r.status===f)&&(!q||`${r.name} ${r.phone} ${r.body}`.toLowerCase().includes(q.toLowerCase())))
-  const provider=status?.provider||'manual',auto=provider!=='manual'
+  const provider=status?.provider||'manual',auto=provider!=='manual'&&!!status&&'ready' in status   // 'ready' comes with database v14
   // with an automatic sender, "Tap to send" only takes the messages you chose to send yourself, so nothing goes twice
   const waiting=(rows||[]).filter(r=>r.status==='queued'&&(!auto||r.manual)).sort((a,b)=>a.send_after.localeCompare(b.send_after))
   const autoWaiting=auto?(rows||[]).filter(r=>r.status==='queued'&&!r.manual).length:0

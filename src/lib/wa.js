@@ -12,7 +12,10 @@ export const KIND_LABEL={broadcast:'Broadcast',direct:'Direct message',duty:'Dut
 // items: [{phone,name,body,donor_id?,member_id?,ref?,vars?}]
 // manual=true: you send them yourself ("Open WhatsApp"); the automatic sender leaves them alone
 export async function enqueue(title,kind,items,sendAfter=null,manual=false){
-  const {data,error}=await supabase.rpc('wa_enqueue',{p_title:title,p_kind:kind,p_items:items,p_send_after:sendAfter,p_manual:!!manual})
+  const args={p_title:title,p_kind:kind,p_items:items,p_send_after:sendAfter}
+  let {data,error}=await supabase.rpc('wa_enqueue',{...args,p_manual:!!manual})
+  // database not yet on v14: queue the old way (the Outbox "Tap to send" still works)
+  if(error&&(error.code==='PGRST202'||/p_manual/.test(error.message||'')))({data,error}=await supabase.rpc('wa_enqueue',args))
   if(error)throw error
   if(!manual)kick()
   return data
