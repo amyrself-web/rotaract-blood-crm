@@ -7,6 +7,8 @@ import {BLOOD,nextEligible,normPhone,fmt} from '../../lib/util'
 import {Field,errText} from '../ui'
 import {enqueue,fill,siteUrl,useWaStatus,getSendMode,setSendMode} from '../../lib/wa'
 import {celebrate} from '../../lib/fx'
+import SpeakFill from '../SpeakFill'
+import AiWrite from '../AiWrite'
 
 async function all(table,cols,f){let out=[],from=0;for(;;){let q=supabase.from(table).select(cols).is('deleted_at',null).order('id').range(from,from+999);if(f)q=f(q)
   const {data,error}=await q;if(error)throw error;out=out.concat(data);if(data.length<1000)return out;from+=1000}}
@@ -42,6 +44,13 @@ export default function Broadcast({onQueued}){
   const send=async()=>{if(!people.length)return toast.error('Nobody matches. Change the filters.');if(msg.body.trim().length<5)return toast.error('Write the message first')
     setBusy(true);try{const r=await enqueue(msg.title||msg.body.slice(0,40),'broadcast',people.map(p=>({phone:p.phone,name:p.name,donor_id:p.donor_id,member_id:p.member_id,body:fill(msg.body,vars(p)).trim(),vars:{...vars(p),message:fill(msg.body,vars(p)).trim()}})),msg.when?new Date(msg.when).toISOString():null,manual)
       setSendMode(manual?'manual':'auto');celebrate();toast.success(`${r.queued} messages ${manual?'ready to tap through':'going out from the club number'}${r.skipped?`, ${r.skipped} skipped (stopped or wrong number)`:''}`);onQueued?.(r)}catch(e){toast.error(errText(e))}setBusy(false)}
+  // a spoken request becomes the message (and picks the blood group for urgent needs)
+  const spoke=x=>{
+    if(x.kind==='urgent'){if(x.group){setSrc('donors');setF(v=>({...v,groups:[x.group],eligible:true}))}
+      setMsg(m=>({...m,title:`Urgent ${x.group||''}`.trim(),body:`Hello {name}, ${x.group||'{bloodgroup}'} blood is urgently needed${x.units?` (${x.units} unit${x.units>1?'s':''})`:''}${x.hospital?` at ${x.hospital}`:''}. If you can donate, please ${x.phone?`call ${x.contact?x.contact+' on ':''}${x.phone}`:'reply to this message'}. - {club}`}));return toast.success('Message written from what you said. Check it before sending.')}
+    const st=STARTERS.find(([l])=>x.kind==='camp'?l==='Camp invite':x.kind==='thanks'?l==='Thank you':false)
+    if(st&&x.text.split(' ').length<6){setMsg(m=>({...m,title:st[0],body:st[1]}));return}
+    setMsg(m=>({...m,body:x.text.charAt(0).toUpperCase()+x.text.slice(1)+(/[.!?]$/.test(x.text)?'':'.')+' - {club}'}))}
   const toggleGroup=g=>setF({...f,groups:f.groups.includes(g)?f.groups.filter(x=>x!==g):[...f.groups,g]})
   const ins=t=>setMsg({...msg,body:msg.body+t})
   return <div className="grid gap-5 lg:grid-cols-[1fr_380px]">
@@ -62,7 +71,9 @@ export default function Broadcast({onQueued}){
         <div className="mt-4 flex items-center gap-2 rounded-xl bg-brand/10 px-3 py-2 text-sm"><Users size={16} className="text-brand"/><b className="tabular-nums text-fg">{donors===null&&src==='donors'?'…':people.length}</b><span className="text-fog-muted">people will get this message</span></div></section>
 
       <section className="card"><h3 className="mb-3 font-semibold text-fg">2. The message</h3>
-        <div className="mb-3 flex flex-wrap gap-1.5">{STARTERS.map(([l,b])=><button key={l} className="chip" onClick={()=>setMsg({...msg,body:b,title:l})}>{l}</button>)}</div>
+        <div className="mb-3 flex flex-wrap items-start gap-1.5">{STARTERS.map(([l,b])=><button key={l} className="chip" onClick={()=>setMsg({...msg,body:b,title:l})}>{l}</button>)}
+          <SpeakFill className="chip" label="Speak the message" hint='e.g. "Urgent O positive needed at GH Salem, call 98765 43210" or say the whole message' onResult={spoke}/>
+          <AiWrite kind="whatsapp" club={club} current={msg.body} onText={t=>setMsg(m=>({...m,body:t}))}/></div>
         <Field label="Title (only for you)"><input className="input" placeholder="For example: November camp invite" value={msg.title} onChange={e=>setMsg({...msg,title:e.target.value})}/></Field>
         <div className="mt-3"><Field label="Message" required><textarea className="input min-h-[140px]" value={msg.body} onChange={e=>setMsg({...msg,body:e.target.value})}/></Field>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-fog-faint"><Smile size={13}/>Insert:{['{name}','{bloodgroup}','{camp}','{date}','{venue}','{link}','{club}','🩸','🙏','❤️'].map(t=><button key={t} className="chip px-2 py-0.5 text-xs" onClick={()=>ins(t)}>{t}</button>)}</div></div>

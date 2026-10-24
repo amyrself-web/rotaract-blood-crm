@@ -9,13 +9,15 @@ import {useBrand} from '../context/Brand'
 import CountUp from '../components/CountUp'
 import LangToggle from '../components/LangToggle'
 import {useLang} from '../lib/i18n'
+import {usePulse} from '../lib/pulse'
 
 const GROUPS=['A+','A-','B+','B-','AB+','AB-','O+','O-']
 
 // Public page: what the club has done, in numbers. No names.
 export default function Impact(){
   const {brand}=useBrand(),{t}=useLang(),[d,setD]=useState(null)
-  useEffect(()=>{if(hasSupabase)supabase.rpc('public_impact').then(({data})=>setD(data))},[])
+  const load=()=>hasSupabase&&supabase.rpc('public_impact').then(({data})=>data&&setD(data))
+  useEffect(()=>{load()},[]);usePulse(load)
   const share=async()=>{const url=location.href;try{if(navigator.share)await navigator.share({title:brand.club_name,url});else{await navigator.clipboard.writeText(url);toast.success(t('Link copied'))}}catch{}}
   const big=d?[[Droplet,t('Units of blood collected'),d.units,'from-blood to-rose-700'],[HeartPulse,t('Lives touched'),d.units*3,'from-rose-500 to-pink-600']]:[]
   const small=d?[[Users,t('Registered donors'),d.donors],[Tent,t('Blood camps held'),d.camps],[Eye,t('Eye donations'),d.eye],[HandHeart,t('Pledges'),d.pledges],

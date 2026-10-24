@@ -102,7 +102,7 @@ export default function Donors(){
         <Field label="Mobile" required hint="10 digits, starts with 6, 7, 8 or 9"><input className="input" required inputMode="numeric" value={form.phone} onChange={set('phone')}/></Field>
         <Field label="Email"><input className="input" type="email" value={form.email} onChange={set('email')}/></Field>
         <Field label="Blood group" required><select required className="input" value={form.blood_group} onChange={set('blood_group')}><option value="">Not known</option>{BLOOD.map(b=><option key={b}>{b}</option>)}</select></Field>
-        <Field label="Gender" required><select required className="input" value={form.gender} onChange={set('gender')}><option value="">Not given</option><option>Male</option><option>Female</option><option>Other</option></select></Field>
+        <Field label="Gender" required><select required className="input" value={form.gender} onChange={set('gender')}><option value="">Choose</option><option>Male</option><option>Female</option><option>Other</option></select></Field>
         <Field label="Date of birth" hint="Donors must be 18 to 65" required><input required type="date" className="input" min={adultMin()} max={adultMax()} value={form.dob} onChange={set('dob')}/></Field>
         <Field label="Last donation"><input type="date" className="input" max={todayIso()} value={form.last_donation} onChange={set('last_donation')}/></Field>
         <Field label="Area or town" className="sm:col-span-2" required><input required className="input" value={form.area} onChange={set('area')}/></Field>

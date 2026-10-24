@@ -95,8 +95,8 @@ export default function PostMaker(){
           {kind==='impact'&&<p className="text-sm text-fog-muted">Numbers come from the CRM: camps, blood units, eye donations, projects and hours.</p>}
           <p className="text-xs text-fog-faint"><ImageIcon size={12} className="mr-1 inline"/>1080 × 1080 PNG. The logo and colours come from Settings.</p></div></div>
       <div className="card grid place-items-center overflow-hidden p-4"><div className="relative aspect-square w-full max-w-[560px] overflow-hidden rounded-2xl shadow-2xl">
-        <div className="absolute left-0 top-0 origin-top-left" style={{transform:'scale(var(--k))',width:1080,height:1080}} ref={el=>{if(el){const k=el.parentElement.clientWidth/1080;el.style.setProperty('--k',k)}}} dangerouslySetInnerHTML={{__html:html}}/></div></div>
+        <div translate="no" className="absolute left-0 top-0 origin-top-left" style={{transform:'scale(var(--k))',width:1080,height:1080}} ref={el=>{if(el){const k=el.parentElement.clientWidth/1080;el.style.setProperty('--k',k)}}} dangerouslySetInnerHTML={{__html:html}}/></div></div>
     </div>
-    <div ref={hidden} aria-hidden className="pointer-events-none fixed left-[-12000px] top-0" dangerouslySetInnerHTML={{__html:html}}/>
+    <div ref={hidden} translate="no" aria-hidden className="pointer-events-none fixed left-[-12000px] top-0" dangerouslySetInnerHTML={{__html:html}}/>
   </div>
 }

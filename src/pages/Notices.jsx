@@ -7,6 +7,7 @@ import {fmt} from '../lib/util'
 import {useBrand} from '../context/Brand'
 import {enqueue} from '../lib/wa'
 import {WaBulk} from '../components/wa/WaSend'
+import AiWrite from '../components/AiWrite'
 import {PageHeader,Drawer,Field,Badge,Empty,useLive,undoToast,errText,Toggle} from '../components/ui'
 
 const when=t=>new Date(t).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit'})
@@ -63,6 +64,8 @@ export default function Notices(){
       {nf&&<form id="notice-form" onSubmit={saveN} className="space-y-4">
         <Field label="Heading" required><input className="input" required minLength={3} value={nf.title} onChange={e=>setNf({...nf,title:e.target.value})}/></Field>
         <Field label="Message"><textarea className="input min-h-[140px]" value={nf.body} onChange={e=>setNf({...nf,body:e.target.value})}/></Field>
+        <div><AiWrite kind="notice" club={brand.club_name} current={[nf.title,nf.body].filter(Boolean).join('\n')} className="btn-quiet"
+          onText={t=>{const [first,...rest]=t.split('\n');const body=rest.join('\n').trim();setNf(v=>body?{...v,title:v.title||first.replace(/^(title|heading)\s*:\s*/i,'').slice(0,120),body}:{...v,body:t})}}/></div>
         <div className="grid grid-cols-2 gap-3"><Field label="Show until" hint="Empty: always"><input type="date" className="input" value={nf.expires_on} onChange={e=>setNf({...nf,expires_on:e.target.value})}/></Field>
           <label className="mt-6 flex items-center gap-3 text-sm text-fog"><Toggle checked={nf.pinned} label="Pin to top" onChange={v=>setNf({...nf,pinned:v})}/>Pin to top</label></div></form>}
     </Drawer>

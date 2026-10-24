@@ -130,7 +130,7 @@ export default function MyClub(){
         <Field label="Mobile" required><input className="input" required inputMode="numeric" value={edit.phone} onChange={e=>setEdit({...edit,phone:e.target.value})}/></Field>
         <Field label="Email"><input className="input" type="email" value={edit.email} onChange={e=>setEdit({...edit,email:e.target.value})}/></Field>
         <Field label="Date of birth"><input type="date" className="input" max={todayIso()} value={edit.dob} onChange={e=>setEdit({...edit,dob:e.target.value})}/></Field>
-        <Field label="Gender"><select className="input" value={edit.gender} onChange={e=>setEdit({...edit,gender:e.target.value})}><option value="">Not given</option><option>Male</option><option>Female</option><option>Other</option></select></Field>
+        <Field label="Gender"><select className="input" value={edit.gender} onChange={e=>setEdit({...edit,gender:e.target.value})}><option value="">Not stated</option><option>Male</option><option>Female</option><option>Other</option></select></Field>
         <Field label="Blood group"><select className="input" value={edit.blood_group} onChange={e=>setEdit({...edit,blood_group:e.target.value})}><option value="">Not known</option>{BLOOD.map(b=><option key={b}>{b}</option>)}</select></Field>
         <Field label="Area or town"><input className="input" value={edit.area} onChange={e=>setEdit({...edit,area:e.target.value})}/></Field>
         <Field label="Occupation"><select className="input" value={edit.occupation} onChange={e=>setEdit({...edit,occupation:e.target.value})}><option value="">Choose</option><option>Student</option><option>Working professional</option><option>Business</option><option>Other</option></select></Field>

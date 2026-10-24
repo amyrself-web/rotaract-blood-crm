@@ -4,6 +4,7 @@ import {motion,AnimatePresence,useReducedMotion} from 'framer-motion'
 import {Droplet,CalendarDays,HeartHandshake,MapPin,Users,ArrowRight,ChevronLeft,ChevronRight} from 'lucide-react'
 import {supabase,hasSupabase} from '../lib/supabase'
 import {fmt} from '../lib/util'
+import {usePulse} from '../lib/pulse'
 
 const TYPE={camp:['Blood camp',Droplet,'text-blood bg-blood/15'],event:['Event',CalendarDays,'text-brand bg-brand/15'],project:['Service project',HeartHandshake,'text-ok bg-ok/15']}
 const PHASE={live:['Happening now','bg-blood text-white'],upcoming:['Coming up','bg-brand/15 text-brand'],ongoing:['Ongoing','bg-warn/15 text-warn'],done:['Done','bg-ok/15 text-ok']}
@@ -12,7 +13,8 @@ const MS=5500
 
 export default function Showcase({compact=false}){
   const [items,setItems]=useState(null),[i,setI]=useState(0),[hold,setHold]=useState(false),reduce=useReducedMotion(),box=useRef(null)
-  useEffect(()=>{if(hasSupabase)supabase.rpc('public_showcase').then(({data})=>setItems(Array.isArray(data)?data:[]),()=>setItems([]));else setItems([])},[])
+  const load=()=>hasSupabase?supabase.rpc('public_showcase').then(({data,error})=>{if(!error)setItems(Array.isArray(data)?data:[])},()=>setItems(x=>x||[])):setItems([])
+  useEffect(()=>{load()},[]);usePulse(load)
   const n=items?.length||0,go=d=>setI(x=>(x+d+n)%n)
   useEffect(()=>{if(n<2||hold)return;const t=setTimeout(()=>go(1),MS);return()=>clearTimeout(t)},[i,n,hold])
   if(!n)return null

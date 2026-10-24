@@ -66,7 +66,7 @@ export async function makeCertificate({name,camp,date,venue,bloodGroup,volume,ce
       <div style="text-align:center"><img src="${qr}" style="width:96px;height:96px"/><div style="font:600 10.5px Manrope,sans-serif;color:#5D6E8F;margin-top:6px">${esc(v?.qrCaption||'Scan to verify')}</div><div style="font:700 10.5px 'Courier New',monospace;color:#0B1324;margin-top:2px;letter-spacing:.5px">${esc(fmtCode(check))}</div></div></div>
   </div>
   <div style="position:absolute;right:66px;top:150px">${seal(v?.sealText)}</div>`
-  document.body.appendChild(el)
+  el.setAttribute('translate','no');document.body.appendChild(el)   // printed as designed, never swapped to Tamil on screen
   try{
     await Promise.all([...el.querySelectorAll('img')].map(i=>i.complete?0:new Promise(r=>{i.onload=i.onerror=r})))
     await document.fonts?.ready

@@ -143,7 +143,7 @@ async function donorFaces(d,stats,brand,lg){
 // ---------- rendering ----------
 async function snap(html,w,h){
   const {default:html2canvas}=await import('html2canvas')
-  const el=document.createElement('div');el.className='crm-card-snap';el.style.cssText=`position:fixed;left:-14000px;top:0;width:${w}px;height:${h}px`;el.innerHTML=html;document.body.appendChild(el)
+  const el=document.createElement('div');el.className='crm-card-snap';el.style.cssText=`position:fixed;left:-14000px;top:0;width:${w}px;height:${h}px`;el.innerHTML=html;el.setAttribute('translate','no');document.body.appendChild(el)
   try{await document.fonts?.ready;return (await html2canvas(el.firstElementChild,{scale:3,backgroundColor:'#ffffff',logging:false,width:w,height:h,windowWidth:w,windowHeight:h})).toDataURL('image/jpeg',.94)}finally{el.remove()}
 }
 // cards: [[frontHtml, backHtml?], ...]; portrait or landscape; layout 'card' or 'sheet'

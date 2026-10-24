@@ -10,6 +10,7 @@ import {spring,usePresence,HeroCtx} from './ui'
 import {BrandMark,ThemeToggle} from './Brand'
 import {useNotifications,Palette,Popover,UiSwitch} from './Layout'
 import LangToggle from './LangToggle'
+import VoiceCommand from './VoiceCommand'
 
 // Modern layout: navy header band with a top menu, the page title inside the band,
 // content on a sheet that rises over it, and a bottom tab bar on phones.
@@ -93,7 +94,7 @@ export default function ModernLayout(){
         <button onClick={()=>setPal(true)} className="hidden items-center gap-2 rounded-full bg-white/[.06] px-3.5 py-1.5 text-sm text-white/60 ring-1 ring-white/10 transition hover:bg-white/10 hover:text-white sm:flex">
           <Search size={15}/><span className="text-left lg:w-16 xl:w-32">Search</span><kbd className="hidden whitespace-nowrap rounded border border-white/15 px-1.5 text-[11px] xl:inline">Ctrl K</kbd></button>
         <button className="btn-ghost sm:hidden" aria-label="Search" onClick={()=>setPal(true)}><Search size={18}/></button>
-        <ThemeToggle/>
+        <VoiceCommand/><LangToggle className="hidden sm:inline-flex"/><ThemeToggle/>
         <div className="relative"><button className="btn-ghost relative" aria-label={`Notifications, ${notes.length}`} onClick={()=>setBell(!bell)}><Bell size={18}/>
             {notes.length>0&&<span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-blood px-1 text-[10px] font-bold text-white ring-2 ring-[#0B1730]">{notes.length}</span>}</button>
           <Popover open={bell} onClose={()=>setBell(false)} className="w-80"><div className="px-2 py-1.5 text-sm font-semibold text-fg">Needs attention</div>

@@ -8,8 +8,11 @@ import {supabase} from '../lib/supabase'
 import {ROLE_LABEL} from '../lib/access'
 import {spring,usePresence,useLive} from './ui'
 import {BrandMark,ThemeToggle} from './Brand'
+import LangToggle from './LangToggle'
+import VoiceCommand from './VoiceCommand'
 import {useBrand} from '../context/Brand'
 import ModernLayout from './ModernLayout'
+import {tr} from '../lib/i18n'
 
 function Sidebar({collapsed,setCollapsed,mobile,closeMobile}){
   const {can}=useAuth()
@@ -62,16 +65,22 @@ export function useNotifications(){
   return items
 }
 
+const cleanCommand=s=>s.replace(/^(please\s+)?(open|go to|goto|show( me)?|find|search( for)?|take me to)\s+/i,'').replace(/\s+(page|screen|tab)$/i,'')
+  .replace(/\s*(பக்கத்தை|பக்கம்)?\s*(திற|திறக்கவும்|காட்டு|காட்டவும்|போ|தேடு)$/,'').replace(/^the\s+/i,'').replace(/[.?!]$/,'').trim()
 export function Palette({open,setOpen}){
   const {can}=useAuth(),nav=useNavigate(),[q,setQ]=useState(''),[i,setI]=useState(0),[donors,setDonors]=useState([]),ref=useRef()
-  const pages=ALL_NAV.filter(n=>allowed(n,can)).filter(n=>n.label.toLowerCase().includes(q.toLowerCase())).map(n=>({label:n.label,hint:'Page',icon:n.icon,go:()=>nav(n.to)}))
-  useEffect(()=>{if(!open){setQ('');setDonors([]);return}setTimeout(()=>ref.current?.focus(),30)},[open])
+  const ql=q.toLowerCase().trim(),[auto,setAuto]=useState(false)
+  const pages=ALL_NAV.filter(n=>allowed(n,can)).filter(n=>!ql||n.label.toLowerCase().includes(ql)||tr(n.label).includes(q.trim())||ql.includes(n.label.toLowerCase())||q.includes(tr(n.label))).map(n=>({label:n.label,hint:'Page',icon:n.icon,go:()=>nav(n.to)}))
+  useEffect(()=>{if(!open){setQ('');setDonors([]);setAuto(false);return}setTimeout(()=>ref.current?.focus(),30)},[open])
+  // a spoken command ("open donors", "முகாம்கள் திற", "find Ravi") opens this box with the words; one clear match is opened straight away
+  useEffect(()=>{const f=e=>{setOpen(true);setTimeout(()=>{setQ(cleanCommand(e.detail||''));setAuto(true)},60)};window.addEventListener('crm-palette',f);return()=>window.removeEventListener('crm-palette',f)},[setOpen])
   useEffect(()=>{if(!can('donors')||q.trim().length<2){setDonors([]);return}
     const t=setTimeout(async()=>{const s=q.replace(/[%,()]/g,'');const id=/^d-?0*(\d+)$/i.exec(s.trim());let qq=supabase.from('donors').select('id,full_name,phone,blood_group,donor_no').is('deleted_at',null)
       qq=id?qq.eq('donor_no',Number(id[1])):qq.or(`full_name.ilike.%${s}%,phone.ilike.%${s}%`);const {data}=await qq.limit(6)
       setDonors((data||[]).map(d=>({label:d.full_name,hint:`D-${String(d.donor_no).padStart(4,'0')} ${d.blood_group||''}`,icon:UserRound,go:()=>nav('/donors?q='+encodeURIComponent(d.phone))})))},200);return()=>clearTimeout(t)},[q,can,nav])
   const all=[...pages,...donors];useEffect(()=>setI(0),[q])
   const pick=x=>{x?.go();setOpen(false)}
+  useEffect(()=>{if(!auto||!open)return;const t=setTimeout(()=>{setAuto(false);if(all.length===1)pick(all[0])},700);return()=>clearTimeout(t)},[auto,all.length,open])
   const mounted=usePresence(open,200);if(!mounted)return null
   return <div className={`fixed inset-0 z-50 grid place-items-start justify-center px-4 pt-[12vh] ${open?'':'pointer-events-none'}`}>
     <motion.div className="absolute inset-0 bg-black/55 backdrop-blur-[2px]" initial={{opacity:0}} animate={{opacity:open?1:0}} transition={{duration:.15}} onClick={()=>setOpen(false)}/>
@@ -126,7 +135,7 @@ function ClassicLayout(){
         <button onClick={()=>setPal(true)} className="hidden items-center gap-2 rounded-[10px] border border-ink-600 bg-ink-900/80 px-3 py-1.5 text-sm text-fog-faint transition hover:border-ink-500 hover:text-fog-muted sm:flex">
           <Search size={15}/><span className="w-40 text-left">Search</span><kbd className="rounded border border-ink-600 px-1.5 text-[11px]">Ctrl K</kbd></button>
         <button className="btn-ghost sm:hidden" aria-label="Search" onClick={()=>setPal(true)}><Search size={18}/></button>
-        <ThemeToggle/>
+        <VoiceCommand/><LangToggle className="hidden sm:inline-flex"/><ThemeToggle/>
         <div className="relative"><button className="btn-ghost relative" aria-label={`Notifications, ${notes.length}`} onClick={()=>setBell(!bell)}><Bell size={18}/>
             {notes.length>0&&<span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-blood px-1 text-[10px] font-bold text-white">{notes.length}</span>}</button>
           <Popover open={bell} onClose={()=>setBell(false)} className="w-80"><div className="px-2 py-1.5 text-sm font-semibold text-fg">Needs attention</div>

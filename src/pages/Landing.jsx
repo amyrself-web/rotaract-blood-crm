@@ -7,9 +7,11 @@ import {useBrand} from '../context/Brand'
 import {Logo} from '../components/Brand'
 import {useLang} from '../lib/i18n'
 import LangToggle from '../components/LangToggle'
+import {usePulse} from '../lib/pulse'
 export default function Landing(){
   const {brand}=useBrand(),[c,setC]=useState(undefined),[now,setNow]=useState(Date.now())
-  const {t}=useLang();useEffect(()=>{if(hasSupabase)supabase.rpc('public_camp_info').then(({data})=>setC(data));const t=setInterval(()=>setNow(Date.now()),30000);return()=>clearInterval(t)},[])
+  const load=()=>hasSupabase&&supabase.rpc('public_camp_info').then(({data})=>setC(data));usePulse(load)
+  const {t}=useLang();useEffect(()=>{load();const t=setInterval(()=>setNow(Date.now()),30000);return()=>clearInterval(t)},[])
   const ms=c?new Date(`${c.date}T${(c.start_time||'09:00').slice(0,5)}`)-now:0,days=Math.floor(ms/864e5),hrs=Math.floor(ms%864e5/36e5)
   return <div className="relative grid min-h-screen place-items-center overflow-hidden p-5"><div aria-hidden className="pointer-events-none absolute left-1/2 top-1/3 h-72 w-72 -translate-x-1/2 rounded-full bg-blood/20 blur-3xl"/><LangToggle className="absolute right-4 top-4 z-10"/><div className="relative w-full max-w-lg text-center">
     <div className="mb-4 flex justify-center"><Logo size={60}/></div>

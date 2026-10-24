@@ -109,7 +109,7 @@ export async function gratitudeLetterHtml(c,brand={},lang='en'){
   const pdf=new jsPDF({orientation:'portrait',unit:'px',format:[W,H],hotfixes:['px_scaling']})
   for(let i=0;i<langs.length;i++){
     const el=document.createElement('div');el.style.cssText=`position:fixed;left:-13000px;top:0;width:${W}px;height:${H}px`
-    el.innerHTML=page(c,brand,langs[i],lg);document.body.appendChild(el)
+    el.innerHTML=page(c,brand,langs[i],lg);el.setAttribute('translate','no');document.body.appendChild(el)
     try{await document.fonts?.ready
       // long letters (for example eyes and body together) get slightly smaller text so nothing is cut off
       const b=el.querySelector('[data-body]');let fs=parseFloat(getComputedStyle(b).fontSize)

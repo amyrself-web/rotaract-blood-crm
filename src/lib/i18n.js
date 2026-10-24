@@ -1,5 +1,5 @@
 // English / Tamil. The English text is the key; anything not in the list stays in English.
-// Covers the pages donors and members use (public pages, donor portal, My club) and the menu.
+// t() covers the public pages, donor portal and My club straight away; the rest of the CRM is translated on screen (see below).
 import {useSyncExternalStore} from 'react'
 
 const TA={
@@ -71,7 +71,48 @@ const TA={
 const KEY='lang',subs=new Set()
 let lang=(()=>{try{return localStorage.getItem(KEY)==='ta'?'ta':'en'}catch{return 'en'}})()
 document.documentElement.lang=lang
-export const setLang=l=>{lang=l==='ta'?'ta':'en';try{localStorage.setItem(KEY,lang)}catch{};document.documentElement.lang=lang;subs.forEach(f=>f())}
+export const setLang=l=>{lang=l==='ta'?'ta':'en';try{localStorage.setItem(KEY,lang)}catch{};document.documentElement.lang=lang;subs.forEach(f=>f());lang==='ta'?enableTamil():disableTamil()}
+
+// ---------- the whole CRM in Tamil ----------
+// Every screen is written in English. When Tamil is chosen, the words on screen (text, placeholders, tooltips,
+// button names, toasts) are swapped for Tamil from ta-dict.js as they appear, and swapped back for English.
+// People's data (names, places, notes) is never in the word list, so it is left as typed.
+let EXACT=null,PATS=[],loading=null,obs=null
+const ATTRS=['placeholder','title','aria-label','alt']
+const tNode=new WeakMap(),tAttr=new WeakMap(),touched=new Set()
+const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')
+function loadDict(){return loading||(loading=import('./ta-dict.js').then(m=>{EXACT={...m.EXACT,...TA}
+  PATS=m.PATTERNS.filter(([en])=>en.replace(/\{\d+\}/g,'').replace(/[^A-Za-z]/g,'').length>=3)
+    .map(([en,ta])=>{let i=0;const re=new RegExp('^'+en.split(/\{\d+\}/).map(esc).join('([\\s\\S]*?)')+'$');return {re,ta,n:(en.match(/\{\d+\}/g)||[]).length}})}))}
+function translate(v,depth=0){
+  const m=/^(\s*)([\s\S]*?)(\s*)$/.exec(v),core=m[2].replace(/\s+/g,' ')
+  if(!core||!/[A-Za-z]/.test(core))return null
+  let out=EXACT[core]
+  if(out==null&&depth<2)for(const p of PATS){const r=p.re.exec(core);if(r){out=p.ta.replace(/\{(\d+)\}/g,(_,k)=>{const part=r[+k+1]??'';return translate(part,depth+1)??part});break}}
+  return out==null?null:m[1]+out+m[3]
+}
+const skip=el=>{for(let e=el;e&&e!==document.body;e=e.parentElement){if(e.translate===false||e.classList?.contains('notranslate')||e.isContentEditable||/^(SCRIPT|STYLE|TEXTAREA|CODE|PRE|NOSCRIPT)$/.test(e.tagName))return true}return false}
+function doText(n){const v=n.nodeValue,rec=tNode.get(n);if(rec&&v===rec.ta)return
+  if(skip(n.parentElement)){return}const tr=translate(v);if(tr==null||tr===v){tNode.delete(n);return}
+  tNode.set(n,{en:v,ta:tr});touched.add(new WeakRef(n));n.nodeValue=tr}
+function doAttr(el,a){const v=el.getAttribute(a);if(v==null)return;let recs=tAttr.get(el);const rec=recs?.[a];if(rec&&v===rec.ta)return
+  const tr=translate(v);if(tr==null||tr===v)return;if(!recs){recs={};tAttr.set(el,recs);touched.add(new WeakRef(el))}recs[a]={en:v,ta:tr};el.setAttribute(a,tr)}
+function walk(root){if(root.nodeType===3)return doText(root);if(root.nodeType!==1||skip(root))return
+  for(const a of ATTRS)if(root.hasAttribute(a))doAttr(root,a)
+  const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT);let n
+  while((n=w.nextNode())){if(n.nodeType===3)doText(n);else for(const a of ATTRS)if(n.hasAttribute(a))doAttr(n,a)}}
+async function enableTamil(){await loadDict();if(lang!=='ta'||obs)return
+  walk(document.body)
+  obs=new MutationObserver(list=>{for(const r of list){if(r.type==='characterData')doText(r.target);else if(r.type==='attributes')doAttr(r.target,r.attributeName);else r.addedNodes.forEach(walk)}})
+  obs.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:ATTRS})}
+function disableTamil(){obs?.disconnect();obs=null
+  for(const ref of touched){const n=ref.deref();if(!n)continue
+    if(n.nodeType===3){const rec=tNode.get(n);if(rec&&n.nodeValue===rec.ta)n.nodeValue=rec.en;tNode.delete(n)}
+    else{const recs=tAttr.get(n);if(recs)for(const [a,rec] of Object.entries(recs))if(n.getAttribute(a)===rec.ta)n.setAttribute(a,rec.en);tAttr.delete(n)}}
+  touched.clear()}
+// for text that is drawn, not shown as page text (toasts are page text, so they are covered already)
+export const tr=s=>lang==='ta'&&EXACT?translate(s)??s:s
+if(lang==='ta')enableTamil()
 export const t=s=>lang==='ta'&&TA[s]||s
 export function useLang(){
   const l=useSyncExternalStore(f=>{subs.add(f);return()=>subs.delete(f)},()=>lang)

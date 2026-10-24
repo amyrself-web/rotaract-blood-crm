@@ -1,5 +1,6 @@
 import {createContext,useCallback,useContext,useEffect,useState} from 'react'
 import {supabase,hasSupabase} from '../lib/supabase'
+import {usePulse} from '../lib/pulse'
 export const DEFAULT_BRAND={brand_name:'Rotaract Blood',tagline:'Sankari donor CRM',logo_url:null,brand_color:'#4C8DFF',club_name:'Sankari Rotaract Club',
   address:'',contact_phone:'',contact_email:'',signatory_name:'',signatory_title:'President'}
 export const ACCENTS=[['Ocean blue','#4C8DFF'],['Crimson','#E11D48'],['Teal','#0EA5A4'],['Violet','#7C5CFF'],['Emerald','#10B981'],['Saffron','#F59E0B']]
@@ -17,10 +18,8 @@ export function BrandProvider({children}){
   const [mode,setModeState]=useState(()=>document.documentElement.dataset.theme==='light'?'light':'dark')
   const refreshBrand=useCallback(async()=>{if(!hasSupabase)return;const {data,error}=await supabase.rpc('public_brand');if(!error&&data)setBrand({...DEFAULT_BRAND,...Object.fromEntries(Object.entries(data).filter(([,v])=>v!==null&&v!==''))})},[])
   useEffect(()=>{refreshBrand()},[refreshBrand])
-  // anyone signed in sees a new name or logo as soon as Settings are saved
-  useEffect(()=>{if(!hasSupabase)return;const ch=supabase.channel('brand-live').on('postgres_changes',{event:'UPDATE',schema:'public',table:'settings'},()=>refreshBrand()).subscribe()
-    const vis=()=>document.visibilityState==='visible'&&refreshBrand();document.addEventListener('visibilitychange',vis)
-    return()=>{supabase.removeChannel(ch);document.removeEventListener('visibilitychange',vis)}},[refreshBrand])
+  // everyone, signed in or not, sees a new name, logo or colour as soon as Settings are saved
+  usePulse(refreshBrand)
   useEffect(()=>{applyAccent(brand.brand_color);document.title=[brand.brand_name,brand.club_name!==brand.brand_name&&brand.club_name].filter(Boolean).join(' · ')||'Blood donation CRM'
     // browser tab icon follows the club logo
     let l=document.querySelector("link[rel~='icon']");if(!l){l=document.createElement('link');l.rel='icon';document.head.appendChild(l)}

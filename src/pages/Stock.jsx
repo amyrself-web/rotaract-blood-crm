@@ -9,6 +9,7 @@ import CountUp from '../components/CountUp'
 import {enqueue} from '../lib/wa'
 import {PageHeader,Drawer,Field,Tabs,Badge,Empty,useConfirm,errText,useLive,undoToast,code,todayIso} from '../components/ui'
 import WaSend,{WaBulk} from '../components/wa/WaSend'
+import SpeakFill from '../components/SpeakFill'
 
 const ST=['collected','in_transit','testing','available','issued','discarded']
 const LB={collected:'Collected',in_transit:'In transit',testing:'Testing',available:'Available',issued:'Issued',discarded:'Discarded'}
@@ -145,6 +146,9 @@ export default function Stock(){
     <Drawer open={!!ef} onClose={()=>setEf(null)} title={ef?.id?'Edit emergency request':'New emergency request'}
       footer={ef&&<>{ef.id&&<button className="btn-quiet mr-auto text-blood" onClick={delReq}><Trash2 size={15}/>Delete</button>}<button className="btn-quiet" onClick={()=>setEf(null)}>Cancel</button><button className="btn" form="req-form">{ef.id?'Save changes':'Create request'}</button></>}>
       {ef&&<form id="req-form" onSubmit={saveReq} className="grid gap-4 sm:grid-cols-2">
+        {!ef.id&&<div className="sm:col-span-2"><SpeakFill label="Speak the request" hint='Say it in one go, e.g. "O positive, two units at GH Salem, contact Ravi 98765 43210"'
+          onResult={x=>{setEf(f=>({...f,blood_group:x.group||f.blood_group,units_needed:x.units?String(x.units):f.units_needed,hospital:x.hospital||f.hospital,contact_phone:x.phone||f.contact_phone,contact_name:x.contact||f.contact_name,notes:f.notes||x.text}))
+            toast.success(x.group||x.hospital?'Filled from what you said. Check before saving.':'Could not pick out the details. The words are in Notes.')}}/></div>}
         <Field label="Blood group needed" required><select className="input" required value={ef.blood_group} onChange={se('blood_group')}><option value="">Choose</option>{BLOOD.map(b=><option key={b}>{b}</option>)}</select></Field>
         <Field label="Units" required><input required className="input" type="number" min="1" value={ef.units_needed} onChange={se('units_needed')}/></Field>
         <Field label="Hospital" className="sm:col-span-2" required><input className="input" placeholder="Hospital" required value={ef.hospital} onChange={se('hospital')}/></Field>

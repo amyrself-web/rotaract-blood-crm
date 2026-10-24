@@ -47,6 +47,7 @@ import Impact from './pages/Impact'
 import PostMaker from './pages/PostMaker'
 import {ALL_NAV,allowed} from './nav'
 import {Lock} from 'lucide-react'
+import VoiceDock from './components/VoiceDock'
 
 function Home(){const {profile}=useAuth();return profile.role==='donor'?<Portal/>:profile.role==='member'?<MyClub/>:<Dashboard/>}
 function Need({to,children}){const {can}=useAuth(),item=ALL_NAV.find(n=>n.to===to)
@@ -69,7 +70,7 @@ function Guard(){const {user,profile,loading,recovery,signOut}=useAuth(),loc=use
 const PAGES=[['/donors',Donors],['/camps',Camps],['/import',Import],['/camp-day',CampDay],['/messages',Messages],['/stock',Stock],['/planning',Planning],
   ['/reports',Reports],['/users',UsersPage],['/calendar',Calendar],['/audit',Audit],['/settings',SettingsPage],['/trash',Trash],['/members',Members],['/meetings',Meetings],['/afterlife',Afterlife],['/certificates',Certificates],['/funds',Funds],['/privacy',Privacy],['/projects',Projects],['/notices',Notices],['/directory',Directory],['/assets',Assets],['/events',Events],['/posts',PostMaker]]
 function Toasts(){const {mode}=useBrand()
-  return <Toaster position="top-center" offset={14} theme={mode} toastOptions={{style:{background:'rgb(var(--ink-800))',border:'1px solid rgb(var(--ink-600))',color:'rgb(var(--fg))',fontFamily:'Manrope, system-ui, sans-serif'}}}/>}
+  return <><VoiceDock/><Toaster position="top-center" offset={14} theme={mode} toastOptions={{style:{background:'rgb(var(--ink-800))',border:'1px solid rgb(var(--ink-600))',color:'rgb(var(--fg))',fontFamily:'Manrope, system-ui, sans-serif'}}}/></>}
 export default function App(){return <BrandProvider><AuthProvider><ConfirmProvider><HashRouter><Routes>
   <Route path="/login" element={<Login/>}/>
   <Route path="/register/:campId" element={<Register/>}/>

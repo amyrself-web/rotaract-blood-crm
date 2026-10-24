@@ -10,11 +10,13 @@ import {Field} from '../components/ui'
 import {celebrate} from '../lib/fx'
 import {useLang} from '../lib/i18n'
 import LangToggle from '../components/LangToggle'
+import {usePulse} from '../lib/pulse'
 
 // Public page from the event's QR code or link
 export default function EventRegister(){
   const {id}=useParams(),{brand}=useBrand(),{t}=useLang(),[e,setE]=useState(undefined),[f,setF]=useState({name:'',phone:'',org:''}),[busy,setBusy]=useState(false),[err,setErr]=useState(''),[done,setDone]=useState(null)
-  useEffect(()=>{supabase.rpc('event_public',{p_event:id}).then(({data})=>setE(data||null))},[id])
+  const load=()=>supabase.rpc('event_public',{p_event:id}).then(({data})=>setE(data||null))
+  useEffect(()=>{load()},[id]);usePulse(load)
   const go=async ev=>{ev.preventDefault();setBusy(true);setErr('');const {data,error}=await supabase.rpc('register_event',{p_event:id,p_name:f.name,p_phone:normPhone(f.phone),p_org:f.org||null});setBusy(false)
     if(error)return setErr(error.message);setDone(data);if(!data.already)celebrate()}
   return <div className="relative grid min-h-screen place-items-center overflow-hidden p-5">

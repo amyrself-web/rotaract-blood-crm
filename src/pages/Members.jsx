@@ -128,7 +128,7 @@ export default function Members(){
         <Field label="Position" required><select className="input" required value={form.position} onChange={set('position')}>{POSITIONS.map(p=><option key={p}>{p}</option>)}</select></Field>
         <Field label="Membership type" required><select className="input" value={form.membership_type} onChange={set('membership_type')}>{TYPES.map(t=><option key={t}>{t}</option>)}</select></Field>
         <Field label="Date of birth"><input type="date" className="input" max={todayIso()} value={form.dob} onChange={set('dob')}/></Field>
-        <Field label="Gender"><select className="input" value={form.gender} onChange={set('gender')}><option value="">Not given</option><option>Male</option><option>Female</option><option>Other</option></select></Field>
+        <Field label="Gender"><select className="input" value={form.gender} onChange={set('gender')}><option value="">Not stated</option><option>Male</option><option>Female</option><option>Other</option></select></Field>
         <Field label="Blood group"><select className="input" value={form.blood_group} onChange={set('blood_group')}><option value="">Not known</option>{BLOOD.map(b=><option key={b}>{b}</option>)}</select></Field>
         <Field label="Joined on" required><input type="date" required className="input" max={todayIso()} value={form.joined_on} onChange={set('joined_on')}/></Field>
         <Field label="Occupation"><select className="input" value={form.occupation} onChange={set('occupation')}><option value="">Choose</option><option>Student</option><option>Working professional</option><option>Business</option><option>Other</option></select></Field>

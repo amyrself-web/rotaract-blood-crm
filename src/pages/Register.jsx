@@ -9,12 +9,15 @@ import {useBrand} from '../context/Brand'
 import {Field,adultMax,adultMin,PHONE_PATTERN} from '../components/ui'
 import {useLang} from '../lib/i18n'
 import LangToggle from '../components/LangToggle'
+import {usePulse} from '../lib/pulse'
 
 export default function Register(){
   const {campId}=useParams(),{brand}=useBrand()
   const {t}=useLang();const [camp,setCamp]=useState(undefined),[taken,setTaken]=useState({}),[f,setF]=useState({name:'',phone:'',group:'',dob:'',area:'',slot:'',consent:false}),[msg,setMsg]=useState(''),[done,setDone]=useState(null),[busy,setBusy]=useState(false)
   const loadSlots=()=>supabase.rpc('camp_slots',{p_camp:campId}).then(({data})=>setTaken(Object.fromEntries((data||[]).map(x=>[x.slot,x]))))
-  useEffect(()=>{if(!hasSupabase)return;supabase.from('camps').select('*').eq('id',campId).maybeSingle().then(({data})=>setCamp(data));loadSlots()
+  const loadCamp=()=>supabase.from('camps').select('*').eq('id',campId).maybeSingle().then(({data})=>setCamp(data))
+  usePulse(()=>{loadCamp();loadSlots()})
+  useEffect(()=>{if(!hasSupabase)return;loadCamp();loadSlots()
     const t=setInterval(loadSlots,20000);return()=>clearInterval(t)},[campId])
   const list=useMemo(()=>camp?slots(camp.start_time,camp.end_time):[],[camp])
   const left=s=>camp?.slot_capacity?camp.slot_capacity-(taken[s]?.taken||0):null
