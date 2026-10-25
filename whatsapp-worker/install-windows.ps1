@@ -77,7 +77,8 @@ Push-Location $Dir; & $Npm install --omit=dev --no-audit --no-fund; Pop-Location
 function Add-CrmTask($Name,$WorkDir,$Cmd,$Log){
   # outer quotes are removed by cmd /s /c, leaving the quoted program path and log path intact
   $act=New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/s /c `"$Cmd >> `"$Log`" 2>&1`"" -WorkingDirectory $WorkDir
-  $trg=New-ScheduledTaskTrigger -AtStartup
+  # starts with Windows, and every 5 minutes Windows checks it is still running and starts it again if it stopped
+  $trg=@((New-ScheduledTaskTrigger -AtStartup),(New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Days 3650)))
   $pri=New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
   $set=New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew
   Register-ScheduledTask -TaskName $Name -Action $act -Trigger $trg -Principal $pri -Settings $set -Force | Out-Null
@@ -129,6 +130,8 @@ if($Engine -eq 'openwa'){
 
 Add-CrmTask 'CRM WhatsApp sender' $Dir "`"$Node`" worker.mjs" (Join-Path $Dir 'worker.log')
 Say ''
+# keep the server awake so messages keep going out
+powercfg /change standby-timeout-ac 0 2>$null; powercfg /change hibernate-timeout-ac 0 2>$null
 Say 'All set. Now open the CRM > WhatsApp and alerts > Connect > "Club phone, linked by QR",' Green
 Say 'and scan the QR with the club phone: WhatsApp > Linked devices > Link a device.' Green
 Say "Logs: Get-Content `"$Dir\worker.log`" -Wait -Tail 30"
