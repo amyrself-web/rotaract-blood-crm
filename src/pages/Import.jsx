@@ -2,14 +2,14 @@ import {useEffect,useMemo,useState} from 'react'
 import readXlsxFile from 'read-excel-file/browser'
 import Papa from 'papaparse'
 import {toast} from 'sonner'
-import {FileSpreadsheet,FileText,Upload,CheckCircle2,AlertTriangle,Undo2,History,Search,Download,X,Users,Droplet,Receipt,Tent,UserCheck,Presentation,ClipboardCheck,Building2,HeartHandshake,PartyPopper,Info} from 'lucide-react'
+import {FileSpreadsheet,FileText,Upload,CheckCircle2,AlertTriangle,Undo2,History,Search,Download,X,Users,Droplet,Receipt,Tent,UserCheck,Presentation,ClipboardCheck,Building2,HeartHandshake,PartyPopper,Info,Eye,Utensils,Sprout} from 'lucide-react'
 import {supabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
 import {PageHeader,Tabs,Badge,Empty,errText,useConfirm,useLive} from '../components/ui'
 import {ENTITIES,entity,headerKey,prepare,templateSheets,templateCsv} from '../lib/importSpec'
 import {xlsxBlob,download} from '../lib/xlsx'
 
-const ICON={donors:Droplet,members:Users,member_dues:Receipt,donor_events:HeartHandshake,camps:Tent,camp_attendance:UserCheck,meetings:Presentation,meeting_attendance:ClipboardCheck,hospitals:Building2,projects:HeartHandshake,events:PartyPopper}
+const ICON={camp_people:Eye,camp_food:Utensils,camp_saplings:Sprout,donors:Droplet,members:Users,member_dues:Receipt,donor_events:HeartHandshake,camps:Tent,camp_attendance:UserCheck,meetings:Presentation,meeting_attendance:ClipboardCheck,hospitals:Building2,projects:HeartHandshake,events:PartyPopper}
 const TONE={insert:'green',update:'blue',same:'neutral',skip:'amber',error:'red'}
 const WORD={insert:'New',update:'Update',same:'No change',skip:'Skipped',error:'Problem'}
 const REFLABEL={member_id:'Member',donor_id:'Donor',meeting_id:'Meeting',camp_id:'Camp'}

@@ -1,4 +1,5 @@
 import {useEffect,useState} from 'react'
+import {CHECKLIST,DESKS as DESK_BY_TYPE,EXPENSES,typeName} from '../lib/campTypes'
 import {toast} from 'sonner'
 import {Send,Trash2,Pencil,ClipboardList} from 'lucide-react'
 import {supabase} from '../lib/supabase'
@@ -11,13 +12,11 @@ import {sponsorLetter} from '../lib/clubReports'
 import {Mail} from 'lucide-react'
 import WaSend from '../components/wa/WaSend'
 
-const DESKS=['Registration','Screening','Donation','Refreshment','Certificate','Crowd control']
-const CATS=['Refreshments','Printing','Banners','Transport','Sound system','Certificates','Other']
-const CHECK=['Permission letter obtained','Partner blood bank confirmed','Doctors and nurses confirmed','Poster and banners printed','Registration QR shared','Refreshments arranged','Volunteers briefed','Certificates printed','Sound system and seating arranged','Medical equipment checked']
+const CATS=EXPENSES
 const inr=n=>'Rs. '+Number(n||0).toLocaleString('en-IN'),sum=(a,k)=>a.reduce((s,x)=>s+Number(x[k]||0),0)
 const NAME={tasks:'task',camp_volunteers:'volunteer',sponsors:'sponsor',expenses:'expense'}
 
-function Editor({item,close,save,remove}){
+function Editor({item,close,save,remove,camp}){
   const [f,setF]=useState(item.row),set=k=>e=>setF({...f,[k]:e.target.type==='checkbox'?e.target.checked:e.target.value}),t=item.table
   return <Drawer open onClose={close} title={`Edit ${NAME[t]}`}
     footer={<><button className="btn-quiet mr-auto text-blood" onClick={()=>remove(t,item.row)}><Trash2 size={15}/>Delete</button><button className="btn-quiet" onClick={close}>Cancel</button>
@@ -26,7 +25,7 @@ function Editor({item,close,save,remove}){
       {t==='tasks'&&<><Field label="Task" required><input className="input" required value={f.title} onChange={set('title')}/></Field><Field label="Assigned to" required><input required className="input" value={f.assignee||''} onChange={set('assignee')}/></Field>
         <Field label="Due" required><input required type="date" className="input" value={f.due||''} onChange={set('due')}/></Field><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.done} onChange={set('done')}/>Done</label></>}
       {t==='camp_volunteers'&&<><Field label="Name" required><input className="input" required value={f.name} onChange={set('name')}/></Field><Field label="Mobile" required><input required className="input" value={f.phone||''} onChange={set('phone')}/></Field>
-        <Field label="Desk" required><select required className="input" value={f.desk||''} onChange={set('desk')}><option value="">Not set</option>{DESKS.map(x=><option key={x}>{x}</option>)}</select></Field>
+        <Field label="Desk" required><select required className="input" value={f.desk||''} onChange={set('desk')}><option value="">Not set</option>{(DESK_BY_TYPE[camp?.camp_type]||DESK_BY_TYPE['Blood donation']).map(x=><option key={x}>{x}</option>)}</select></Field>
         <Field label="Shift" required><input required className="input" value={f.shift||''} onChange={set('shift')}/></Field><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.attended} onChange={set('attended')}/>Present at the camp</label></>}
       {t==='sponsors'&&<><Field label="Sponsor" required><input className="input" required value={f.name} onChange={set('name')}/></Field><Field label="Amount (Rs.)" required><input required type="number" min="0" className="input" value={f.amount} onChange={set('amount')}/></Field>
         <Field label="Notes"><input className="input" value={f.notes||''} onChange={set('notes')}/></Field><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.received} onChange={set('received')}/>Money received</label></>}
@@ -60,13 +59,13 @@ export default function Planning(){
   if(camps&&!camps.length)return <div><PageHeader title="Camp planning"/><div className="card"><Empty icon={ClipboardList} title="Create a camp first">Planning is kept per camp.</Empty></div></div>
   return <div>
     <PageHeader title="Camp planning" description="Checklist, volunteers, materials, entry passes and money for one camp."
-      actions={camps&&<select aria-label="Camp" className="input w-auto" value={cid} onChange={e=>setCid(e.target.value)}>{camps.map(c=><option key={c.id} value={c.id}>{c.name} ({fmt(c.camp_date)})</option>)}</select>}/>
+      actions={camps&&<select aria-label="Camp" className="input w-auto" value={cid} onChange={e=>setCid(e.target.value)}>{camps.map(c=><option key={c.id} value={c.id}>{c.name} ({fmt(c.camp_date)}) · {typeName(c)}</option>)}</select>}/>
     <Tabs id="plan-tabs" value={tab} onChange={k=>{setTab(k);setF({})}} tabs={[['tasks',`Checklist ${done}/${d.tasks.length}`],['camp_volunteers',`Volunteers ${d.camp_volunteers.length}`],['materials','Materials'],['passes','Entry passes'],['money','Money']]}/>
     {tab==='materials'&&<Materials camp={camp}/>}
     {tab==='passes'&&camp&&<Passes camp={camp} volunteers={d.camp_volunteers}/>}
     {tab==='tasks'&&<div className="card"><div className="mb-4 flex items-center justify-between gap-3"><div className="flex-1"><div className="text-sm text-fog-muted">{done} of {d.tasks.length} done</div>
         <div className="mt-2 h-1.5 max-w-xs overflow-hidden rounded-full bg-ink-700"><div className="h-full rounded-full bg-ok transition-all duration-500" style={{width:(d.tasks.length?done/d.tasks.length*100:0)+'%'}}/></div></div>
-        {!d.tasks.length&&<button className="btn" onClick={()=>add('tasks',CHECK.map(title=>({title})),'Checklist added')}>Add standard checklist</button>}</div>
+        {!d.tasks.length&&<button className="btn" onClick={()=>add('tasks',(CHECKLIST[camp?.camp_type]||CHECKLIST['Blood donation']).map(title=>({title})),'Checklist added')}>Add standard checklist</button>}</div>
       <form className="mb-3 flex flex-wrap gap-2" onSubmit={e=>{e.preventDefault();add('tasks',{title:f.title,assignee:f.assignee||null,due:f.due||null})}}>
         <input className="input w-64" placeholder="New task" required value={v('title')} onChange={set('title')}/><input className="input w-40" placeholder="Assigned to" required value={v('assignee')} onChange={set('assignee')}/>
         <input type="date" className="input w-auto" aria-label="Due date" required value={v('due')} onChange={set('due')}/><button className="btn">Add</button></form>
@@ -75,7 +74,7 @@ export default function Planning(){
         {t.due&&<Badge tone={!t.done&&t.due<=today?'amber':'neutral'}>{fmt(t.due)}</Badge>}<EditBtn t="tasks" row={t}/></div>)}</div>}
     {tab==='camp_volunteers'&&<div className="card"><form className="mb-3 flex flex-wrap gap-2" onSubmit={e=>{e.preventDefault();add('camp_volunteers',{name:f.name,phone:normPhone(f.phone)||null,desk:f.desk||null,shift:f.shift||null})}}>
         <input className="input w-44" placeholder="Name" required value={v('name')} onChange={set('name')}/><input className="input w-36" placeholder="Mobile" required pattern="[6-9][0-9]{9}" title="10-digit mobile" value={v('phone')} onChange={set('phone')}/>
-        <select className="input w-auto" aria-label="Desk" required value={v('desk')} onChange={set('desk')}><option value="">Desk</option>{DESKS.map(x=><option key={x}>{x}</option>)}</select>
+        <select className="input w-auto" aria-label="Desk" required value={v('desk')} onChange={set('desk')}><option value="">Desk</option>{(DESK_BY_TYPE[camp?.camp_type]||DESK_BY_TYPE['Blood donation']).map(x=><option key={x}>{x}</option>)}</select>
         <input className="input w-36" placeholder="Shift, e.g. 8 to 12" required value={v('shift')} onChange={set('shift')}/><button className="btn">Add</button></form>
       {d.camp_volunteers.map(x=><div key={x.id} className="flex flex-wrap items-center gap-3 border-t border-ink-700 py-2.5 text-sm"><input type="checkbox" title="Present" checked={x.attended} onChange={e=>upd('camp_volunteers',x.id,{attended:e.target.checked})}/>
         <span className="code">{code('V',x.volunteer_no,3)}</span><span className="font-medium text-fg">{x.name}</span>{x.desk&&<Badge tone="blue">{x.desk}</Badge>}<span className="text-fog-faint">{x.shift}</span>
@@ -96,6 +95,6 @@ export default function Planning(){
           <select className="input w-auto" aria-label="Category" value={v('cat')} onChange={set('cat')}>{CATS.map(x=><option key={x}>{x}</option>)}</select><input className="input flex-1" placeholder="Details" required value={v('desc')} onChange={set('desc')}/>
           <input className="input w-28" type="number" min="0" required placeholder="Amount" value={v('eamt')} onChange={set('eamt')}/><button className="btn">Add</button></form>
         {d.expenses.map(x=><div key={x.id} className="flex items-center gap-3 border-t border-ink-700 py-2.5 text-sm"><span className="code">{code('EX',x.expense_no)}</span><span className="text-fg">{x.category}</span><span className="truncate text-fog-muted">{x.description}</span><span className="text-fog">{inr(x.amount)}</span><EditBtn t="expenses" row={x}/></div>)}</div></div></div>}
-    {edit&&<Editor item={edit} close={()=>setEdit(null)} save={save} remove={remove}/>}
+    {edit&&<Editor item={edit} camp={camp} close={()=>setEdit(null)} save={save} remove={remove}/>}
   </div>
 }

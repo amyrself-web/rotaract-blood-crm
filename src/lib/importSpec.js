@@ -55,6 +55,30 @@ export const ENTITIES=[
    fields:[F('camp_ref','Camp','ref',{req:true,hint:'Camp ID (C-004), camp date (if only one camp that day) or exact camp name.',ex:'C-001'}),
      F('member_ref','Member','ref',{req:true,hint:'Member ID, mobile or exact name.',ex:'M-001'}),F('status','Attendance','enum',{options:ATT,ex:'Present'}),
      F('late_minutes','Minutes late','int',{ex:''}),F('duty','Duty','text',{ex:'Registration desk'})]},
+  {key:'camp_people',label:'People at eye / cancer / other camps',desc:'Who came, what was found, referrals and follow-up',perm:['camps','campday'],
+   unique:'Same camp + mobile, or the same camp + name + age',
+   fields:[F('camp_ref','Camp','ref',{req:true,hint:'Camp ID (C-004), camp date (if only one camp that day) or exact camp name.',ex:'C-002'}),
+     F('full_name','Full name','text',{req:true,ex:'Muthu'}),F('age','Age','int',{ex:'64'}),F('gender','Gender','enum',{options:GENDER,ex:'Male'}),F('phone','Mobile','phone',{ex:'9876500011'}),
+     F('area','Area / village','text',{ex:'Sankari'}),F('address','Address','text',{ex:''}),
+     F('screenings','Screenings done','list',{hint:'Separate with commas, e.g. Oral cavity check, Breast examination',ex:''}),
+     F('findings','Findings','list',{hint:'Eye: Normal, Refractive error (needs glasses), Cataract, ... Separate with commas.',ex:'Cataract'}),
+     F('actions','What was done','list',{hint:'Eye: Spectacles given, Surgery referral, ... Separate with commas.',ex:'Surgery referral'}),
+     F('result','Result','enum',{options:[['normal','Normal'],['needs_care','Needs care'],['suspicious','Suspicious, refer']],ex:'Needs care'}),
+     F('vision_right','Vision right eye','text',{ex:'6/18'}),F('vision_left','Vision left eye','text',{ex:'6/24'}),F('power','Glasses power','text',{ex:''}),
+     F('referred_to','Referred to','text',{ex:'Aravind Eye Hospital'}),
+     F('follow_up','Follow-up','enum',{options:[['none','No follow-up'],['pending','Follow-up pending'],['done','Followed up'],['not_reachable','Not reachable'],['declined','Declined']],ex:'Follow-up pending'}),
+     F('follow_up_on','Follow-up date','date',{ex:''}),F('notes','Notes','text',{ex:''}),F('consent','Agreed to be contacted','bool',{ex:'Yes'})]},
+  {key:'camp_food',label:'Food distribution',desc:'Where food was served and how many people',perm:['camps','campday'],
+   unique:'Same camp + place + time',
+   fields:[F('camp_ref','Camp','ref',{req:true,hint:'Camp ID, date or exact name.',ex:'C-003'}),F('place','Place','text',{req:true,ex:'Anbu Illam'}),
+     F('group_type','Who','enum',{options:['Orphanage','Old age home','Hospital','Street / roadside','Slum / colony','School','Special home','Other'],ex:'Orphanage'}),
+     F('people','People served','int',{ex:'60'}),F('packets','Packets','int',{ex:'60'}),F('items','Items','text',{ex:'Lemon rice, water'}),F('served_at','Time','time',{ex:'12:30'}),
+     F('served_by','Served by','text',{ex:'Team A'}),F('notes','Notes','text',{ex:''})]},
+  {key:'camp_saplings',label:'Saplings planted',desc:'Species, count, place and who waters them',perm:['camps','campday'],
+   unique:'Same camp + species + place',
+   fields:[F('camp_ref','Camp','ref',{req:true,hint:'Camp ID, date or exact name.',ex:'C-004'}),F('species','Species','text',{req:true,ex:'Neem'}),F('count','Count','int',{req:true,ex:'25'}),
+     F('place','Place','text',{ex:'Govt school'}),F('landmark','Landmark / row','text',{ex:'Near the gate'}),F('lat','Latitude','num',{ex:''}),F('lng','Longitude','num',{ex:''}),
+     F('planted_by','Planted by','text',{ex:'NSS students'}),F('guardian','Who waters','text',{ex:'School watchman'}),F('guardian_phone','Their mobile','phone',{ex:''}),F('notes','Notes','text',{ex:''})]},
   {key:'meetings',label:'Meetings',desc:'Past or planned meetings with minutes',perm:['meetings'],
    unique:'Meeting ID, or the same title + date',
    fields:[F('meeting_no','Meeting ID','code',{hint:'Only to update a meeting already in the CRM (MT-005).',ex:''}),F('title','Title','text',{req:true,ex:'Monthly meeting'}),
@@ -135,6 +159,7 @@ export function cell(f,raw){
       if(f.key==='blood_group')s=s.toUpperCase().replace(/\s/g,'').replace(/POSITIVE|POS|\+VE|VE\+/g,'+').replace(/NEGATIVE|NEG|-VE/g,'-').replace(/^0/,'O')
       if(f.key==='gender'){const g=s.toLowerCase();s=g[0]==='m'||g==='ஆண்'?'Male':g[0]==='f'||g==='பெண்'?'Female':s}
       const n=norm(s),hit=f.options.find(([v,l])=>norm(v)===n||norm(l)===n);return hit?{v:hit[0]}:{e:`"${raw}" is not one of: ${f.options.map(o=>o[1]).join(', ')}`}}
+    case 'list':{const a=String(raw).split(/[,;\n]/).map(x=>x.trim()).filter(Boolean);return {v:a.length?a:null}}
     default:return {v:String(raw).trim()}}}
 
 // turn sheet rows into what the database receives, plus problems found before sending
@@ -149,10 +174,10 @@ export function prepare(e,rows,map){const out=[],errs={}
 // template: sheet 1 = the columns with one example row; sheet 2 = how to fill each column
 export function templateSheets(e){const f=e.fields
   return [{name:e.label,header:true,rows:[f.map(x=>x.label+(x.req?' *':'')),f.map(x=>x.ex??'')],widths:f.map(x=>Math.min(40,Math.max(14,x.label.length+4))),
-      textCols:f.map((x,i)=>['phone','code','text','ref','email','date','time'].includes(x.type)?i:-1).filter(i=>i>=0),
+      textCols:f.map((x,i)=>['phone','code','text','ref','email','date','time','list'].includes(x.type)?i:-1).filter(i=>i>=0),
       lists:Object.fromEntries(f.map((x,i)=>[i,x.type==='enum'?x.options.map(o=>o[1]):x.type==='bool'?['Yes','No']:null]).filter(([,o])=>o))},
     {name:'How to fill',rows:[[`${e.label}: how to fill the sheet`],[],['Column','Needed?','What to write','Example'],
-      ...f.map(x=>[x.label,x.req?'Required':'Optional',x.hint||{date:'Date as DD/MM/YYYY',time:'Time as 09:30 or 6:30 PM',phone:'10-digit mobile number',email:'Email address',int:'Whole number',num:'Amount in rupees, numbers only',bool:'Yes or No',enum:'One of: '+(x.options||[]).map(o=>o[1]).join(', ')}[x.type]||'Text',x.ex??'']),
+      ...f.map(x=>[x.label,x.req?'Required':'Optional',x.hint||{date:'Date as DD/MM/YYYY',time:'Time as 09:30 or 6:30 PM',phone:'10-digit mobile number',email:'Email address',int:'Whole number',num:'Amount in rupees, numbers only',bool:'Yes or No',enum:'One of: '+(x.options||[]).map(o=>o[1]).join(', '),list:'Several values, separated by commas'}[x.type]||'Text',x.ex??'']),
       [],['Duplicates',`A row is the same record when it has the same ${e.unique}. Such rows are skipped, or updated if you choose "Add new and update existing".`],
       ['Empty cells','An empty cell never clears a value that is already in the CRM.'],
       ['Undo','Every import can be undone from the Import page (History).']],

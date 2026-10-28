@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useRef,useState} from 'react'
+import {isBlood,typeName,takesOnline,kindOf} from '../lib/campTypes'
 import {toast} from 'sonner'
 import {Download,Image as ImageIcon,Megaphone,Heart,Star,Siren,BarChart3} from 'lucide-react'
 import {supabase} from '../lib/supabase'
@@ -27,22 +28,30 @@ function frame(inner,{brand,lg,bg='linear-gradient(150deg,#0B1324 0%,#16233F 60%
 // html2canvas draws text low when the line height is 'normal', so every font gets an explicit one
 const tight=h=>h.replace(/font:(\d+) (\d+)px (?!\/)/g,'font:$1 $2px/1.15 ').replace(/font:(\d+) (\d+)px\/1\.02/g,'font:$1 $2px/1.05')
 function postHtml(kind,d,ctx){return tight(postInner(kind,d,ctx))}
+const POSTER={
+  'Blood donation':['BLOOD DONATION CAMP','இரத்த தானம் செய்வோம், உயிர் காப்போம்','Register now','Scan the code · Eat well · Bring a photo ID','உயிர் காத்த உங்களுக்கு நன்றி','to every donor and volunteer at'],
+  'Eye checking':['FREE EYE CHECK-UP CAMP','இலவச கண் பரிசோதனை முகாம்','Register now','Scan the code · Bring old glasses and reports','பார்வை காக்க வந்த அனைவருக்கும் நன்றி','to everyone who came, and to our doctors and volunteers at'],
+  'Cancer awareness':['CANCER AWARENESS CAMP','விழிப்புணர்வே முதல் பாதுகாப்பு','Register for a free check-up','Scan the code · Early check-ups save lives','விழிப்புணர்வுக்குத் துணை நின்றவர்களுக்கு நன்றி','to everyone who joined us, and to our doctors and volunteers at'],
+  'Food donation':['FOOD DONATION DRIVE','பசியில்லா சமூகம் படைப்போம்','Join us','Volunteers and sponsors welcome','பசி போக்கிய கரங்களுக்கு நன்றி','to every volunteer and sponsor of'],
+  'Environment (plantation)':['TREE PLANTATION DRIVE','மரம் வளர்ப்போம், மழை பெறுவோம்','Plant a tree with us','Bring a friend · Wear comfortable clothes','பசுமை காக்க வந்தவர்களுக்கு நன்றி','to every volunteer who planted with us at'],
+  Others:['COMMUNITY CAMP','சேவையே எங்கள் இலக்கு','Join us','Everyone is welcome','கை கொடுத்த அனைவருக்கும் நன்றி','to everyone who joined us at']}
+const posterOf=c=>{const p=POSTER[c?.camp_type]||POSTER.Others;return c?.camp_type==='Others'?[`${typeName(c).toUpperCase()} CAMP`,...p.slice(1)]:p}
 function postInner(kind,d,ctx){
   const {brand}=ctx
   if(kind==='invite'){const c=d.camp;if(!c)return frame(`<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:600 34px ${B};color:#A9B8D6">Choose a camp</div>`,ctx)
     return frame(`<div style="position:absolute;left:72px;right:72px;top:230px">
-      <div style="display:inline-block;padding:6px 22px 16px;border-radius:999px;background:#E11D48;font:800 24px ${F};letter-spacing:3px">BLOOD DONATION CAMP</div>
+      <div style="display:inline-block;padding:6px 22px 16px;border-radius:999px;background:${isBlood(c)?'#E11D48':ctx.brand.brand_color||'#0EA5A4'};font:800 24px ${F};letter-spacing:3px">${esc(posterOf(c)[0])}</div>
       <div style="font:800 ${c.name.length>28?64:76}px/1.05 ${F};margin-top:26px;max-width:930px">${esc(c.name)}</div>
-      <div style="font:700 32px ${TA};color:#FFC9D2;margin-top:18px">இரத்த தானம் செய்வோம், உயிர் காப்போம்</div>
+      <div style="font:700 32px ${TA};color:#FFC9D2;margin-top:18px">${posterOf(c)[1]}</div>
       <div style="display:flex;gap:16px;margin-top:34px;max-width:936px">${[['DATE',fmt(c.camp_date)],['TIME',c.start_time?`${t5(c.start_time)} – ${t5(c.end_time)}`:'All day'],['VENUE',c.venue||'']].filter(x=>x[1]).map(([l,v])=>`<div style="flex:1;border:2px solid #ffffff33;border-radius:22px;padding:18px 22px;background:#ffffff0f"><div style="font:700 18px ${B};letter-spacing:2px;color:#A9B8D6">${l}</div><div style="font:800 ${String(v).length>16?24:30}px ${F};margin-top:6px">${esc(v)}</div></div>`).join('')}</div></div>
       <div style="position:absolute;left:72px;bottom:72px;right:72px;display:flex;align-items:flex-end;justify-content:space-between">
-        <div><div style="font:800 40px ${F}">Register now</div><div style="font:500 24px ${B};color:#A9B8D6;margin-top:6px">Scan the code · Eat well · Bring a photo ID</div>${brand.contact_phone?`<div style="font:700 26px ${B};margin-top:14px">📞 ${esc(brand.contact_phone)}</div>`:''}</div>
-        ${ctx.qr?`<div style="background:#fff;border-radius:26px;padding:16px"><img src="${ctx.qr}" style="width:230px;height:230px"/></div>`:''}</div>`,ctx)}
+        <div><div style="font:800 40px ${F}">${esc(posterOf(c)[2])}</div><div style="font:500 24px ${B};color:#A9B8D6;margin-top:6px">${esc(takesOnline(c)?posterOf(c)[3]:posterOf(c)[3].replace('Scan the code · ',''))}</div>${brand.contact_phone?`<div style="font:700 26px ${B};margin-top:14px">📞 ${esc(brand.contact_phone)}</div>`:''}</div>
+        ${ctx.qr&&takesOnline(c)?`<div style="background:#fff;border-radius:26px;padding:16px"><img src="${ctx.qr}" style="width:230px;height:230px"/></div>`:''}</div>`,ctx)}
   if(kind==='thanks'){const c=d.camp,s=d.stats||{};if(!c)return frame('',ctx)
     return frame(`<div style="position:absolute;left:72px;right:72px;top:250px;text-align:center">
-      <div style="font:800 120px/1 ${F}">THANK YOU</div><div style="font:700 44px ${TA};color:#FFC9D2;margin-top:40px">உயிர் காத்த உங்களுக்கு நன்றி</div>
-      <div style="font:500 30px ${B};color:#C9D4EA;margin-top:26px">to every donor and volunteer at <b style="color:#fff">${esc(c.name)}</b>, ${fmt(c.camp_date)}</div>
-      <div style="display:flex;gap:22px;justify-content:center;margin-top:56px">${[[s.donated||0,'units collected'],[(s.donated||0)*3,'lives touched'],[s.registered||0,'came forward']].map(([n,l])=>`<div style="width:280px;border-radius:28px;padding:26px;background:#ffffff12;border:2px solid #ffffff2a"><div style="font:800 84px ${F};color:#FF8796">${n}</div><div style="font:600 24px ${B};color:#C9D4EA;margin-top:16px">${l}</div></div>`).join('')}</div></div>`,ctx)}
+      <div style="font:800 120px/1 ${F}">THANK YOU</div><div style="font:700 44px ${TA};color:#FFC9D2;margin-top:40px">${posterOf(c)[4]}</div>
+      <div style="font:500 30px ${B};color:#C9D4EA;margin-top:26px">${esc(posterOf(c)[5])} <b style="color:#fff">${esc(c.name)}</b>, ${fmt(c.camp_date)}</div>
+      <div style="display:flex;gap:22px;justify-content:center;margin-top:56px">${(s.tiles||[[s.donated||0,'units collected'],[(s.donated||0)*3,'lives touched'],[s.registered||0,'came forward']]).map(([n,l])=>`<div style="width:280px;border-radius:28px;padding:26px;background:#ffffff12;border:2px solid #ffffff2a"><div style="font:800 84px ${F};color:#FF8796">${n}</div><div style="font:600 24px ${B};color:#C9D4EA;margin-top:16px">${l}</div></div>`).join('')}</div></div>`,ctx)}
   if(kind==='star'){const x=d.donor;if(!x)return frame(`<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:600 34px ${B};color:#A9B8D6">Choose a donor</div>`,ctx)
     const ini=String(x.name).split(' ').map(s=>s[0]).slice(0,2).join('')
     return frame(`<div style="position:absolute;left:72px;right:72px;top:220px;text-align:center">
@@ -74,7 +83,13 @@ export default function PostMaker(){
     supabase.rpc('public_impact').then(({data})=>setImpact(data))},[])
   const camp=camps.find(c=>c.id===cid)
   useEffect(()=>{if(!camp)return;brandQr(`${siteUrl()}#/register/${camp.id}`,brand,{size:520,quiet:1}).then(setQr)
-    supabase.from('registrations').select('status').eq('camp_id',camp.id).then(({data})=>setStats({registered:(data||[]).length,donated:(data||[]).filter(r=>r.status==='donated').length}))},[cid])
+    if(isBlood(camp))supabase.from('registrations').select('status').eq('camp_id',camp.id).then(({data})=>setStats({registered:(data||[]).length,donated:(data||[]).filter(r=>r.status==='donated').length}))
+    else supabase.rpc('camp_summary',{p_camp:camp.id}).then(({data:x})=>{if(!x)return setStats({tiles:[[camp.beneficiaries||0,'people helped']]});const k=kindOf(camp),t=x.team
+      setStats({tiles:k==='food'?[[x.food.people,'people fed'],[x.food.packets,'food packets'],[x.food.points,'places reached']]
+        :k==='plants'?[[x.plants.planted,'saplings planted'],[x.plants.batches,'places greened'],[t.members_present+t.volunteers_present,'volunteers']]
+        :camp.camp_type==='Eye checking'?[[x.people.attended,'people screened'],[x.people.actions?.['Spectacles given']||0,'spectacles given'],[x.people.referred,'referred for care']]
+        :camp.camp_type==='Cancer awareness'?[[x.people.attended,'people screened'],[(x.sessions||[]).reduce((a,y)=>a+(y.attendees||0),0),'heard the talks'],[x.people.referred,'referred for care']]
+        :[[camp.beneficiaries||x.people.attended,'people helped'],[t.members_present,'members'],[t.volunteers_present,'volunteers']]})})},[cid])
   const html=useMemo(()=>postHtml(kind,{camp,stats,donor,urgent,impact},{brand,lg,qr}),[kind,camp,stats,donor,urgent,impact,lg,qr])
   const save=async()=>{setBusy(true);try{const {default:html2canvas}=await import('html2canvas');await document.fonts?.ready
       const el=hidden.current,cv=await html2canvas(el.firstElementChild,{scale:1,width:1080,height:1080,windowWidth:1080,windowHeight:1080,backgroundColor:null,logging:false})

@@ -1,4 +1,5 @@
 import {useEffect,useState} from 'react'
+import {KITS} from '../lib/campTypes'
 import {toast} from 'sonner'
 import {Package,Plus,Trash2,FileText,BadgeCheck,Printer} from 'lucide-react'
 import {supabase} from '../lib/supabase'
@@ -9,7 +10,7 @@ import {buildPdf,rs} from '../lib/docpdf'
 import {entryPasses} from '../lib/cards'
 
 const CATS=['Banners and printing','Medical supplies','Refreshments','Certificates and gifts','Stationery','Furniture and setup','Other']
-const SOURCES=['To buy','Sponsored','Borrowed','Blood bank','Club stock']
+const SOURCES=['To buy','Sponsored','Borrowed','Blood bank','Club stock','Partner']
 const STATUS=[['needed','Needed','amber'],['arranged','Arranged','blue'],['at venue','At venue','green'],['returned','Returned','neutral']]
 // a standard kit for a blood donation camp; quantities are a starting point for about 100 donors
 const KIT=[['Flex banner (main entrance)','Banners and printing',1,'nos','To buy'],['Standee with registration QR','Banners and printing',2,'nos','To buy'],['Direction boards','Banners and printing',4,'nos','To buy'],
@@ -24,7 +25,7 @@ export function Materials({camp,canEdit=true}){
   const load=()=>camp&&supabase.from('camp_materials').select('*').eq('camp_id',camp.id).order('category').order('item_no').then(({data,error})=>error?toast.error(error.message):setRows(data))
   useEffect(()=>{setRows(null);load()},[camp?.id]);useLive(['camp_materials'],load)
   const add=async e=>{e.preventDefault();const r=await supabase.from('camp_materials').insert({...f,qty_needed:Number(f.qty_needed),camp_id:camp.id});if(r.error)return toast.error(r.error.message);setF({...f,item:'',qty_needed:1,responsible:''});load()}
-  const kit=async()=>{const r=await supabase.from('camp_materials').insert(KIT.map(([item,category,qty_needed,unit,source])=>({camp_id:camp.id,item,category,qty_needed,unit,source})));if(r.error)return toast.error(r.error.message);toast.success(`${KIT.length} standard items added. Change the numbers to suit your camp.`);load()}
+  const kit=async()=>{const K=camp.camp_type&&camp.camp_type!=='Blood donation'?(KITS[camp.camp_type]||KITS.Others):KIT;const r=await supabase.from('camp_materials').insert(K.map(([item,category,qty_needed,unit,source])=>({camp_id:camp.id,item,category,qty_needed,unit,source})));if(r.error)return toast.error(r.error.message);toast.success(`${(camp.camp_type&&camp.camp_type!=='Blood donation'?(KITS[camp.camp_type]||KITS.Others):KIT).length} standard items added. Change the numbers to suit your camp.`);load()}
   const upd=async(m,p)=>{setRows(x=>x.map(y=>y.id===m.id?{...y,...p}:y));const r=await supabase.from('camp_materials').update(p).eq('id',m.id);if(r.error){toast.error(r.error.message);load()}}
   const del=async m=>{const r=await supabase.from('camp_materials').delete().eq('id',m.id);if(r.error)return toast.error(r.error.message);load()
     undoToast(`${m.item} removed`,async()=>{const x=await supabase.from('camp_materials').insert(m);if(x.error)throw x.error;load()})}

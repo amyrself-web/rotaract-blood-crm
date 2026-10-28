@@ -21,7 +21,7 @@ export default function Impact(){
   const share=async()=>{const url=location.href;try{if(navigator.share)await navigator.share({title:brand.club_name,url});else{await navigator.clipboard.writeText(url);toast.success(t('Link copied'))}}catch{}}
   const big=d?[[Droplet,t('Units of blood collected'),d.units,'from-blood to-rose-700'],[HeartPulse,t('Lives touched'),d.units*3,'from-rose-500 to-pink-600']]:[]
   const small=d?[[Users,t('Registered donors'),d.donors],[Tent,t('Blood camps held'),d.camps],[Eye,t('Eye donations'),d.eye],[HandHeart,t('Pledges'),d.pledges],
-    [FolderHeart,t('Service projects done'),d.projects],[Users,t('People helped'),d.helped],[Clock,t('Volunteer hours'),Math.round(d.hours)],[Users,t('Active members'),d.members]]:[]
+    [FolderHeart,t('Service projects done'),d.projects],[Users,t('People helped'),d.helped],...(d.eye_screened?[[Eye,t('Eye check-ups'),d.eye_screened]]:[]),...(d.spectacles?[[Eye,t('Spectacles given'),d.spectacles]]:[]),...(d.cancer_screened?[[HeartPulse,t('Cancer screenings'),d.cancer_screened]]:[]),...(d.meals?[[HandHeart,t('Meals served'),d.meals]]:[]),...(d.saplings?[[FolderHeart,t('Saplings planted'),d.saplings]]:[]),[Clock,t('Volunteer hours'),Math.round(d.hours)],[Users,t('Active members'),d.members]]:[]
   const maxG=d?.by_group?Math.max(1,...Object.values(d.by_group)):1,maxM=d?.by_month?.length?Math.max(...d.by_month.map(x=>x.n)):1
   return <div className="relative min-h-screen overflow-hidden px-5 py-10">
     <div aria-hidden className="pointer-events-none absolute -top-20 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-blood/20 blur-3xl"/>

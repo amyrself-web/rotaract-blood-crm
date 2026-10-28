@@ -15,6 +15,10 @@ async function all(table,cols,f){let out=[],from=0;for(;;){let q=supabase.from(t
 
 const STARTERS=[
   ['Camp invite','Hello {name}! {club} is holding a blood donation camp: {camp} on {date} at {venue}. One donation can save three lives. Register here: {link}'],
+  ['Eye camp invite','Hello {name}! {club} is holding a free eye check-up camp: {camp} on {date} at {venue}. Bring elders and family who need an eye check. Register here: {link}'],
+  ['Cancer camp invite','Hello {name}! {club} invites you to a cancer awareness and free check-up camp: {camp} on {date} at {venue}. Early check-ups save lives. Register here: {link}'],
+  ['Plantation call','Hello {name}! Join {club} to plant trees: {camp} on {date} at {venue}. Bring a friend! Reply YES to join.'],
+  ['Food drive call','Hello {name}! {club} is serving food to people in need: {camp} on {date}. Join us as a volunteer or sponsor. Reply YES to help.'],
   ['Urgent need','Hello {name}, {bloodgroup} blood is urgently needed. If you are able to donate in the next few days, please reply to this message. - {club}'],
   ['Thank you','Dear {name}, thank you for being a blood donor with {club}. Because of donors like you, patients in our town get blood on time.'],
   ['Club news','Hello {name}, news from {club}: ']]

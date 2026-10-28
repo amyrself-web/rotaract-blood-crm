@@ -1,5 +1,10 @@
 import {toast} from 'sonner'
-import {useLive,code,adultMax,adultMin,useConfirm,PageHeader} from '../components/ui'
+import {useLive,code,adultMax,adultMin,useConfirm,PageHeader,Tabs,Badge} from '../components/ui'
+import Team from '../components/camp/Team'
+import People from '../components/camp/People'
+import Summary,{tilesOf} from '../components/camp/Summary'
+import {Food,Saplings,Sessions} from '../components/camp/Records'
+import {isBlood,kindOf,typeName} from '../lib/campTypes'
 import {celebrate} from '../lib/fx'
 import {useEffect,useRef,useState} from 'react'
 import {UserPlus,Undo2,Search,WifiOff,CloudUpload,X} from 'lucide-react'
@@ -72,8 +77,9 @@ function overlay(rows,queue,cid){
 export default function CampDay(){
   const {can}=useAuth(),medic=can('screening'),confirm=useConfirm()
   const [camps,setCamps]=useState([]),[cid,setCid]=useState(''),[rows,setRows]=useState([]),[q,setQ]=useState(''),[f,setF]=useState(''),[act,setAct]=useState(null),[err,setErr]=useState('')
+  const [dtab,setDtab]=useState('main')
   const [queue,setQueue]=useState(readQueue()),[offline,setOffline]=useState(!navigator.onLine),[syncing,setSyncing]=useState(false)
-  useEffect(()=>{supabase.from('camps').select('*').in('status',['open','live']).eq('camp_type','Blood donation').is('deleted_at',null).order('camp_date').then(r=>r,e=>({data:null,error:e})).then(({data,error})=>{
+  useEffect(()=>{supabase.from('camps').select('*').in('status',['open','live']).is('deleted_at',null).order('camp_date').then(r=>r,e=>({data:null,error:e})).then(({data,error})=>{
     if(error){if(!isNetError(error))return setErr(error.message);data=cacheGet('campday-camps')||[];setOffline(true)}else cacheSet('campday-camps',data)
     setCamps(data);const p=data.find(c=>c.status==='live')||data[0];if(p)setCid(p.id)})},[])
   const load=async()=>{if(!cid)return;const w=await supabase.rpc('camp_board',{p_camp:cid}).then(r=>r,e=>({error:e}))
@@ -109,8 +115,14 @@ export default function CampDay(){
     {medic&&r.status==='screened'&&<button className="btn px-3 py-1.5" onClick={()=>setAct({type:'donate',row:r})}>Record<span className="hidden sm:inline">&nbsp;donation</span></button>}
     {medic&&['screened','deferred','donated'].includes(r.status)&&<button className="btn-ghost text-xs" title="Entered by mistake? Take this donor back one step" aria-label="Take back one step" onClick={()=>takeBack(r)}><Undo2 size={14}/></button>}</>
   if(!camps.length)return <div className="card text-center text-fog-muted">No open or live camp. Set a camp to Open or Live on the Camps page.</div>
+  const pick=<select className="input w-auto min-w-0 max-w-full truncate sm:max-w-sm" aria-label="Camp" value={cid} onChange={e=>{setCid(e.target.value);setDtab('main')}}>{camps.map(c=><option key={c.id} value={c.id}>{c.name} ({fmt(c.camp_date)}){isBlood(c)?'':` · ${typeName(c)}`}</option>)}</select>
+  if(camp&&!isBlood(camp)){const k=kindOf(camp),main={people:'People',food:'Food served',plants:'Saplings'}[k]
+    return <div><PageHeader eyebrow="Camp work" title="Camp day" description={`${typeName(camp)} · ${camp.name}${camp.venue?' · '+camp.venue:''}`} actions={pick}/>
+      <Tabs id="day-tabs" value={dtab} onChange={setDtab} tabs={[['main',main],...(camp.camp_type==='Cancer awareness'?[['talks','Talks']]:[]),['team','Team'],['summary','Summary']]}/>
+      <div className="card">{dtab==='main'?(k==='people'?<People camp={camp} day/>:k==='food'?<Food camp={camp}/>:<Saplings camp={camp}/>)
+        :dtab==='talks'?<Sessions camp={camp}/>:dtab==='team'?<Team camp={camp}/>:<Summary camp={camp} onClosed={()=>{const rest=camps.filter(c=>c.id!==camp.id);setCamps(rest);setCid(rest[0]?.id||'');setDtab('main')}}/>}</div></div>}
   return <div>
-    <PageHeader eyebrow="Camp work" title="Camp day" description={camp?`${camp.name} · ${camp.venue||''}`:''} actions={<><select className="input w-auto min-w-0 max-w-full truncate sm:max-w-sm" aria-label="Camp" value={cid} onChange={e=>setCid(e.target.value)}>{camps.map(c=><option key={c.id} value={c.id}>{c.name} ({fmt(c.camp_date)}, {c.status})</option>)}</select>
+    <PageHeader eyebrow="Camp work" title="Camp day" description={camp?`${camp.name} · ${camp.venue||''}`:''} actions={<>{pick}
         {can('campday')&&<button className="btn" onClick={()=>setAct({type:'walk'})}><UserPlus size={16}/>Walk-in</button>}</>}/>
     {(offline||mine.length>0)&&<div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${offline?'border-warn/40 bg-warn/10':'border-brand/40 bg-brand/10'}`}>
       <div className="flex flex-wrap items-center gap-3">{offline?<WifiOff size={18} className="text-warn"/>:<CloudUpload size={18} className="text-brand"/>}
@@ -122,6 +134,10 @@ export default function CampDay(){
       <div className="grid grid-cols-3 gap-4 text-center sm:grid-cols-6">{[['Registered',shown.length],['Arrived',arrived],['Cleared',by('screened')],['Donated',donated.length],['Deferred',by('deferred')],['Blood collected',litres+' L']].map(([l,n])=><div key={l}><div className="text-2xl font-semibold tabular-nums text-fg"><CountUp value={n}/></div><div className="text-xs text-fog-muted">{l}</div></div>)}</div>
       {camp?.target_donors&&<div className="mt-4"><div className="h-2 overflow-hidden rounded-full bg-ink-700"><div className="h-full rounded-full bg-gradient-to-r from-rose-700 to-blood transition-all duration-700" style={{width:Math.min(100,donated.length/camp.target_donors*100)+'%'}}/></div><div className="mt-1 text-xs text-fog-muted">{donated.length} of {camp.target_donors} target donors</div></div>}
       <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-8">{BLOOD.map(b=><div key={b} className="tile py-2 text-center"><div className="font-semibold text-blood">{b}</div><div className="text-lg tabular-nums text-fg"><CountUp value={donated.filter(r=>r.blood_group===b).length}/></div></div>)}</div></div>
+    <Tabs id="day-tabs" value={dtab} onChange={setDtab} tabs={[['main','Donors'],['team','Team'],['summary','Summary']]}/>
+    {dtab==='team'&&camp&&<div className="card"><Team camp={camp}/></div>}
+    {dtab==='summary'&&camp&&<div className="card"><Summary camp={camp} onClosed={()=>{const rest=camps.filter(c=>c.id!==camp.id);setCamps(rest);setCid(rest[0]?.id||'');setDtab('main')}}/></div>}
+    {dtab==='main'&&<>
     {act?.type==='walk'&&<Walk camp={cid} run={run} close={()=>setAct(null)}/>}
     {act?.type==='screen'&&<Screen row={act.row} run={run} close={()=>setAct(null)}/>}
     {act?.type==='donate'&&<Donate row={act.row} run={run} close={()=>setAct(null)}/>}
@@ -145,5 +161,5 @@ export default function CampDay(){
             <div className="mt-0.5 truncate text-xs"><span className={`font-medium ${TONE[r.status]}`}>{LABEL[r.status]}</span><span className="text-fog-faint">{r.slot?` · ${r.slot}`:''}{r.bag_number?` · ${r.bag_number}`:''}</span></div></div>
           <div className="flex shrink-0 items-center gap-1">{actions(r)}</div></li>)}
         {!list.length&&<li className="p-6 text-center text-sm text-fog-faint">No donors here yet.</li>}</ul>
-    </div></div>
+    </div></>}</div>
 }
