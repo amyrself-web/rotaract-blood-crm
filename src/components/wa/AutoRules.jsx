@@ -11,7 +11,7 @@ const RULES=[
   ['birthday',Cake,'Birthday wishes','Donors whose birthday is today.'],
   ['member_birthday',Users,'Member birthday wishes','Club members whose birthday is today.'],
   ['eligible_again',HeartPulse,'Can donate again','When 3 months (men) or 4 months (women) have passed since the last donation.'],
-  ['reminder_1d',CalendarClock,'Camp reminder, day before','Everyone registered for tomorrow’s camp, with their slot.'],
+  ['reminder_1d',CalendarClock,'Camp reminder, day before','Everyone registered for tomorrow’s camp: blood donors with their slot, and people at eye, cancer and other camps with their token.'],
   ['reminder_today',Sun,'Camp reminder, morning','Everyone registered for today’s camp, at 7 am.'],
   ['followup',Award,'Next-day thank-you with certificate','The day after a camp, every donor gets a thank-you, a “drink water” reminder and a link to download their certificate.'],
   ['meeting_1d',Presentation,'Meeting reminder for members','Active club members, the day before each meeting.']]

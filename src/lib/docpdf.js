@@ -59,9 +59,13 @@ export async function letterhead(doc,{brand={},label,heading,subtitle,meta=[],W,
   doc.setFont(F,'bold').setFontSize(15).setTextColor(...NAVY).text(club,x,19)
   doc.setFont(F,'normal').setFontSize(8).setTextColor(...MUTED)
   doc.text([brand.address||'Blood donation and community service',brand.reg_no?`Reg. no. ${brand.reg_no}`:''].filter(Boolean),x,24)
+  // the international / district logo sits on the far right; contact details move in beside it
+  const il=brand.intl_logo_url?await logoImage(brand.intl_logo_url):null,rx=il?W-M-22:W-M
+  try{if(il){placeLogo(doc,il,W-M-18,brand.intl_logo_label?10.5:11.5,18)
+    if(brand.intl_logo_label)doc.setFont(F,'normal').setFontSize(5.6).setTextColor(...MUTED).text(doc.splitTextToSize(brand.intl_logo_label,26).slice(0,2),W-M-9,31,{align:'center'})}}catch(e){console.warn(e)}
   const contact=[brand.contact_phone&&['Phone',brand.contact_phone],brand.contact_email&&['Email',brand.contact_email]].filter(Boolean)
-  contact.forEach(([k,v],i)=>{doc.setFont(F,'semibold').setFontSize(7).setTextColor(...accent).text(k.toUpperCase(),W-M,16+i*7.5,{align:'right'})
-    doc.setFont(F,'normal').setFontSize(8.5).setTextColor(...INK).text(v,W-M,19.6+i*7.5,{align:'right'})})
+  contact.forEach(([k,v],i)=>{doc.setFont(F,'semibold').setFontSize(7).setTextColor(...accent).text(k.toUpperCase(),rx,16+i*7.5,{align:'right'})
+    doc.setFont(F,'normal').setFontSize(8.5).setTextColor(...INK).text(v,rx,19.6+i*7.5,{align:'right'})})
   // two-tone rule under the letterhead
   doc.setDrawColor(...LINE).setLineWidth(.3).line(M,34,W-M,34)
   doc.setFillColor(...BLOOD).rect(M,33.2,26,1.6,'F');doc.setFillColor(...accent).rect(M+26,33.2,10,1.6,'F')

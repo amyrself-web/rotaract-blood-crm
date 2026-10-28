@@ -53,7 +53,8 @@ function seal(club,accent){const t=`${club}  ·  WITH GRATITUDE  ·  `.toUpperCa
     <g transform="translate(46 46) scale(.36)"><path d="M50 6C50 6 18 46 18 66a32 32 0 0 0 64 0C82 46 50 6 50 6z" fill="#C81E3A"/></g>
 </svg>`}
 
-function page(c,brand,lang,lg){
+function page(c,brand,lang,lg,il){
+  const intl=il?`<div style="width:72px;height:72px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:14px"><img src="${il.data}" style="max-width:66px;max-height:66px"/></div>`:''
   const T=TXT[lang],ta=lang==='ta',accent=brand.brand_color||'#4C8DFF',club=brand.club_name||''
   const fmtD=d=>d?new Date(d).toLocaleDateString(ta?'ta-IN':'en-IN',{day:'numeric',month:'long',year:'numeric'}):'-'
   const kinds=(c.kinds||['eye'])
@@ -73,7 +74,7 @@ function page(c,brand,lang,lg){
         <div style="width:72px;height:72px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${logo}</div>
         <div style="flex:1;min-width:0"><div style="font:800 21px Manrope,sans-serif;color:#0B1324;letter-spacing:-.2px">${esc(club)}</div>
           <div style="font:500 12px Manrope,sans-serif;color:#6B778C;margin-top:3px">${esc([brand.address,brand.reg_no&&('Reg. no. '+brand.reg_no)].filter(Boolean).join('  ·  ')||'Blood donation and community service')}</div></div>
-        <div style="text-align:right;font:500 11.5px/1.6 Manrope,sans-serif;color:#3A4558">${contact}</div></div>
+        <div style="text-align:right;font:500 11.5px/1.6 Manrope,sans-serif;color:#3A4558">${contact}</div>${intl}</div>
       <div style="position:relative;height:3px;margin-top:14px;border-bottom:1px solid #E3E7EF"><div style="position:absolute;left:0;top:0;width:90px;height:3px;background:#C81E3A"></div><div style="position:absolute;left:90px;top:0;width:34px;height:3px;background:${accent}"></div></div>
       <div style="display:flex;justify-content:space-between;margin-top:12px;font:500 12px ${body};color:#6B778C">
         <span>${esc(T.refl)}: <b style="color:#0B1324;font-family:Manrope,sans-serif">${ref(c.case_no)}</b></span><span>${esc(T.date)}: <b style="color:#0B1324">${esc(fmtD(new Date()))}</b></span></div>
@@ -106,10 +107,11 @@ export async function gratitudeLetterHtml(c,brand={},lang='en'){
   await Promise.all([document.fonts?.load("400 16px 'Noto Serif Tamil'",'தமிழ்'),document.fonts?.load("700 16px 'Noto Serif Tamil'",'தமிழ்'),
     document.fonts?.load("600 16px 'Cormorant Garamond'",'Aa'),document.fonts?.load("italic 600 16px 'Cormorant Garamond'",'Aa')].map(p=>p?.catch?.(()=>{})))
   const lg=await logoImage(brand.logo_url)
+  const il=brand.intl_logo_url?await logoImage(brand.intl_logo_url):null
   const pdf=new jsPDF({orientation:'portrait',unit:'px',format:[W,H],hotfixes:['px_scaling']})
   for(let i=0;i<langs.length;i++){
     const el=document.createElement('div');el.style.cssText=`position:fixed;left:-13000px;top:0;width:${W}px;height:${H}px`
-    el.innerHTML=page(c,brand,langs[i],lg);el.setAttribute('translate','no');document.body.appendChild(el)
+    el.innerHTML=page(c,brand,langs[i],lg,il);el.setAttribute('translate','no');document.body.appendChild(el)
     try{await document.fonts?.ready
       // long letters (for example eyes and body together) get slightly smaller text so nothing is cut off
       const b=el.querySelector('[data-body]');let fs=parseFloat(getComputedStyle(b).fontSize)

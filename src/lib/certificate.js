@@ -30,6 +30,8 @@ export async function makeCertificate({name,camp,date,venue,bloodGroup,volume,ce
   const accent=brand.brand_color||'#4C8DFF'
   const club=brand.club_name||'Blood donation club'
   const lg=await logoImage(brand.logo_url),fit=lg?Math.min(70/lg.w,70/lg.h):1
+  const il=brand.intl_logo_url?await logoImage(brand.intl_logo_url):null
+  const intl=il?`<div style="margin-left:auto;display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0"><div style="width:76px;height:76px;border-radius:16px;background:#fff;box-shadow:0 4px 14px rgba(11,19,36,.12);display:flex;align-items:center;justify-content:center"><img src="${il.data}" style="max-width:64px;max-height:64px"/></div>${brand.intl_logo_label?`<div style="font:500 10px Manrope,sans-serif;color:#5D6E8F;max-width:130px;text-align:center">${esc(brand.intl_logo_label)}</div>`:''}</div>`:''
   const logo=lg?`<div style="width:84px;height:84px;border-radius:18px;background:#fff;box-shadow:0 4px 14px rgba(11,19,36,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0"><img src="${lg.data}" style="width:${Math.round(lg.w*fit)}px;height:${Math.round(lg.h*fit)}px"/></div>`
     :`<svg width="64" height="64" viewBox="0 0 100 100"><path d="${DROP}" fill="#E11D48"/><path d="M38 64a12 12 0 0 0 12 12" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" opacity=".8"/></svg>`
   const sign=(n,t)=>n||t?`<div style="text-align:center;width:210px"><div style="height:44px"></div><div style="border-top:1.5px solid #0B1324;padding-top:8px;font:600 15px Sora,sans-serif;color:#0B1324">${esc(n||'')}</div>
@@ -51,7 +53,7 @@ export async function makeCertificate({name,camp,date,venue,bloodGroup,volume,ce
   <div style="position:absolute;left:215px;right:60px;top:62px;bottom:56px;display:flex;flex-direction:column">
     <div style="display:flex;align-items:center;gap:18px">${logo}
       <div><div style="font:700 24px Sora,sans-serif;color:#0B1324;letter-spacing:-.3px">${esc(club)}</div>
-        <div style="font:500 13px Manrope,sans-serif;color:#5D6E8F;margin-top:3px">${esc([brand.address,brand.reg_no&&('Reg. '+brand.reg_no)].filter(Boolean).join(' · ')||'Blood donation camp')}</div></div></div>
+        <div style="font:500 13px Manrope,sans-serif;color:#5D6E8F;margin-top:3px">${esc([brand.address,brand.reg_no&&('Reg. '+brand.reg_no)].filter(Boolean).join(' · ')||'Blood donation camp')}</div></div>${intl}</div>
     <div style="margin-top:42px;font:600 13px Manrope,sans-serif;letter-spacing:4px;color:#B4233A">${esc(v?.label||'CERTIFICATE OF APPRECIATION')}</div>
     <div style="font:700 44px Sora,sans-serif;color:#0B1324;letter-spacing:-1px;margin-top:6px;line-height:1.05">${esc(v?.headline||'Thank you for giving blood')}</div>
     <div style="font:500 16px Manrope,sans-serif;color:#45546F;margin-top:22px">${esc(v?.intro||'This certificate is proudly presented to')}</div>
@@ -65,7 +67,7 @@ export async function makeCertificate({name,camp,date,venue,bloodGroup,volume,ce
       <div style="flex:1"></div>
       <div style="text-align:center"><img src="${qr}" style="width:96px;height:96px"/><div style="font:600 10.5px Manrope,sans-serif;color:#5D6E8F;margin-top:6px">${esc(v?.qrCaption||'Scan to verify')}</div><div style="font:700 10.5px 'Courier New',monospace;color:#0B1324;margin-top:2px;letter-spacing:.5px">${esc(fmtCode(check))}</div></div></div>
   </div>
-  <div style="position:absolute;right:66px;top:150px">${seal(v?.sealText)}</div>`
+  <div style="position:absolute;right:66px;top:${il?196:150}px">${seal(v?.sealText)}</div>`
   el.setAttribute('translate','no');document.body.appendChild(el)   // printed as designed, never swapped to Tamil on screen
   try{
     await Promise.all([...el.querySelectorAll('img')].map(i=>i.complete?0:new Promise(r=>{i.onload=i.onerror=r})))

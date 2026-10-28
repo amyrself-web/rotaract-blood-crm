@@ -9,30 +9,31 @@ import {PageHeader,Field} from '../components/ui'
 
 const num=v=>v===''||v===null||v===undefined?null:Number(v)
 export default function SettingsPage(){
-  const {settings,setSettings}=useAuth(),{brand,refreshBrand,mode,setMode}=useBrand(),file=useRef()
+  const {settings,setSettings}=useAuth(),{brand,refreshBrand,mode,setMode}=useBrand(),file=useRef(),file2=useRef()
   const [f,setF]=useState({...settings}),[th,setTh]=useState({}),[busy,setBusy]=useState(false),[up,setUp]=useState(false),missing=!settings.id
   useEffect(()=>{supabase.from('stock_thresholds').select('*').then(({data})=>setTh(Object.fromEntries((data||[]).map(x=>[x.blood_group,x.min_units]))))},[])
   useEffect(()=>()=>applyAccent(brand.brand_color),[brand.brand_color])
   const set=k=>e=>setF({...f,[k]:e.target.value})
   const pickColor=c=>{setF({...f,brand_color:c});applyAccent(c)}
-  const upload=async e=>{const fl=e.target.files?.[0];if(!fl)return;e.target.value=''
+  const upload=async(e,field='logo_url')=>{const fl=e.target.files?.[0];if(!fl)return;e.target.value=''
     if(!['image/png','image/jpeg','image/webp'].includes(fl.type))return toast.error('Use a PNG, JPG or WEBP image')
     if(fl.size>2*1024*1024)return toast.error('Logo must be smaller than 2 MB')
-    setUp(true);const path=`logo-${Date.now()}.${fl.name.split('.').pop().toLowerCase()}`
+    setUp(field);const path=`${field==='logo_url'?'logo':'intl-logo'}-${Date.now()}.${fl.name.split('.').pop().toLowerCase()}`
     const {error}=await supabase.storage.from('branding').upload(path,fl,{upsert:true,contentType:fl.type,cacheControl:'3600'})
     if(error){setUp(false);return toast.error(/row-level security|not authorized|403/i.test(error.message)?'Only people with the Settings permission can upload the logo.':error.message)}
     // save the new logo straight away so it is used everywhere without a second click
-    const logo_url=supabase.storage.from('branding').getPublicUrl(path).data.publicUrl
-    const r=await supabase.from('settings').update({logo_url}).eq('id',1);setUp(false)
+    const url=supabase.storage.from('branding').getPublicUrl(path).data.publicUrl
+    const r=await supabase.from('settings').update({[field]:url}).eq('id',1);setUp(false)
     if(r.error)return toast.error(r.error.message)
-    setF(x=>({...x,logo_url}));setSettings?.(s=>({...s,logo_url}));refreshBrand?.();toast.success('Logo uploaded and saved. It now shows in the app, reports and certificates.')}
+    setF(x=>({...x,[field]:url}));setSettings?.(s=>({...s,[field]:url}));refreshBrand?.()
+    toast.success(field==='logo_url'?'Logo uploaded and saved. It now shows in the app, reports and certificates.':'International logo saved. It now shows on the right of reports, letters and certificates.')}
   const save=async e=>{e.preventDefault()
     if(!f.brand_name?.trim())return toast.error('Enter a CRM name')
     if(!/^#[0-9a-f]{6}$/i.test(f.brand_color||''))return toast.error('Pick a colour')
     for(const [k,l,min] of [['min_hb','Lowest Hb',5],['min_weight','Lowest weight',30],['gap_male','Gap for men',1],['gap_female','Gap for women',1],['expiry_days','Days until expiry',1]])
       if(num(f[k])===null||num(f[k])<min)return toast.error(`${l} must be at least ${min}`)
     setBusy(true)
-    const row={club_name:f.club_name?.trim(),brand_name:f.brand_name.trim(),tagline:f.tagline?.trim()||null,logo_url:f.logo_url||null,brand_color:f.brand_color,
+    const row={club_name:f.club_name?.trim(),brand_name:f.brand_name.trim(),tagline:f.tagline?.trim()||null,logo_url:f.logo_url||null,intl_logo_url:f.intl_logo_url||null,intl_logo_label:f.intl_logo_label?.trim()||null,brand_color:f.brand_color,
       address:f.address||null,contact_phone:f.contact_phone||null,contact_email:f.contact_email||null,signatory_name:f.signatory_name||null,signatory_title:f.signatory_title||null,signatory2_name:f.signatory2_name||null,signatory2_title:f.signatory2_title||null,reg_no:f.reg_no||null,default_theme:f.default_theme||'dark',
       min_hb:num(f.min_hb),min_weight:num(f.min_weight),gap_male:num(f.gap_male),gap_female:num(f.gap_female),expiry_days:num(f.expiry_days),default_slot_capacity:num(f.default_slot_capacity),year_label:f.year_label?.trim()||'Lionism year',member_subscription:num(f.member_subscription)??0,updated_at:new Date().toISOString()}
     const {data,error}=await supabase.from('settings').update(row).eq('id',1).select().single()
@@ -45,13 +46,14 @@ export default function SettingsPage(){
     <div className="grid gap-5 md:grid-cols-2">
       <section className="card space-y-4 md:col-span-2"><h2 className="font-semibold text-fg">Brand</h2>
         <div className="grid gap-5 md:grid-cols-[auto_1fr]">
-          <div className="flex flex-col items-center gap-2">
-            <div className="grid h-28 w-28 place-items-center overflow-hidden rounded-2xl border border-dashed border-ink-500 bg-ink-900">
-              {f.logo_url?<img src={f.logo_url} alt="Logo preview" className="h-full w-full bg-white object-contain p-2"/>:<span className="px-3 text-center text-xs text-fog-faint">No logo yet</span>}</div>
-            <input ref={file} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={upload}/>
-            <div className="flex gap-1"><button type="button" className="btn-quiet px-3 py-1.5 text-xs" disabled={up} onClick={()=>file.current.click()}><Upload size={13}/>{up?'Uploading…':'Upload logo'}</button>
-              {f.logo_url&&<button type="button" className="btn-ghost" title="Remove logo" onClick={()=>setF({...f,logo_url:null})}><X size={15}/></button>}</div>
-            <span className="text-[11px] text-fog-faint">PNG, JPG or WEBP, up to 2 MB</span></div>
+          <div className="flex gap-4">{[['logo_url','Club logo','Left side',file],['intl_logo_url','International logo','Right side of reports',file2]].map(([k,l,h,ref])=>
+            <div key={k} className="flex flex-col items-center gap-2"><span className="text-xs font-medium text-fog-muted">{l}</span>
+              <div className="grid h-28 w-28 place-items-center overflow-hidden rounded-2xl border border-dashed border-ink-500 bg-ink-900">
+                {f[k]?<img src={f[k]} alt={`${l} preview`} className="h-full w-full bg-white object-contain p-2"/>:<span className="px-3 text-center text-xs text-fog-faint">{k==='logo_url'?'No logo yet':'Not added'}</span>}</div>
+              <input ref={ref} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" aria-label={`Upload ${l}`} onChange={e=>upload(e,k)}/>
+              <div className="flex gap-1"><button type="button" className="btn-quiet px-3 py-1.5 text-xs" disabled={!!up} onClick={()=>ref.current.click()}><Upload size={13}/>{up===k?'Uploading…':'Upload'}</button>
+                {f[k]&&<button type="button" className="btn-ghost" title={`Remove ${l}`} aria-label={`Remove ${l}`} onClick={()=>setF({...f,[k]:null})}><X size={15}/></button>}</div>
+              <span className="max-w-[7.5rem] text-center text-[11px] text-fog-faint">{h} · PNG, JPG or WEBP, up to 2 MB</span></div>)}</div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="CRM name" required hint="Shown in the menu, login page and title."><input className="input" required maxLength={40} value={f.brand_name||''} onChange={set('brand_name')}/></Field>
             <Field label="Tagline"><input className="input" maxLength={60} value={f.tagline||''} onChange={set('tagline')}/></Field>
@@ -63,6 +65,7 @@ export default function SettingsPage(){
             <Field label="Signed by (title)"><input className="input" value={f.signatory_title||''} onChange={set('signatory_title')}/></Field>
             <Field label="Second signature (name)" hint="For example the Secretary."><input className="input" value={f.signatory2_name||''} onChange={set('signatory2_name')}/></Field>
             <Field label="Second signature (title)"><input className="input" value={f.signatory2_title||''} onChange={set('signatory2_title')}/></Field>
+            <Field label="International logo caption" hint="Optional, printed under the right-side logo, e.g. Lions Clubs International."><input className="input" maxLength={60} value={f.intl_logo_label||''} onChange={set('intl_logo_label')}/></Field>
             <Field label="Club registration no." hint="Printed on reports and certificates."><input className="input" value={f.reg_no||''} onChange={set('reg_no')}/></Field>
           </div></div></section>
       <section className="card md:col-span-2"><h2 className="mb-1 font-semibold text-fg">Look</h2><p className="mb-4 text-sm text-fog-muted">Accent colour is for everyone. Day or night is your own choice on this device.</p>
