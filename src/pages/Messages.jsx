@@ -12,6 +12,7 @@ import Outbox from '../components/wa/Outbox'
 import Broadcast from '../components/wa/Broadcast'
 import AutoRules from '../components/wa/AutoRules'
 import Connect from '../components/wa/Connect'
+import EmailPanel from '../components/wa/EmailPanel'
 import {enqueue,useWaStatus,useWaReady,setSendMode,PROVIDERS} from '../lib/wa'
 const SIGN=' - {club}'
 const DEFAULTS={
@@ -94,10 +95,10 @@ export default function Messages(){
   const {can}=useAuth(),st=useWaStatus(20000),[sp,setSp]=useSearchParams(),tab=sp.get('tab')||'outbox'
   const setTab=(t,tap)=>setSp(t==='outbox'?(tap?{tap}:{}):{tab:t},{replace:true})
   const queued=r=>setTab('outbox',r?.manual?r.broadcast_id:'')
-  const tabs=[['outbox',`Outbox${st?.queued?` · ${st.queued}`:''}`],['broadcast','Broadcast'],['lists','Lists'],['auto','Automatic'],...(can('settings')?[['connect','Connect']]:[])]
+  const tabs=[['outbox',`Outbox${st?.queued?` · ${st.queued}`:''}`],['broadcast','Broadcast'],['lists','Lists'],['auto','Automatic'],['email','Email'],...(can('settings')?[['connect','Connect']]:[])]
   return <div><PageHeader eyebrow="People" title="WhatsApp and alerts" description={st?`Sending by: ${PROVIDERS[st.provider]||st.provider}${st.provider==='qr'?` (${st.status==='connected'?'connected':'not connected'})`:''} · ${st.sent_today} sent today`:'Broadcasts, reminders, birthday wishes and certificates'}/>
     <Tabs id="wa-tabs" value={tab} onChange={setTab} tabs={tabs}/>
     {tab==='outbox'&&<Outbox tapId={sp.get('tap')} onTapOpened={()=>setSp({},{replace:true})}/>}{tab==='broadcast'&&<Broadcast onQueued={queued}/>}{tab==='lists'&&<Lists onQueued={queued}/>}
-    {tab==='auto'&&<AutoRules/>}{tab==='connect'&&<Connect/>}
+    {tab==='auto'&&<AutoRules/>}{tab==='email'&&<EmailPanel/>}{tab==='connect'&&<Connect/>}
   </div>
 }

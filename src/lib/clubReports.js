@@ -3,7 +3,8 @@ import {supabase} from './supabase'
 import {buildPdf,pad,rs,BLOOD} from './docpdf'
 import {fmt} from './util'
 
-// Rotary year runs 1 July to 30 June
+// The club year (Lionism year) runs 1 July to 30 June; its name comes from Settings
+export {YEAR_NAME,setYearName,clubYearOf} from './year'
 export const rotaryYear=(d=new Date())=>{const y=d.getMonth()>=6?d.getFullYear():d.getFullYear()-1;return {from:`${y}-07-01`,to:`${y+1}-06-30`,label:`${y}-${String(y+1).slice(2)}`}}
 export const iso=d=>new Date(d).toLocaleDateString('en-CA')
 export const KIND_LABEL={eye:'Eyes',body:'Body',organ:'Organs',skin:'Skin'}
@@ -27,33 +28,37 @@ export async function duesPdf(brand,{from,to,label}){
   const [m,d]=await Promise.all([supabase.from('members').select('id,member_no,full_name,position,status').is('deleted_at',null).order('member_no'),
     supabase.from('member_dues').select('*').gte('paid_on',from).lte('paid_on',to).order('receipt_no')]).then(x=>x.map(must))
   const by=Object.fromEntries(m.map(x=>[x.id,x])),total=d.reduce((a,x)=>a+Number(x.amount),0),paid=new Set(d.map(x=>x.member_id))
+  const subs=d.reduce((a,x)=>a+Number(x.subscription??x.amount),0),dons=d.reduce((a,x)=>a+Number(x.donation||0),0)
   return buildPdf({title:'Dues collection',heading:`Membership dues ${label}`,subtitle:`Receipts from ${fmt(from)} to ${fmt(to)}`,docNo:`DU-${stamp()}`,brand,footer:`Dues ${label}`,filename:`dues-${slug(label)}.pdf`,blocks:[
-    {type:'boxes',boxes:[{title:'PERIOD',rows:[['From',fmt(from)],['To',fmt(to)],['Receipts',d.length]]},{title:'COLLECTION',rows:[['Total',rs(total)],['Members paid',paid.size],['Not paid',m.filter(x=>x.status==='active'&&!paid.has(x.id)).length]]}]},
-    {type:'table',heading:'Receipts',columns:['Receipt','Date','Member','Period','Mode','Reference','Amount'],
-      rows:d.map(x=>[pad('RC',x.receipt_no,4),fmt(x.paid_on),`${by[x.member_id]?.full_name||'-'} (${pad('M',by[x.member_id]?.member_no)})`,x.period,x.mode,x.reference||'',rs(x.amount)]),
-      opts:{columnStyles:{6:{halign:'right'}},foot:[['','','','','','Total',rs(total)]]}},
+    {type:'boxes',boxes:[{title:'PERIOD',rows:[['From',fmt(from)],['To',fmt(to)],['Receipts',d.length]]},{title:'COLLECTION',rows:[['Subscriptions',rs(subs)],['Donations',rs(dons)],['Total',rs(total)],['Members paid',paid.size],['Not paid',m.filter(x=>x.status==='active'&&!paid.has(x.id)).length]]}]},
+    {type:'table',heading:'Receipts',columns:['Receipt','Date','Member','Year','Mode','Subscription','Donation','Total'],
+      rows:d.map(x=>[pad('RC',x.receipt_no,4),fmt(x.paid_on),`${by[x.member_id]?.full_name||'-'} (${pad('M',by[x.member_id]?.member_no)})`,x.period,x.mode,rs(x.subscription??x.amount),rs(x.donation||0),rs(x.amount)]),
+      opts:{columnStyles:{5:{halign:'right'},6:{halign:'right'},7:{halign:'right',fontStyle:'bold'}},foot:[['','','','','Total',rs(subs),rs(dons),rs(total)]]}},
     {type:'table',heading:'Active members with no payment in this period',columns:['ID','Name','Position'],
       rows:m.filter(x=>x.status==='active'&&!paid.has(x.id)).map(x=>[pad('M',x.member_no),x.full_name,x.position]),empty:'Every active member has paid.'},
     {type:'signatures',items:[[brand.signatory2_name,'Treasurer / Secretary'],[brand.signatory_name,brand.signatory_title||'President']]}]})
 }
 
+export const attPct=x=>x.held?Math.round(x.present/x.held*100):null
 export async function attendancePdf(brand,{from,to,label}){
   const s=must(await supabase.rpc('attendance_summary',{p_from:from,p_to:to}))
-  const pct=x=>x.held?Math.round(x.present/x.held*100):0,avg=s.members.length?Math.round(s.members.reduce((a,x)=>a+pct(x),0)/s.members.length):0
-  return buildPdf({title:'Attendance register',heading:`Meeting attendance, ${label}`,subtitle:`${s.meetings.length} meetings held from ${fmt(from)} to ${fmt(to)}`,docNo:`AT-${stamp()}`,brand,footer:`Attendance ${label}`,filename:`attendance-${slug(label)}.pdf`,blocks:[
-    {type:'stats',items:[['Meetings held',s.meetings.length],['Active members',s.members.length],['Average attendance',avg+'%'],['Guests',s.meetings.reduce((a,x)=>a+(x.guests||0),0)]]},
-    {type:'table',heading:'Member attendance',columns:['ID','Member','Position','Held','Present','Leave','Attendance'],
-      rows:[...s.members].sort((a,b)=>pct(b)-pct(a)).map(x=>[pad('M',x.no),x.name,x.position,x.held,x.present,x.leave,pct(x)+'%']),
-      opts:{columnStyles:{3:{halign:'center'},4:{halign:'center'},5:{halign:'center'},6:{halign:'right',fontStyle:'bold'}}}},
-    {type:'table',heading:'Meetings',columns:['No.','Date','Type','Title','Present','Guests'],rows:s.meetings.map(x=>[pad('MT',x.no),fmt(x.date),x.kind,x.title,x.present,x.guests||0])},
+  const pct=x=>attPct(x)??0,withM=s.members.filter(x=>x.held),avg=withM.length?Math.round(withM.reduce((a,x)=>a+pct(x),0)/withM.length):0
+  return buildPdf({title:'Attendance register',heading:`Attendance, ${label}`,subtitle:`${s.meetings.length} meetings held and ${s.camps.length} camps from ${fmt(from)} to ${fmt(to)}. Late counts as present.`,docNo:`AT-${stamp()}`,brand,footer:`Attendance ${label}`,filename:`attendance-${slug(label)}.pdf`,landscape:true,blocks:[
+    {type:'stats',items:[['Meetings held',s.meetings.length],['Camps',s.camps.length],['Active members',s.members.length],['Average attendance',avg+'%'],['Late arrivals',s.members.reduce((a,x)=>a+(x.late||0),0)]]},
+    {type:'table',heading:'Member attendance',columns:['ID','Member','Position','Meetings','Present','Late','Late min','Leave','Absent','%','Camps attended'],
+      rows:[...s.members].sort((a,b)=>pct(b)-pct(a)||a.name.localeCompare(b.name)).map(x=>[pad('M',x.no),x.name,x.position,x.held,x.present,x.late||0,x.late_minutes||0,x.leave,x.absent??Math.max(0,x.held-x.present-x.leave),x.held?pct(x)+'%':'-',`${x.camps_present||0} of ${x.camps||0}`]),
+      opts:{columnStyles:{3:{halign:'center'},4:{halign:'center'},5:{halign:'center'},6:{halign:'center'},7:{halign:'center'},8:{halign:'center'},9:{halign:'right',fontStyle:'bold'},10:{halign:'center'}}}},
+    {type:'table',heading:'Meetings',columns:['No.','Date','Type','For','Title','Expected','Present','Late','Leave','Absent','Guests'],
+      rows:s.meetings.map(x=>[pad('MT',x.no),fmt(x.date),x.kind,x.audience==='board'?'Board':'All',x.title,x.expected,x.present,x.late||0,x.leave||0,Math.max(0,(x.expected||0)-x.present-(x.leave||0)),x.guests||0])},
+    {type:'table',heading:'Camps',columns:['Date','Type','Camp','Members present','Late','Leave'],rows:s.camps.map(x=>[fmt(x.date),x.type,x.name,x.present,x.late||0,x.leave||0]),empty:'No camps in this period.'},
     {type:'signatures',items:[[brand.signatory2_name,brand.signatory2_title||'Secretary'],[brand.signatory_name,brand.signatory_title||'President']]}]})
 }
 
 export async function minutesPdf(brand,mt,attendance,members,actions){
-  const st={present:'Present',late:'Late',leave:'On leave',absent:'Absent'},byId=Object.fromEntries(members.map(m=>[m.id,m]))
-  const rows=members.map(m=>[pad('M',m.member_no),m.full_name,m.position,st[attendance[m.id]||'absent']])
+  const st={present:'Present',late:'Late',leave:'On leave',absent:'Absent'},byId=Object.fromEntries(members.map(m=>[m.id,m])),lateMin=mt._lateMin||{}
+  const rows=members.map(m=>[pad('M',m.member_no),m.full_name,m.position,st[attendance[m.id]||'absent']+(attendance[m.id]==='late'&&lateMin[m.id]?` (${lateMin[m.id]} min)`:'')])
   const present=members.filter(m=>['present','late'].includes(attendance[m.id])).length
-  return buildPdf({title:'Minutes of meeting',heading:mt.title,subtitle:`${mt.kind} meeting  ·  ${fmt(mt.meeting_date)}${mt.start_time?`, ${mt.start_time.slice(0,5)}`:''}  ·  ${mt.mode==='Online'?'Online':mt.venue||''}`,docNo:pad('MT',mt.meeting_no),brand,footer:`${mt.title}, ${fmt(mt.meeting_date)}`,filename:`minutes-${pad('MT',mt.meeting_no)}.pdf`,blocks:[
+  return buildPdf({title:'Minutes of meeting',heading:mt.title,subtitle:`${mt.kind==='Others'?mt.kind_other||'Other':mt.kind} meeting${mt.audience==='board'?' (board)':''}  ·  ${fmt(mt.meeting_date)}${mt.start_time?`, ${mt.start_time.slice(0,5)}`:''}  ·  ${mt.mode==='Online'?'Online':mt.venue||''}`,docNo:pad('MT',mt.meeting_no),brand,footer:`${mt.title}, ${fmt(mt.meeting_date)}`,filename:`minutes-${pad('MT',mt.meeting_no)}.pdf`,blocks:[
     {type:'boxes',boxes:[{title:'MEETING',rows:[['Title',mt.title],['Type',mt.kind],['Date',`${fmt(mt.meeting_date)}${mt.start_time?`, ${mt.start_time.slice(0,5)}${mt.end_time?'-'+mt.end_time.slice(0,5):''}`:''}`],['Venue',mt.mode==='Online'?'Online':mt.venue||'-']]},
       {title:'ATTENDANCE',rows:[['Chaired by',mt.chaired_by||'-'],['Minutes by',mt.minutes_by||'-'],['Present',`${present} of ${members.length}`],['Guests',`${mt.guests||0}${mt.chief_guest?` (chief guest: ${mt.chief_guest})`:''}`]]}]},
     {type:'text',heading:'Agenda',text:mt.agenda},{type:'text',heading:'Minutes',text:mt.minutes},{type:'text',heading:'Decisions',text:mt.decisions},

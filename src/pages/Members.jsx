@@ -12,7 +12,8 @@ import {buildPdf,rs,pad} from '../lib/docpdf'
 import CountUp from '../components/CountUp'
 import {memberIdCards} from '../lib/cards'
 import {PhotoPicker} from '../components/PhotoPicker'
-import {InductionTab,NewYear} from '../components/ClubAdmin'
+import {InductionTab,NewYear,BoardHistory} from '../components/ClubAdmin'
+import {YEAR_NAME} from '../lib/year'
 import {Crown} from 'lucide-react'
 
 const genPw=()=>{const a='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';return 'Rc-'+[...crypto.getRandomValues(new Uint32Array(10))].map(x=>a[x%a.length]).join('')}
@@ -26,17 +27,20 @@ function Stat({label,value,sub,tone}){return <div className="card py-4"><div cla
 const Bar=({v})=><div className="flex items-center gap-2"><div className="h-1.5 w-20 overflow-hidden rounded-full bg-ink-700"><div className={`h-full rounded-full ${v>=75?'bg-ok':v>=50?'bg-warn':'bg-blood'}`} style={{width:v+'%'}}/></div><span className="w-9 text-right text-xs tabular-nums text-fog-muted">{v}%</span></div>
 
 export default function Members(){
-  const {can}=useAuth(),{brand}=useBrand(),confirm=useConfirm(),ry=rotaryYear()
+  const {can,settings}=useAuth(),{brand}=useBrand(),confirm=useConfirm(),ry=rotaryYear(),FEE=Number(settings.member_subscription??15000)
   const [rows,setRows]=useState(null),[dues,setDues]=useState([]),[att,setAtt]=useState({}),[q,setQ]=useState(''),[st,setSt]=useState('active'),[type,setType]=useState('')
-  const [newYear,setNewYear]=useState(false),[form,setForm]=useState(null),[tab,setTab]=useState('details'),[busy,setBusy]=useState(false),[prof,setProf]=useState(null),[pay,setPay]=useState(null),[pdf,setPdf]=useState(''),[login,setLogin]=useState(null),[loginInfo,setLoginInfo]=useState(null)
+  const [boardOpen,setBoardOpen]=useState(false),[newYear,setNewYear]=useState(false),[form,setForm]=useState(null),[tab,setTab]=useState('details'),[busy,setBusy]=useState(false),[prof,setProf]=useState(null),[pay,setPay]=useState(null),[pdf,setPdf]=useState(''),[login,setLogin]=useState(null),[loginInfo,setLoginInfo]=useState(null)
   const load=async()=>{try{
-    const [m,d,a]=await Promise.all([supabase.from('members').select('*').is('deleted_at',null).order('member_no'),supabase.from('member_dues').select('member_id,amount,paid_on').gte('paid_on',ry.from).lte('paid_on',ry.to),
+    const [m,d,a]=await Promise.all([supabase.from('members').select('*').is('deleted_at',null).order('member_no'),supabase.from('member_dues').select('member_id,amount,subscription,donation,paid_on,period').eq('period',ry.label),
       supabase.rpc('attendance_summary',{p_from:ry.from,p_to:ry.to})])
     if(m.error)throw m.error;setRows(m.data);setDues(d.data||[]);setAtt(Object.fromEntries((a.data?.members||[]).map(x=>[x.id,x])))}catch(e){toast.error(errText(e))}}
   useEffect(()=>{load()},[])
   useLive(['members','member_dues','meeting_attendance','meetings'],load)
   const pct=id=>{const x=att[id];return x?.held?Math.round(x.present/x.held*100):null}
-  const paid=useMemo(()=>{const o={};dues.forEach(d=>o[d.member_id]=(o[d.member_id]||0)+Number(d.amount));return o},[dues])
+  // subscription paid this year per member; donations kept apart
+  const paid=useMemo(()=>{const o={};dues.forEach(d=>o[d.member_id]=(o[d.member_id]||0)+Number(d.subscription??d.amount));return o},[dues])
+  const donated=useMemo(()=>dues.reduce((a,d)=>a+Number(d.donation||0),0),[dues])
+  const subStatus=id=>{const v=paid[id]||0;return !v?['Not paid','neutral']:v>FEE?['Above fee','amber']:v>=FEE?['Paid','green']:['Part paid','blue']}
   const list=(rows||[]).filter(r=>(!st||r.status===st)&&(!type||r.membership_type===type)&&(!q||`${code('M',r.member_no,3)} ${r.full_name} ${r.phone||''} ${r.email||''} ${r.position}`.toLowerCase().includes(q.toLowerCase())))
   const active=(rows||[]).filter(r=>r.status==='active'),pcts=active.map(r=>pct(r.id)).filter(v=>v!=null)
   const loadProfile=id=>supabase.rpc('member_profile',{p_member:id}).then(({data})=>setProf(data))
@@ -53,13 +57,19 @@ export default function Members(){
     setForm(null);load()}
   const remove=async()=>{const {id,full_name}=form;const r=await supabase.from('members').update({deleted_at:new Date().toISOString()}).eq('id',id);if(r.error)return toast.error(r.error.message)
     setForm(null);load();undoToast(`${full_name} moved to the Recycle bin`,async()=>{const x=await supabase.from('members').update({deleted_at:null}).eq('id',id);if(x.error)throw x.error;load()})}
-  const addPay=async e=>{e.preventDefault();const r=await supabase.from('member_dues').insert({member_id:form.id,period:pay.period,amount:Number(pay.amount),paid_on:pay.paid_on,mode:pay.mode,reference:pay.reference||null}).select().single()
-    if(r.error)return toast.error(r.error.message);toast.success(`Receipt ${code('RC',r.data.receipt_no,4)} saved`);setPay(null);loadProfile(form.id);load()}
+  // what this member has already paid as subscription for the chosen year
+  const paidFor=(year)=>(prof?.dues||[]).filter(d=>d.period===year).reduce((a,d)=>a+Number(d.subscription??d.amount),0)
+  const addPay=async e=>{e.preventDefault();const sub=Number(pay.subscription||0),don=Number(pay.donation||0)
+    if(sub<=0&&don<=0)return toast.error('Enter the subscription or the donation amount')
+    const before=paidFor(pay.period),over=before+sub-FEE
+    if(FEE>0&&over>0&&!await confirm({title:`Rs. ${over.toLocaleString('en-IN')} above the yearly subscription`,body:`${form.full_name} has paid ${rs(before)} of ${rs(FEE)} for ${pay.period}. This payment takes the subscription to ${rs(before+sub)}. If the extra is a donation, put it in the Donation box instead. Save anyway? An alert goes to the team.`,action:'Save anyway',danger:false}))return
+    const r=await supabase.from('member_dues').insert({member_id:form.id,period:pay.period,subscription:sub,donation:don,amount:sub+don,paid_on:pay.paid_on,mode:pay.mode,reference:pay.reference||null}).select().single()
+    if(r.error)return toast.error(r.error.message);toast.success(`Receipt ${code('RC',r.data.receipt_no,4)} saved${don?` · ${rs(don)} donation`:''}`);setPay(null);loadProfile(form.id);load()}
   const delPay=async d=>{if(!await confirm({title:`Delete receipt ${code('RC',d.receipt_no,4)}?`,body:`${rs(d.amount)} for ${d.period}. You can undo this from the Audit log.`,action:'Delete'}))return
     const r=await supabase.from('member_dues').delete().eq('id',d.id);if(r.error)return toast.error(r.error.message);loadProfile(form.id);load()}
-  const receipt=d=>buildPdf({title:'Receipt',heading:`Membership dues, ${d.period}`,subtitle:`Received ${rs(d.amount)} from ${form.full_name} by ${d.mode}`,docNo:pad('RC',d.receipt_no,4),brand,footer:'Membership dues receipt',filename:`receipt-${pad('RC',d.receipt_no,4)}.pdf`,blocks:[
+  const receipt=d=>buildPdf({title:'Receipt',heading:`Membership subscription ${Number(d.donation)>0?'and donation':''}, ${d.period}`,subtitle:`Received ${rs(d.amount)} from ${form.full_name} by ${d.mode}`,docNo:pad('RC',d.receipt_no,4),brand,footer:'Membership dues receipt',filename:`receipt-${pad('RC',d.receipt_no,4)}.pdf`,blocks:[
     {type:'boxes',boxes:[{title:'RECEIVED FROM',rows:[['Member',form.full_name],['Member ID',pad('M',form.member_no)],['Position',form.position]]},{title:'PAYMENT',rows:[['Date',fmt(d.paid_on)],['Mode',d.mode],['Reference',d.reference||'-']]}]},
-    {type:'table',heading:'Details',columns:['#','Description','Amount'],rows:[[1,`Membership dues for ${d.period}`,rs(d.amount)]],opts:{columnStyles:{0:{cellWidth:10},2:{halign:'right'}},foot:[['','Total received',rs(d.amount)]]}},
+    {type:'table',heading:'Details',columns:['#','Description','Amount'],rows:[[1,`Membership subscription for ${d.period}`,rs(d.subscription??d.amount)],...(Number(d.donation)>0?[[2,'Donation to the club',rs(d.donation)]]:[])],opts:{columnStyles:{0:{cellWidth:10},2:{halign:'right'}},foot:[['','Total received',rs(d.amount)]]}},
     {type:'signatures',items:[['','Member'],['','Treasurer']]}]})
   const linkDonor=async()=>{if(!form.phone)return toast.error('Add the member\'s mobile number first')
     let {data:d}=await supabase.from('donors').select('id,donor_no').eq('phone',normPhone(form.phone)).maybeSingle()
@@ -73,18 +83,20 @@ export default function Members(){
     [`attendance_${ry.label}`]:pct(r.id)??'',[`dues_${ry.label}`]:paid[r.id]||0})),'members.csv')
 
   return <div>
-    <PageHeader title="Members" description={rows?`${active.length} active members · Rotary year ${ry.label}`:'Loading members'}
+    <PageHeader title="Members" description={rows?`${active.length} active members · ${YEAR_NAME} ${ry.label}`:'Loading members'}
       actions={<><button className="btn-quiet" onClick={exportCsv} disabled={!list.length}><Download size={15}/>CSV</button>
         <button className="btn-quiet" disabled={!!pdf} onClick={()=>run('dir',()=>memberDirectoryPdf(brand))}><FileText size={15}/>{pdf==='dir'?'Preparing…':'Directory PDF'}</button>
         <button className="btn-quiet" disabled={!!pdf} onClick={()=>run('dues',()=>duesPdf(brand,ry))}><Wallet size={15}/>{pdf==='dues'?'Preparing…':'Dues report'}</button>
         <button className="btn-quiet" disabled={!!pdf||!active.length} onClick={()=>run('ids',()=>memberIdCards(active,brand,'sheet'))}><IdCard size={15}/>{pdf==='ids'?'Preparing…':'ID cards'}</button>
-        <button className="btn-quiet" onClick={()=>setNewYear(true)}><Crown size={15}/>New Rotary year</button>
+        <button className="btn-quiet" onClick={()=>setBoardOpen(true)}><Crown size={15}/>Board by year</button>
+        <button className="btn-quiet" onClick={()=>setNewYear(true)}><Crown size={15}/>New {YEAR_NAME}</button>
         <button className="btn" onClick={()=>open(null)}><Plus size={16}/>Add member</button></>}/>
     <NewYear open={newYear} onClose={()=>setNewYear(false)} members={rows||[]} positions={POSITIONS} onDone={load}/>
+    <BoardHistory open={boardOpen} onClose={()=>setBoardOpen(false)}/>
     <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
       <Stat label="Active members" value={active.length} sub={`${(rows||[]).filter(r=>r.membership_type==='Prospective').length} prospective`}/>
       <Stat label={`Average attendance ${ry.label}`} value={pcts.length?Math.round(pcts.reduce((a,b)=>a+b,0)/pcts.length)+'%':'-'}/>
-      <Stat label={`Dues collected ${ry.label}`} value={rs(dues.reduce((a,d)=>a+Number(d.amount),0))} sub={`${active.filter(r=>!paid[r.id]).length} active members not paid`}/>
+      <Stat label={`Subscriptions ${ry.label}`} value={rs(Object.values(paid).reduce((a,b)=>a+b,0))} sub={`Fee ${rs(FEE)} · ${active.filter(r=>!paid[r.id]).length} not paid${donated?` · donations ${rs(donated)}`:''}`}/>
       <Stat label="Members who give blood" value={(rows||[]).filter(r=>r.donor_id).length} tone="blood"/></div>
     <div className="card overflow-hidden p-0">
       <div className="grid grid-cols-2 gap-2 border-b border-ink-700 p-3 lg:grid-cols-[1fr_auto_auto]">
@@ -93,7 +105,7 @@ export default function Members(){
         <select className="input lg:w-auto" aria-label="Type" value={type} onChange={e=>setType(e.target.value)}><option value="">All types</option>{TYPES.map(t=><option key={t}>{t}</option>)}</select></div>
       <div className="hidden overflow-x-auto md:block"><table className="table table-fixed">
         <colgroup><col className="w-[84px]"/><col/><col className="w-[19%]"/><col className="w-[70px]"/><col className="w-[110px]"/><col className="w-[140px]"/><col className="w-[110px]"/><col className="w-[40px]"/></colgroup>
-        <thead><tr><th>ID</th><th>Member</th><th>Position</th><th>Group</th><th>Joined</th><th>Attendance</th><th className="text-right">Dues {ry.label}</th><th/></tr></thead>
+        <thead><tr><th>ID</th><th>Member</th><th>Position</th><th>Group</th><th>Joined</th><th>Attendance</th><th className="text-right">Subscription {ry.label}</th><th/></tr></thead>
         <tbody>{rows===null?[0,1,2].map(i=><tr key={i}><td colSpan="8"><div className="skeleton h-8"/></td></tr>):list.map(r=><tr key={r.id} className="cursor-pointer" onClick={()=>open(r)}>
           <td><span className="code">{code('M',r.member_no,3)}</span></td>
           <td className="truncate"><div className="flex items-center gap-2"><span className="truncate font-medium text-fg">{r.full_name}</span>{r.status!=='active'&&<Badge tone={tone[r.status]}>{r.status}</Badge>}{r.membership_type!=='Active'&&<Badge tone="blue">{r.membership_type}</Badge>}</div><div className="truncate text-xs text-fog-faint">{r.phone||r.email||'-'}</div></td>
@@ -101,7 +113,8 @@ export default function Members(){
           <td><span className="font-display font-semibold text-blood">{r.blood_group||'-'}</span>{r.profile_id&&<KeyRound size={12} className="ml-1 inline text-brand" aria-label="Has login"/>}{r.donor_id&&<Droplet size={12} className="ml-1 inline text-blood" fill="currentColor" aria-label="Linked donor"/>}</td>
           <td className="whitespace-nowrap tabular-nums text-fog-muted">{fmt(r.joined_on)}</td>
           <td>{pct(r.id)==null?<span className="text-xs text-fog-faint">No meetings</span>:<Bar v={pct(r.id)}/>}</td>
-          <td className="text-right tabular-nums">{paid[r.id]?<span className="text-ok">{rs(paid[r.id])}</span>:<span className="text-fog-faint">Not paid</span>}</td>
+          <td className="text-right tabular-nums">{paid[r.id]?<span className={paid[r.id]>FEE?'text-warn':paid[r.id]>=FEE?'text-ok':'text-fg'}>{rs(paid[r.id])}</span>:<span className="text-fog-faint">Not paid</span>}
+            <span className="block text-[11px] text-fog-faint">{subStatus(r.id)[0]}</span></td>
           <td><ChevronRight size={16} className="text-fog-faint"/></td></tr>)}</tbody></table></div>
       <ul className="divide-y divide-ink-700/80 md:hidden">{(rows||[]).length?list.map(r=><li key={r.id}><button onClick={()=>open(r)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand/10 font-display text-sm font-semibold text-brand">{r.full_name.split(' ').map(x=>x[0]).slice(0,2).join('')}</span>
@@ -142,27 +155,38 @@ export default function Members(){
         <Field label="Notes" className="sm:col-span-2"><textarea className="input min-h-[64px]" value={form.notes} onChange={set('notes')}/></Field>
       </form>}
       {tab==='dues'&&<div>
-        {!pay?<button className="btn mb-4" onClick={()=>setPay({period:ry.label,amount:'',paid_on:todayIso(),mode:'UPI',reference:''})}><Receipt size={15}/>Record payment</button>
-        :<form onSubmit={addPay} className="tile mb-4 grid gap-3 p-4 sm:grid-cols-2">
-          <Field label="Period" required hint="For example 2026-27 or Oct 2026"><input className="input" required value={pay.period} onChange={e=>setPay({...pay,period:e.target.value})}/></Field>
-          <Field label="Amount (Rs.)" required><input className="input" required type="number" min="1" step="any" value={pay.amount} onChange={e=>setPay({...pay,amount:e.target.value})}/></Field>
+        {prof?.subscription&&(()=>{const x=prof.subscription,pd=Number(x.paid),bal=Number(x.fee)-pd;return <div className="mb-4 grid grid-cols-3 gap-3 text-center">
+          {[[`Subscription ${x.year}`,rs(x.fee)],['Paid',rs(pd)],[bal>=0?'Balance due':'Above the fee',rs(Math.abs(bal))]].map(([l,v],i)=><div key={l} className={`tile py-3 ${i===2&&bal<0?'border-warn/50':''}`}><div className={`text-lg font-semibold ${i===2?bal>0?'text-blood':bal<0?'text-warn':'text-ok':'text-fg'}`}>{v}</div><div className="text-xs text-fog-muted">{l}</div></div>)}
+          {Number(x.donated)>0&&<div className="col-span-3 text-xs text-fog-muted">Donations this year: <b className="text-fg">{rs(x.donated)}</b></div>}</div>})()}
+        {!pay?<button className="btn mb-4" onClick={()=>{const due=Math.max(0,FEE-paidFor(ry.label));setPay({period:ry.label,subscription:due?String(due):'',donation:'',paid_on:todayIso(),mode:'UPI',reference:''})}}><Receipt size={15}/>Record payment</button>
+        :(()=>{const due=Math.max(0,FEE-paidFor(pay.period)),sub=Number(pay.subscription||0),over=sub-due
+          return <form onSubmit={addPay} className="tile mb-4 grid gap-3 p-4 sm:grid-cols-2">
+          <Field label={YEAR_NAME} required hint={`July to June · fee ${rs(FEE)}, due ${rs(due)}`}><select className="input" value={pay.period} onChange={e=>setPay({...pay,period:e.target.value})}>
+            {[0,1,-1,2].map(k=>{const y=Number(ry.label.slice(0,4))-k;return `${y}-${String(y+1).slice(2)}`}).map(y=><option key={y}>{y}</option>)}</select></Field>
           <Field label="Paid on" required><input className="input" required type="date" max={todayIso()} value={pay.paid_on} onChange={e=>setPay({...pay,paid_on:e.target.value})}/></Field>
+          <Field label="Subscription (Rs.)" hint="Towards the yearly membership fee"><input className="input" type="number" min="0" step="any" value={pay.subscription} onChange={e=>setPay({...pay,subscription:e.target.value})}/></Field>
+          <Field label="Donation (Rs.)" hint="Extra, given to the club"><input className="input" type="number" min="0" step="any" value={pay.donation} onChange={e=>setPay({...pay,donation:e.target.value})}/></Field>
+          {FEE>0&&over>0&&<div className="flex flex-wrap items-center gap-3 rounded-xl border border-warn/50 bg-warn/10 p-3 text-sm text-warn sm:col-span-2"><span className="flex-1">{rs(over)} above the subscription due ({rs(due)}). Was the extra a donation?</span>
+            <button type="button" className="btn-quiet px-3 py-1 text-xs" onClick={()=>setPay({...pay,subscription:String(due),donation:String(Number(pay.donation||0)+over)})}>Move {rs(over)} to donation</button></div>}
           <Field label="Mode" required><select className="input" value={pay.mode} onChange={e=>setPay({...pay,mode:e.target.value})}><option>Cash</option><option>UPI</option><option>Bank transfer</option><option>Cheque</option></select></Field>
-          <Field label="Reference" hint="UPI or cheque number" className="sm:col-span-2"><input className="input" value={pay.reference} onChange={e=>setPay({...pay,reference:e.target.value})}/></Field>
-          <div className="flex gap-2 sm:col-span-2"><button className="btn">Save payment</button><button type="button" className="btn-quiet" onClick={()=>setPay(null)}>Cancel</button></div></form>}
+          <Field label="Reference" hint="UPI or cheque number"><input className="input" value={pay.reference} onChange={e=>setPay({...pay,reference:e.target.value})}/></Field>
+          <div className="flex flex-wrap items-center gap-2 sm:col-span-2"><button className="btn">Save payment</button><button type="button" className="btn-quiet" onClick={()=>setPay(null)}>Cancel</button>
+            <span className="ml-auto text-sm text-fog-muted">Total <b className="text-fg">{rs(sub+Number(pay.donation||0))}</b></span></div></form>})()}
         {!prof?<div className="skeleton h-20"/>:!prof.dues.length?<p className="text-sm text-fog-faint">No payments recorded.</p>:
         <ul className="divide-y divide-ink-700 rounded-xl border border-ink-700">{prof.dues.map(d=><li key={d.id} className="flex items-center gap-3 px-3 py-2.5 text-sm">
-          <span className="code">{code('RC',d.receipt_no,4)}</span><span className="flex-1"><span className="text-fg">{d.period}</span><span className="block text-xs text-fog-faint">{fmt(d.paid_on)} · {d.mode}{d.reference?` · ${d.reference}`:''}</span></span>
+          <span className="code">{code('RC',d.receipt_no,4)}</span><span className="flex-1"><span className="text-fg">{d.period}</span><span className="block text-xs text-fog-faint">{fmt(d.paid_on)} · {d.mode}{d.reference?` · ${d.reference}`:''} · subscription {rs(d.subscription??d.amount)}{Number(d.donation)>0?` · donation ${rs(d.donation)}`:''}</span></span>
           <span className="font-semibold tabular-nums text-fg">{rs(d.amount)}</span>
           <button className="btn-ghost" title="Download receipt" aria-label="Download receipt" onClick={()=>receipt(d)}><FileText size={15}/></button>
           <button className="btn-ghost text-blood" title="Delete" aria-label="Delete receipt" onClick={()=>delPay(d)}><Trash2 size={15}/></button></li>)}</ul>}</div>}
       {tab==='attendance'&&(!prof?<div className="skeleton h-20"/>:<div>
-        {(()=>{const h=prof.meetings.length,p=prof.meetings.filter(m=>['present','late'].includes(m.status)).length;return <div className="mb-4 grid grid-cols-3 gap-3 text-center">
-          {[['Meetings since joining',h],['Attended',p],['Attendance',h?Math.round(p/h*100)+'%':'-']].map(([l,v])=><div key={l} className="tile py-3"><div className="text-xl font-semibold text-fg">{v}</div><div className="text-xs text-fog-muted">{l}</div></div>)}</div>})()}
+        {(()=>{const h=prof.meetings.length,p=prof.meetings.filter(m=>['present','late'].includes(m.status)).length,l=prof.meetings.filter(m=>m.status==='late').length,cp=(prof.camps||[]).filter(c=>['present','late'].includes(c.status)).length;return <div className="mb-4 grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
+          {[['Meetings expected',h],['Attended',p],['Late',l],['Attendance',h?Math.round(p/h*100)+'%':'-'],['Camps attended',cp]].map(([lb,v])=><div key={lb} className="tile py-3"><div className="text-xl font-semibold text-fg">{v}</div><div className="text-xs text-fog-muted">{lb}</div></div>)}</div>})()}
         {prof.actions.length>0&&<><h3 className="mb-2 text-sm font-semibold text-fg">Action items</h3><ul className="mb-4 space-y-1 text-sm">{prof.actions.map((a,i)=><li key={i} className="flex items-center gap-2"><Badge tone={a.done?'green':'amber'}>{a.done?'Done':'Open'}</Badge><span className="flex-1 text-fog">{a.task}</span><span className="text-xs text-fog-faint">{code('MT',a.meeting_no,3)}{a.due?` · due ${fmt(a.due)}`:''}</span></li>)}</ul></>}
         <ul className="divide-y divide-ink-700 rounded-xl border border-ink-700">{prof.meetings.map((m,i)=><li key={i} className="flex items-center gap-3 px-3 py-2 text-sm"><span className="code">{code('MT',m.no,3)}</span><span className="flex-1 truncate text-fg">{m.title}<span className="block text-xs text-fog-faint">{fmt(m.date)} · {m.kind}</span></span>
-          <Badge tone={{present:'green',late:'blue',leave:'amber',absent:'red'}[m.status]}>{{present:'Present',late:'Late',leave:'Leave',absent:'Absent'}[m.status]}</Badge></li>)}
-          {!prof.meetings.length&&<li className="p-4 text-sm text-fog-faint">No meetings held since this member joined.</li>}</ul></div>)}
+          <Badge tone={{present:'green',late:'blue',leave:'amber',absent:'red'}[m.status]}>{{present:'Present',late:'Late',leave:'Leave',absent:'Absent'}[m.status]}{m.status==='late'&&m.late_minutes?` ${m.late_minutes} min`:''}</Badge></li>)}
+          {!prof.meetings.length&&<li className="p-4 text-sm text-fog-faint">No meetings held since this member joined.</li>}</ul>
+        {(prof.camps||[]).length>0&&<><h3 className="mb-2 mt-4 text-sm font-semibold text-fg">Camps</h3><ul className="divide-y divide-ink-700 rounded-xl border border-ink-700">{prof.camps.map((c,i)=><li key={i} className="flex items-center gap-3 px-3 py-2 text-sm"><span className="flex-1 truncate text-fg">{c.name}<span className="block text-xs text-fog-faint">{fmt(c.date)} · {c.type}</span></span>
+          <Badge tone={{present:'green',late:'blue',leave:'amber',absent:'red'}[c.status]}>{{present:'Present',late:'Late',leave:'Leave',absent:'Absent'}[c.status]}{c.status==='late'&&c.late_minutes?` ${c.late_minutes} min`:''}</Badge></li>)}</ul></>}</div>)}
       {tab==='login'&&<div className="space-y-4">
         {form.profile_id?<div className="tile flex items-center gap-4 p-4"><span className="grid h-12 w-12 place-items-center rounded-xl bg-ok/15 text-ok"><ShieldCheck size={22}/></span>
           <div className="min-w-0 flex-1"><div className="font-semibold text-fg">Has a login</div><div className="truncate text-sm text-fog-muted">{loginInfo?.email||form.email||'-'}{loginInfo?.role&&loginInfo.role!=='member'?` · team account (${loginInfo.role})`:''}</div></div></div>

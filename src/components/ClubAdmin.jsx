@@ -9,6 +9,7 @@ import {STEPS} from './MyClubExtra'
 import {makeCertificate} from '../lib/certificate'
 import {memberCardUrl} from '../lib/cards'
 import {rotaryYear} from '../lib/clubReports'
+import {YEAR_NAME,clubYearOf} from '../lib/year'
 import {celebrate} from '../lib/fx'
 
 export function InductionTab({member,onChange}){
@@ -42,16 +43,31 @@ export function NewYear({open,onClose,members,positions,onDone}){
   useEffect(()=>{if(!open)return;setBoard(Object.fromEntries(positions.filter(p=>p!=='Member').map(p=>[p,members.find(m=>m.position===p&&m.status==='active')?.id||''])))
     supabase.from('board_terms').select('*').order('rotary_year',{ascending:false}).then(({data})=>setHist(data||[]))},[open])
   const go=async()=>{const items=Object.entries(board).filter(([,id])=>id).map(([position,member_id])=>({position,member_id}))
-    if(!await confirm({title:`Start Rotary year ${year}?`,body:`The current board is saved in history, everyone becomes Member, and the ${items.length} people you chose take their new positions.`,action:'Start new year',danger:false}))return
+    if(!await confirm({title:`Start ${YEAR_NAME} ${year}?`,body:`The current board is saved in history, everyone becomes Member, and the ${items.length} people you chose take their new positions.`,action:'Start new year',danger:false}))return
     setBusy(true);const {data,error}=await supabase.rpc('start_rotary_year',{p_year:year,p_board:items});setBusy(false);if(error)return toast.error(errText(error))
     celebrate();toast.success(`New board of ${data} set for ${year}`);onDone?.();onClose()}
   const years=[...new Set(hist.map(h=>h.rotary_year))]
-  return <Drawer open={open} onClose={onClose} width="max-w-2xl" title="New Rotary year" description="Hand over to the new board on 1 July. The outgoing board is kept in the club's history."
+  return <Drawer open={open} onClose={onClose} width="max-w-2xl" title={`New ${YEAR_NAME}`} description="Hand over to the new board on 1 July. The outgoing board is kept in the club's history."
     footer={<><button className="btn-quiet" onClick={onClose}>Cancel</button><button className="btn" disabled={busy} onClick={go}><Crown size={15}/>{busy?'Saving…':`Start ${year}`}</button></>}>
-    <div className="space-y-5"><Field label="Rotary year"><input className="input w-40" pattern="\d{4}-\d{2}" value={year} onChange={e=>setYear(e.target.value)}/></Field>
+    <div className="space-y-5"><Field label={YEAR_NAME} hint="1 July to 30 June"><input className="input w-40" pattern="\d{4}-\d{2}" value={year} onChange={e=>setYear(e.target.value)}/></Field>
       <div className="grid gap-3 sm:grid-cols-2">{Object.keys(board).map(p=><Field key={p} label={p}><select className="input" value={board[p]} onChange={e=>setBoard({...board,[p]:e.target.value})}><option value="">Nobody</option>
         {members.filter(m=>m.status==='active').map(m=><option key={m.id} value={m.id}>{m.full_name}</option>)}</select></Field>)}</div>
       {years.length>0&&<section><h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-fg"><History size={15}/>Past boards</h3>
         <div className="space-y-3">{years.map(y=><div key={y} className="tile p-3"><div className="mb-1 font-medium text-fg">{y}</div><div className="grid gap-x-4 text-sm sm:grid-cols-2">{hist.filter(h=>h.rotary_year===y).map(h=><div key={h.id} className="flex justify-between gap-2"><span className="text-fog-muted">{h.position}</span><span className="text-fg">{h.member_name}</span></div>)}</div></div>)}</div></section>}</div>
+  </Drawer>
+}
+
+// The board of every year, as it was. Past years never change, even when positions change later.
+export function BoardHistory({open,onClose}){
+  const cur=clubYearOf(),[years,setYears]=useState([]),[y,setY]=useState(cur),[rows,setRows]=useState(null)
+  useEffect(()=>{if(!open)return;supabase.from('board_terms').select('rotary_year').then(({data})=>{const ys=[...new Set([cur,...(data||[]).map(x=>x.rotary_year)])].sort().reverse();setYears(ys)})},[open])
+  useEffect(()=>{if(!open)return;setRows(null);supabase.rpc('board_of_year',{p_year:y}).then(({data,error})=>error?toast.error(errText(error)):setRows(data||[]))},[open,y])
+  return <Drawer open={open} onClose={onClose} title="Board by year" description={`Each ${YEAR_NAME} keeps its own board. Board meetings, their reminders and attendance use the board of that year.`}>
+    <div className="mb-4 flex flex-wrap gap-2">{years.map(x=><button key={x} onClick={()=>setY(x)} className={`chip ${x===y?'border-brand/50 bg-brand/15 text-fg':''}`}>{YEAR_NAME} {x}{x===cur?' (now)':''}</button>)}</div>
+    {!rows?<div className="skeleton h-40"/>:!rows.length?<p className="text-sm text-fog-faint">No board recorded for {y}.</p>:
+    <ul className="divide-y divide-ink-700 rounded-xl border border-ink-700">{rows.map((r,i)=><li key={i} className="flex items-center gap-3 px-3 py-2.5 text-sm">
+      <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand/10 text-brand"><Crown size={15}/></span><span className="flex-1"><span className="block font-medium text-fg">{r.name}</span><span className="text-xs text-fog-faint">{r.member_no?code('M',r.member_no,3):'former member'}</span></span>
+      <span className="text-fog-muted">{r.position}</span></li>)}</ul>}
+    {y===cur&&<p className="mt-3 text-xs text-fog-faint">This year's board follows the positions on the Members page. When the new year starts, it is saved and stays as it is.</p>}
   </Drawer>
 }

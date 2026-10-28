@@ -122,7 +122,7 @@ export default function MyClub(){
     <Drawer open={!!card} onClose={()=>setCard(null)} title={t('My ID card')} description="Add your photo, then download the card. Show it at club events; the QR code proves you are a member."
       footer={card&&<><button className="btn-quiet" onClick={()=>setCard(null)}>Close</button><button className="btn" disabled={dl} onClick={getCard}><Download size={15}/>{dl?'Preparing…':'Download ID card'}</button></>}>
       {card&&<div className="space-y-4"><PhotoPicker self member={card} onSaved={u=>setCard({...card,photo_url:u||null})}/>
-        <p className="text-sm text-fog-muted">The card shows your name, member ID {code('M',card.member_no,3)}, position, blood group and photo. It is valid till 30 June of this Rotary year; download it again after that.</p></div>}
+        <p className="text-sm text-fog-muted">The card shows your name, member ID {code('M',card.member_no,3)}, position, blood group and photo. It is valid till 30 June of this club year (July to June); download it again after that.</p></div>}
     </Drawer>
     <Drawer open={!!edit} onClose={()=>setEdit(null)} title="My details" description="Position and membership type are changed by the secretary."
       footer={edit&&<><button className="btn-quiet" onClick={()=>setEdit(null)}>Cancel</button><button className="btn" form="me-form" disabled={busy}>{busy?'Saving…':'Save'}</button></>}>

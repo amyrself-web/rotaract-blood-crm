@@ -8,7 +8,7 @@ import path from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {createClient} from '@supabase/supabase-js'
 
-const VERSION='1.1.0'
+const VERSION='1.2.0'
 const ENGINE=(process.env.ENGINE||'baileys').toLowerCase()   // 'baileys' (built in) or 'openwa' (an OpenWA gateway on this machine)
 const here=path.dirname(fileURLToPath(import.meta.url))   // works on Windows too
 for(const f of [path.join(here,'.env'),'.env'])if(fs.existsSync(f))for(const line of fs.readFileSync(f,'utf8').split('\n')){const m=line.match(/^\s*([A-Z_]+)\s*=\s*(.*)\s*$/);if(m&&!process.env[m[1]])process.env[m[1]]=m[2].replace(/^["']|["']$/g,'')}
@@ -109,12 +109,17 @@ async function sendLoop(){
 }
 
 let rulesDay=''
+// Every 10 minutes ask the database to do the day's work: at (send time - 30 min) it runs the morning check and queues
+// birthday wishes and reminders for the send time. The database also does this by itself (pg_cron); this is a second clock.
 async function dailyRules(){
-  const t=istNow(),day=t.toISOString().slice(0,10)
+  const {data,error}=await sb.rpc('daily_tick')
+  if(!error){if(data&&Object.keys(data).length)log('daily tick',JSON.stringify(data));return}
+  if(!/daily_tick/.test(error.message||''))return log('daily tick failed:',error.message)
+  const t=istNow(),day=t.toISOString().slice(0,10)          // older database without daily_tick
   if(rulesDay===day||t.getUTCHours()<8)return
-  const {data,error}=await sb.rpc('wa_daily_rules',{p_day:null})
-  if(error)return log('daily messages failed:',error.message)
-  rulesDay=day;log('daily messages queued',JSON.stringify(data))
+  const r=await sb.rpc('wa_daily_rules',{p_day:null})
+  if(r.error)return log('daily messages failed:',r.error.message)
+  rulesDay=day;log('daily messages queued',JSON.stringify(r.data))
 }
 
 log(`CRM WhatsApp worker ${VERSION} · engine ${ENGINE}${DRY?' (dry run)':''}`)

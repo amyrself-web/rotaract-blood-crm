@@ -1,4 +1,5 @@
 import {createContext,useCallback,useContext,useEffect,useState} from 'react'
+import {setYearName} from '../lib/year'
 import {supabase,hasSupabase} from '../lib/supabase'
 import {effectivePerms,DEFAULT_SETTINGS} from '../lib/access'
 const Ctx=createContext(null)
@@ -32,5 +33,6 @@ export function AuthProvider({children}){
   const signOut=()=>{if(hasSupabase)return supabase.auth.signOut();setUser(null);setProfile(null)}
   const demo=role=>{setUser({id:'demo'});setProfile({full_name:'Demo '+role,role,active:true});setPerms(effectivePerms(role))}
   const can=useCallback(m=>!!perms[m],[perms])
+  useEffect(()=>{setYearName(settings?.year_label)},[settings?.year_label])
   return <Ctx.Provider value={{recovery,setRecovery,user,profile,perms,can,settings,setSettings,loading,signIn,signUp,signOut,demo,refresh:()=>load(user)}}>{children}</Ctx.Provider>
 }

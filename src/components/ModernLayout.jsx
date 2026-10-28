@@ -98,8 +98,8 @@ export default function ModernLayout(){
         <div className="relative"><button className="btn-ghost relative" aria-label={`Notifications, ${notes.length}`} onClick={()=>setBell(!bell)}><Bell size={18}/>
             {notes.length>0&&<span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-blood px-1 text-[10px] font-bold text-white ring-2 ring-[#0B1730]">{notes.length}</span>}</button>
           <Popover open={bell} onClose={()=>setBell(false)} className="w-80"><div className="px-2 py-1.5 text-sm font-semibold text-fg">Needs attention</div>
-            {notes.map((n,k)=><button key={k} onClick={()=>{nav(n.to);setBell(false)}} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm text-fog hover:bg-ink-750">
-              <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${toneCls[n.tone]}`}><n.icon size={15}/></span>{n.text}</button>)}
+            {notes.map((n,k)=><button key={k} onClick={()=>{n.done?.();nav(n.to);setBell(false)}} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm text-fog hover:bg-ink-750">
+              <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${toneCls[n.tone]}`}><n.icon size={15}/></span><span className="min-w-0"><span className="block">{n.text}</span>{n.sub&&<span className="line-clamp-2 block text-xs text-fog-faint">{n.sub}</span>}</span></button>)}
             {!notes.length&&<div className="px-2 py-4 text-sm text-fog-faint">All clear for today.</div>}</Popover></div>
         <div className="relative"><button onClick={()=>setMe(!me)} className="flex items-center gap-2 rounded-full py-1 pl-1 pr-1 transition hover:bg-white/10 2xl:pr-3" aria-label="Account menu">
             <span className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-blood to-brand text-sm font-semibold text-white ring-2 ring-white/20">{initial}</span>

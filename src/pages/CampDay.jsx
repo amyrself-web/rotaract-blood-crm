@@ -73,7 +73,7 @@ export default function CampDay(){
   const {can}=useAuth(),medic=can('screening'),confirm=useConfirm()
   const [camps,setCamps]=useState([]),[cid,setCid]=useState(''),[rows,setRows]=useState([]),[q,setQ]=useState(''),[f,setF]=useState(''),[act,setAct]=useState(null),[err,setErr]=useState('')
   const [queue,setQueue]=useState(readQueue()),[offline,setOffline]=useState(!navigator.onLine),[syncing,setSyncing]=useState(false)
-  useEffect(()=>{supabase.from('camps').select('*').in('status',['open','live']).is('deleted_at',null).order('camp_date').then(r=>r,e=>({data:null,error:e})).then(({data,error})=>{
+  useEffect(()=>{supabase.from('camps').select('*').in('status',['open','live']).eq('camp_type','Blood donation').is('deleted_at',null).order('camp_date').then(r=>r,e=>({data:null,error:e})).then(({data,error})=>{
     if(error){if(!isNetError(error))return setErr(error.message);data=cacheGet('campday-camps')||[];setOffline(true)}else cacheSet('campday-camps',data)
     setCamps(data);const p=data.find(c=>c.status==='live')||data[0];if(p)setCid(p.id)})},[])
   const load=async()=>{if(!cid)return;const w=await supabase.rpc('camp_board',{p_camp:cid}).then(r=>r,e=>({error:e}))

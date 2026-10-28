@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useRef,useState} from 'react'
 import {NavLink,Outlet,useLocation,useNavigate} from 'react-router-dom'
 import {motion} from 'framer-motion'
-import {AlertTriangle,Bell,Cake,ChevronsLeft,Clock,DatabaseBackup,Droplet,Eye,LayoutTemplate,ListChecks,LogOut,Menu,MessageCircle,Presentation,Search,ShieldCheck,UserRound,X} from 'lucide-react'
+import {AlertTriangle,BellRing,Bell,Cake,Mail,ChevronsLeft,Clock,DatabaseBackup,Droplet,Eye,LayoutTemplate,ListChecks,LogOut,Menu,MessageCircle,Presentation,Search,ShieldCheck,UserRound,X} from 'lucide-react'
 import {useAuth} from '../context/Auth'
 import {NAV,ALL_NAV,allowed} from '../nav'
 import {supabase} from '../lib/supabase'
@@ -35,16 +35,23 @@ function Sidebar({collapsed,setCollapsed,mobile,closeMobile}){
 
 export function useNotifications(){
   const {can}=useAuth(),[items,setItems]=useState([]),[tick,setTick]=useState(0)
-  useLive(['emergency_requests','blood_units','tasks','donors','meetings','meeting_actions','afterlife_cases','wa_outbox','privacy_requests'],()=>setTick(x=>x+1))
+  useLive(['app_alerts','email_outbox','emergency_requests','blood_units','tasks','donors','meetings','meeting_actions','afterlife_cases','wa_outbox','privacy_requests'],()=>setTick(x=>x+1))
   useEffect(()=>{let live=true;(async()=>{
     const out=[],today=new Date().toLocaleDateString('en-CA'),soon=new Date(Date.now()+3*864e5).toLocaleDateString('en-CA')
+    {const r=await supabase.rpc('my_alerts');(Array.isArray(r.data)?r.data:[]).forEach(a=>out.push({icon:a.kind==='emergency'?AlertTriangle:BellRing,tone:a.kind==='over_subscription'?'amber':'red',text:a.title,sub:a.body,
+      to:a.link||'/',done:()=>supabase.rpc('resolve_alert',{p_id:a.id}).then(()=>setTick(x=>x+1))}))}
     if(can('emergency')){const r=await supabase.from('emergency_requests').select('id,blood_group,units_needed,hospital').eq('status','open').limit(5)
       r.data?.forEach(x=>out.push({icon:AlertTriangle,tone:'red',text:`${x.blood_group} x ${x.units_needed} needed at ${x.hospital}`,to:'/stock'}))}
     if(can('stock')){const r=await supabase.from('blood_units').select('id',{count:'exact',head:true}).in('status',['collected','in_transit','testing','available']).lte('expiry_date',soon)
       if(r.count)out.push({icon:Clock,tone:'amber',text:`${r.count} blood unit${r.count>1?'s':''} expire within 3 days`,to:'/stock'})}
     if(can('messages')){const r=await supabase.from('donors').select('dob').is('deleted_at',null).eq('consent',true).not('dob','is',null)
       const n=(r.data||[]).filter(d=>d.dob.slice(5)===today.slice(5)).length
-      if(n)out.push({icon:Cake,tone:'blue',text:`${n} donor birthday${n>1?'s':''} today`,to:'/messages'})}
+      if(n)out.push({icon:Cake,tone:'blue',text:`${n} donor birthday${n>1?'s':''} today`,to:'/messages'})
+      const e=await supabase.from('email_outbox').select('id',{count:'exact',head:true}).eq('status','failed').gte('created_at',new Date(Date.now()-864e5).toISOString())
+      if(e.count)out.push({icon:Mail,tone:'amber',text:`${e.count} email${e.count>1?'s':''} failed today`,to:'/messages?tab=email'})}
+    if(can('members')){const r=await supabase.from('members').select('dob').is('deleted_at',null).eq('status','active').not('dob','is',null)
+      const n=(r.data||[]).filter(d=>d.dob.slice(5)===today.slice(5)).length
+      if(n)out.push({icon:Cake,tone:'blue',text:`${n} member birthday${n>1?'s':''} today`,to:'/members'})}
     if(can('planning')){const r=await supabase.from('tasks').select('id',{count:'exact',head:true}).eq('done',false).lte('due',today)
       if(r.count)out.push({icon:ListChecks,tone:'amber',text:`${r.count} camp task${r.count>1?'s are':' is'} due`,to:'/planning'})}
     if(can('meetings')){const m=await supabase.from('meetings').select('title,start_time').is('deleted_at',null).eq('status','scheduled').eq('meeting_date',today).limit(2)
@@ -139,8 +146,8 @@ function ClassicLayout(){
         <div className="relative"><button className="btn-ghost relative" aria-label={`Notifications, ${notes.length}`} onClick={()=>setBell(!bell)}><Bell size={18}/>
             {notes.length>0&&<span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-blood px-1 text-[10px] font-bold text-white">{notes.length}</span>}</button>
           <Popover open={bell} onClose={()=>setBell(false)} className="w-80"><div className="px-2 py-1.5 text-sm font-semibold text-fg">Needs attention</div>
-            {notes.map((n,k)=><button key={k} onClick={()=>{nav(n.to);setBell(false)}} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm text-fog hover:bg-ink-750">
-              <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${tone[n.tone]}`}><n.icon size={15}/></span>{n.text}</button>)}
+            {notes.map((n,k)=><button key={k} onClick={()=>{n.done?.();nav(n.to);setBell(false)}} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm text-fog hover:bg-ink-750">
+              <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${tone[n.tone]}`}><n.icon size={15}/></span><span className="min-w-0"><span className="block">{n.text}</span>{n.sub&&<span className="line-clamp-2 block text-xs text-fog-faint">{n.sub}</span>}</span></button>)}
             {!notes.length&&<div className="px-2 py-4 text-sm text-fog-faint">All clear for today.</div>}</Popover></div>
         <div className="relative"><button onClick={()=>setMe(!me)} className="flex items-center gap-2.5 rounded-[10px] py-1 pl-1 pr-2 transition hover:bg-ink-800" aria-label="Account menu">
             <span className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-brand to-brand-deep text-sm font-semibold text-white">{initial}</span>

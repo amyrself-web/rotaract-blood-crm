@@ -34,7 +34,7 @@ export default function SettingsPage(){
     setBusy(true)
     const row={club_name:f.club_name?.trim(),brand_name:f.brand_name.trim(),tagline:f.tagline?.trim()||null,logo_url:f.logo_url||null,brand_color:f.brand_color,
       address:f.address||null,contact_phone:f.contact_phone||null,contact_email:f.contact_email||null,signatory_name:f.signatory_name||null,signatory_title:f.signatory_title||null,signatory2_name:f.signatory2_name||null,signatory2_title:f.signatory2_title||null,reg_no:f.reg_no||null,default_theme:f.default_theme||'dark',
-      min_hb:num(f.min_hb),min_weight:num(f.min_weight),gap_male:num(f.gap_male),gap_female:num(f.gap_female),expiry_days:num(f.expiry_days),default_slot_capacity:num(f.default_slot_capacity),updated_at:new Date().toISOString()}
+      min_hb:num(f.min_hb),min_weight:num(f.min_weight),gap_male:num(f.gap_male),gap_female:num(f.gap_female),expiry_days:num(f.expiry_days),default_slot_capacity:num(f.default_slot_capacity),year_label:f.year_label?.trim()||'Lionism year',member_subscription:num(f.member_subscription)??0,updated_at:new Date().toISOString()}
     const {data,error}=await supabase.from('settings').update(row).eq('id',1).select().single()
     if(!error){const t=await supabase.from('stock_thresholds').upsert(BLOOD.map(g=>({blood_group:g,min_units:Number(th[g]??5)})));if(t.error){setBusy(false);return toast.error(t.error.message)}}
     setBusy(false);if(error)return toast.error(error.message);setSettings({...settings,...data});await refreshBrand();toast.success('Settings saved')}
@@ -74,6 +74,10 @@ export default function SettingsPage(){
             <select className="input w-auto py-1.5" value={f.default_theme||'dark'} onChange={set('default_theme')}><option value="dark">Night</option><option value="light">Day</option></select></label>
           <div className="ml-auto inline-flex rounded-xl border border-ink-700 bg-ink-900 p-1">{[['dark','Night',Moon],['light','Day',Sun]].map(([m,l,I])=>
             <button type="button" key={m} onClick={()=>setMode(m)} className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm ${mode===m?'bg-ink-700 text-fg':'text-fog-muted'}`}><I size={14}/>{l}</button>)}</div></div></section>
+      <section className="card space-y-4 md:col-span-2"><h2 className="font-semibold text-fg">Club year and subscription</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Name of the club year" hint="The year runs July to next June, e.g. 2026-27."><input className="input" maxLength={30} placeholder="Lionism year" value={f.year_label??''} onChange={set('year_label')}/></Field>
+          <Field label="Yearly member subscription (Rs.)" hint="Anything paid above this is flagged and can be moved to donation."><input className="input" type="number" min="0" value={f.member_subscription??''} onChange={set('member_subscription')}/></Field></div></section>
       <section className="card space-y-4"><h2 className="font-semibold text-fg">Camps</h2>
         <Field label="Donors per time slot" hint="Default for new camps. Leave empty for no limit."><input className="input" type="number" min="1" value={f.default_slot_capacity??''} onChange={set('default_slot_capacity')}/></Field></section>
       <section className="card space-y-4"><h2 className="font-semibold text-fg">Blood stock</h2>

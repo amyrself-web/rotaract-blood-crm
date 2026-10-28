@@ -10,6 +10,7 @@ import {toast} from 'sonner'
 import {Clock,FileText,FolderHeart,Receipt,Send} from 'lucide-react'
 import CountUp from '../components/CountUp'
 import {afterlifePdf,attendancePdf,districtPdf,duesPdf,hoursPdf,iso,memberDirectoryPdf,projectsPdf,rotaryYear} from '../lib/clubReports'
+import {YEAR_NAME} from '../lib/year'
 import {IdCard,Wallet,Presentation,Eye} from 'lucide-react'
 
 function ClubReports({brand,can}){
@@ -26,7 +27,7 @@ function ClubReports({brand,can}){
     ['members',Clock,'Volunteer hours','Approved service hours per member',()=>hoursPdf(brand,P)]].filter(x=>can(x[0]))
   if(!items.length)return null
   return <div className="card mt-5"><div className="mb-4 flex flex-wrap items-end gap-3"><div className="flex-1"><h2 className="font-semibold text-fg">Club reports</h2><p className="text-sm text-fog-muted">A4 PDF reports for members, meetings and eye donation.</p></div>
-    <select className="input w-auto" aria-label="Period" value={k} onChange={e=>setK(e.target.value)}><option value="year">Rotary year {ry.label}</option><option value="month">This month</option><option value="custom">Choose dates</option></select>
+    <select className="input w-auto" aria-label="Period" value={k} onChange={e=>setK(e.target.value)}><option value="year">{YEAR_NAME} {ry.label}</option><option value="month">This month</option><option value="custom">Choose dates</option></select>
     {k==='custom'&&<><input type="date" className="input w-auto" aria-label="From" value={c.from} onChange={e=>setC({...c,from:e.target.value})}/><input type="date" className="input w-auto" aria-label="To" value={c.to} onChange={e=>setC({...c,to:e.target.value})}/></>}</div>
     {(can('reports')||can('members'))&&<div className="tile mb-3 flex flex-wrap items-center gap-3 border-brand/40 bg-brand/[.06] p-4"><span className="grid h-10 w-10 place-items-center rounded-xl bg-brand text-white"><Send size={18}/></span>
       <div className="min-w-0 flex-1"><div className="font-semibold text-fg">Monthly report for the district</div><div className="text-xs text-fog-muted">Members, meetings and attendance, projects, camps, eye donation and money for one month, ready to send to the DRR.</div></div>

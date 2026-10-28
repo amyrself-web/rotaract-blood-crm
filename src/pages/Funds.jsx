@@ -8,6 +8,7 @@ import {useBrand} from '../context/Brand'
 import {fmt,normPhone} from '../lib/util'
 import {PageHeader,Drawer,Field,Badge,Empty,Tabs,useLive,undoToast,code,errText,todayIso,useConfirm} from '../components/ui'
 import {rotaryYear,csv,iso} from '../lib/clubReports'
+import {YEAR_NAME} from '../lib/year'
 import {buildPdf,rs,pad,GREEN} from '../lib/docpdf'
 import {inWords} from '../lib/money'
 import CountUp from '../components/CountUp'
@@ -129,7 +130,7 @@ export default function Funds(){
 
     {view==='acc'&&<div className="space-y-5">
       <div className="card flex flex-wrap items-end gap-3"><div className="flex-1"><h2 className="font-semibold text-fg">Accounts statement</h2><p className="text-sm text-fog-muted">Donations, dues and sponsorship in; club and camp expenses out.</p></div>
-        <select className="input w-auto" aria-label="Period" onChange={e=>{const p=periods[e.target.value];if(p)setRange({from:p.from,to:p.to,label:p.label})}}><option value="year">Rotary year {ry.label}</option><option value="month">This month</option></select>
+        <select className="input w-auto" aria-label="Period" onChange={e=>{const p=periods[e.target.value];if(p)setRange({from:p.from,to:p.to,label:p.label})}}><option value="year">{YEAR_NAME} {ry.label}</option><option value="month">This month</option></select>
         <input type="date" className="input w-auto" aria-label="From" value={range.from} onChange={e=>setRange({...range,from:e.target.value,label:`${e.target.value} to ${range.to}`})}/>
         <input type="date" className="input w-auto" aria-label="To" value={range.to} onChange={e=>setRange({...range,to:e.target.value,label:`${range.from} to ${e.target.value}`})}/>
         <button className="btn" disabled={!sum||!!pdf} onClick={()=>run('acc',()=>accountsPdf(sum,brand,range))}><FileText size={15}/>{pdf==='acc'?'Preparing…':'Statement PDF'}</button></div>

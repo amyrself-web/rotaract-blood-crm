@@ -1,55 +1,74 @@
 import {useEffect,useMemo,useState} from 'react'
 import {toast} from 'sonner'
 import {motion} from 'framer-motion'
-import {Plus,Presentation,FileText,Download,CalendarDays,MapPin,Users,CheckCircle2,Circle,Trash2,Clock,Video,QrCode,RefreshCw,Maximize2,X} from 'lucide-react'
+import {Plus,Presentation,FileText,Download,CalendarDays,MapPin,Users,CheckCircle2,Circle,Trash2,Clock,Video,QrCode,RefreshCw,Maximize2,X,Crown,Repeat,CalendarClock,History} from 'lucide-react'
 import {createPortal} from 'react-dom'
 import {supabase} from '../lib/supabase'
 import {useBrand} from '../context/Brand'
 import {fmt} from '../lib/util'
 import {PageHeader,Drawer,Field,Badge,Empty,Tabs,useLive,undoToast,code,errText,todayIso,useConfirm} from '../components/ui'
-import {rotaryYear,attendancePdf,minutesPdf,csv,iso} from '../lib/clubReports'
+import {rotaryYear,attendancePdf,minutesPdf,csv,iso,attPct} from '../lib/clubReports'
+import {YEAR_NAME,clubYearOf} from '../lib/year'
 import CountUp from '../components/CountUp'
 
-const KINDS=['Weekly','Monthly','Board','General body','Special','Joint','Installation']
+const KINDS=['Weekly','Monthly','Board','General body','Special','Joint','Installation','Others']
+const kindName=r=>r.kind==='Others'?(r.kind_other||'Other'):r.kind
 const ST={present:['Present','bg-ok text-white'],late:['Late','bg-brand text-white'],leave:['Leave','bg-warn text-white'],absent:['Absent','bg-blood text-white']}
-const empty=()=>({kind:'Weekly',title:'Weekly meeting',meeting_date:todayIso(),start_time:'19:00',end_time:'20:00',venue:'',mode:'In person',online_link:'',chaired_by:'',minutes_by:'',chief_guest:'',guests:0,guest_names:'',agenda:'',minutes:'',decisions:'',next_meeting:'',status:'scheduled'})
+const empty=()=>({kind:'Weekly',kind_other:'',audience:'all',repeat:false,repeat_day:'',title:'Weekly meeting',meeting_date:todayIso(),start_time:'19:00',end_time:'20:00',venue:'',mode:'In person',online_link:'',chaired_by:'',minutes_by:'',chief_guest:'',guests:0,guest_names:'',agenda:'',minutes:'',decisions:'',next_meeting:'',status:'scheduled'})
 const statusTone={scheduled:'blue',held:'green',cancelled:'neutral'}
 const periods=()=>{const ry=rotaryYear(),d=new Date(),m0=new Date(d.getFullYear(),d.getMonth(),1),m1=new Date(d.getFullYear(),d.getMonth()+1,0),l0=new Date(d.getFullYear(),d.getMonth()-1,1),l1=new Date(d.getFullYear(),d.getMonth(),0)
-  return {year:{...ry,label:`Rotary year ${ry.label}`},month:{from:iso(m0),to:iso(m1),label:m0.toLocaleDateString('en-IN',{month:'long',year:'numeric'})},last:{from:iso(l0),to:iso(l1),label:l0.toLocaleDateString('en-IN',{month:'long',year:'numeric'})}}}
+  return {year:{...ry,label:`${YEAR_NAME} ${ry.label}`},month:{from:iso(m0),to:iso(m1),label:m0.toLocaleDateString('en-IN',{month:'long',year:'numeric'})},last:{from:iso(l0),to:iso(l1),label:l0.toLocaleDateString('en-IN',{month:'long',year:'numeric'})}}}
 
 export default function Meetings(){
   const {brand}=useBrand(),confirm=useConfirm()
   const [view,setView]=useState('meetings'),[rows,setRows]=useState(null),[members,setMembers]=useState([]),[counts,setCounts]=useState({}),[actions,setActions]=useState([])
   const [form,setForm]=useState(null),[tab,setTab]=useState('details'),[att,setAtt]=useState({}),[acts,setActs]=useState([]),[busy,setBusy]=useState(false),[meta,setMeta]=useState({}),[qr,setQr]=useState(false),[newAct,setNewAct]=useState({task:'',owner_member:'',due:''})
+  const [boards,setBoards]=useState({}),[moving,setMoving]=useState(null),[changes,setChanges]=useState([]),[mins,setMins]=useState({})
   const [period,setPeriod]=useState('year'),[sum,setSum]=useState(null),[pdf,setPdf]=useState(''),[kind,setKind]=useState('')
-  const P=periods()[period]
+  const [custom,setCustom]=useState(()=>({from:rotaryYear().from,to:todayIso()}))
+  const P=period==='custom'?{...custom,label:`${fmt(custom.from)} to ${fmt(custom.to)}`}:periods()[period]
   const load=async()=>{try{const [m,b,a,x]=await Promise.all([supabase.from('meetings').select('*').is('deleted_at',null).order('meeting_date',{ascending:false}),
       supabase.from('members').select('id,member_no,full_name,position,joined_on,status').is('deleted_at',null).order('member_no'),
       supabase.from('meeting_attendance').select('meeting_id,status'),supabase.from('meeting_actions').select('*').order('due',{nullsFirst:false})])
     if(m.error)throw m.error;setRows(m.data);setMembers(b.data||[]);setActions(x.data||[])
+    const yrs=[...new Set([clubYearOf(),...m.data.filter(r=>r.audience==='board').map(r=>clubYearOf(r.meeting_date))])]
+    const bs=await Promise.all(yrs.map(y=>supabase.rpc('board_of_year',{p_year:y}).then(r=>[y,new Set((r.data||[]).map(x=>x.member_id).filter(Boolean))])));setBoards(Object.fromEntries(bs))
     const c={};(a.data||[]).forEach(r=>{if(['present','late'].includes(r.status))c[r.meeting_id]=(c[r.meeting_id]||0)+1});setCounts(c)}catch(e){toast.error(errText(e))}}
   const loadSum=()=>supabase.rpc('attendance_summary',{p_from:P.from,p_to:P.to}).then(({data,error})=>error?toast.error(error.message):setSum(data))
-  useEffect(()=>{load()},[]);useEffect(()=>{loadSum()},[period,view])
+  useEffect(()=>{load()},[]);useEffect(()=>{loadSum()},[period,view,custom.from,custom.to])
   useLive(['meetings','meeting_attendance','meeting_actions','members'],()=>{load();loadSum();if(form?.id)loadAtt(form.id)})
-  const eligible=mt=>members.filter(m=>m.status==='active'&&(!m.joined_on||m.joined_on<=mt.meeting_date))
+  // who the meeting is for: everyone active who had joined, or only that year's board (same rule as the database)
+  const eligible=mt=>members.filter(m=>(m.status==='active'||att[m.id])&&(!m.joined_on||m.joined_on<=mt.meeting_date)&&(mt.audience!=='board'||boards[clubYearOf(mt.meeting_date)]?.has(m.id)))
   const open=async r=>{setTab('details');setNewAct({task:'',owner_member:'',due:''})
     if(!r){setForm(empty());setAtt({});setActs([]);return}
     setForm({...empty(),...Object.fromEntries(Object.entries(r).map(([k,v])=>[k,v??''])),start_time:r.start_time?.slice(0,5)||'',end_time:r.end_time?.slice(0,5)||'',_orig:r})
-    const [a,x]=await Promise.all([loadAtt(r.id),supabase.from('meeting_actions').select('*').eq('meeting_id',r.id).order('action_no')]);setActs(x.data||[])}
-  const loadAtt=async id=>{const a=await supabase.from('meeting_attendance').select('member_id,status,note,self_marked').eq('meeting_id',id)
-    setAtt(Object.fromEntries((a.data||[]).map(z=>[z.member_id,z.status])));setMeta(Object.fromEntries((a.data||[]).map(z=>[z.member_id,z])))}
+    const yr=clubYearOf(r.meeting_date);if(r.audience==='board'&&!boards[yr])supabase.rpc('board_of_year',{p_year:yr}).then(b=>setBoards(o=>({...o,[yr]:new Set((b.data||[]).map(x=>x.member_id).filter(Boolean))})))
+    const [a,x,c]=await Promise.all([loadAtt(r.id),supabase.from('meeting_actions').select('*').eq('meeting_id',r.id).order('action_no'),supabase.from('meeting_changes').select('*').eq('meeting_id',r.id).order('changed_at',{ascending:false})]);setActs(x.data||[]);setChanges(c.data||[])}
+  const loadAtt=async id=>{const a=await supabase.from('meeting_attendance').select('member_id,status,note,self_marked,late_minutes').eq('meeting_id',id)
+    setAtt(Object.fromEntries((a.data||[]).map(z=>[z.member_id,z.status])));setMeta(Object.fromEntries((a.data||[]).map(z=>[z.member_id,z])));setMins(Object.fromEntries((a.data||[]).filter(z=>z.late_minutes!=null).map(z=>[z.member_id,z.late_minutes])))}
   const newCode=async()=>{const c=String(Math.floor(Math.random()*1e6)).padStart(6,'0');const r=await supabase.from('meetings').update({checkin_code:c}).eq('id',form.id);if(r.error)return toast.error(r.error.message);setForm({...form,checkin_code:c});toast.success('New check-in code made')}
   const set=k=>e=>setForm({...form,[k]:e.target.value})
-  const save=async e=>{e?.preventDefault();setBusy(true);const {id,meeting_no,created_at,created_by,deleted_at,deleted_by,_orig,...rest}=form
+  const save=async e=>{e?.preventDefault();setBusy(true);const {id,meeting_no,created_at,created_by,deleted_at,deleted_by,_orig,repeat,repeat_day,checkin_code,series_id,original_date,original_start,reschedules,...rest}=form
     const row=Object.fromEntries(Object.entries(rest).map(([k,v])=>[k,v===''?null:v]));row.guests=Number(row.guests||0)
+    if(row.kind!=='Others')row.kind_other=null;else if(!row.kind_other){setBusy(false);return toast.error('Type the name of this meeting type')}
+    if(!id&&repeat){const day=Number(repeat_day)||new Date(row.meeting_date).getDate()
+      const r=await supabase.rpc('create_meeting_series',{p_meeting:row,p_day:day,p_months:12});setBusy(false);if(r.error)return toast.error(r.error.message)
+      toast.success(`${r.data.created} meetings created, on day ${day} of every month for a year`);setForm(null);return load()}
     const r=id?await supabase.from('meetings').update(row).eq('id',id).select().single():await supabase.from('meetings').insert(row).select().single();setBusy(false)
     if(r.error)return toast.error(r.error.message)
     if(id){const prev=Object.fromEntries(Object.keys(row).map(k=>[k,_orig[k]]));undoToast('Meeting saved',async()=>{const x=await supabase.from('meetings').update(prev).eq('id',id);if(x.error)throw x.error;load()})
       setForm({...form,_orig:r.data})}
     else{toast.success(`Meeting ${code('MT',r.data.meeting_no,3)} created. Mark attendance next.`);open(r.data);setTab('attendance')}
     load()}
-  const mark=async(mid,s)=>{const prev=att[mid];setAtt(a=>({...a,[mid]:s}))
-    const r=await supabase.from('meeting_attendance').upsert({meeting_id:form.id,member_id:mid,status:s,noted_at:new Date().toISOString()});if(r.error){setAtt(a=>({...a,[mid]:prev}));toast.error(r.error.message)}}
+  // late: how many minutes after the start (today: worked out from the clock; can be changed)
+  const lateGuess=()=>{if(!form.start_time||form.meeting_date!==todayIso())return null;const [h,m]=form.start_time.split(':').map(Number),n=new Date();return Math.max(0,n.getHours()*60+n.getMinutes()-(h*60+m))}
+  const mark=async(mid,s,minutes)=>{const prev=att[mid];setAtt(a=>({...a,[mid]:s}))
+    const lm=s==='late'?(minutes!==undefined?minutes:(mins[mid]??lateGuess())):null;if(s==='late')setMins(o=>({...o,[mid]:lm}))
+    const r=await supabase.from('meeting_attendance').upsert({meeting_id:form.id,member_id:mid,status:s,late_minutes:lm===''||lm==null?null:Number(lm),noted_at:new Date().toISOString()});if(r.error){setAtt(a=>({...a,[mid]:prev}));toast.error(r.error.message)}}
+  const move=async e=>{e.preventDefault();const r=await supabase.rpc('reschedule_meeting',{p_meeting:form.id,p_date:moving.date,p_start:moving.start||null,p_end:moving.end||null,p_reason:moving.reason,p_notify:moving.notify})
+    if(r.error)return toast.error(r.error.message);const k=r.data.kind
+    toast.success(`Meeting ${k==='prepone'?'brought forward':k==='postpone'?'postponed':'moved'} to ${fmt(moving.date)}${moving.notify?`. ${r.data.notified} members told on WhatsApp`:''}`)
+    setMoving(null);const x=await supabase.from('meetings').select('*').eq('id',form.id).single();if(!x.error)open(x.data);load()}
   const markAll=async(st='present')=>{const list=eligible(form).filter(m=>!att[m.id]);if(!list.length)return toast('Everyone is already marked')
     const r=await supabase.from('meeting_attendance').upsert(list.map(m=>({meeting_id:form.id,member_id:m.id,status:st})));if(r.error)return toast.error(r.error.message)
     setAtt(a=>({...a,...Object.fromEntries(list.map(m=>[m.id,st]))}));toast.success(`${list.length} marked ${st}`);return list.length}
@@ -68,9 +87,9 @@ export default function Meetings(){
   const byMember=useMemo(()=>Object.fromEntries(members.map(m=>[m.id,m])),[members])
   const ry=rotaryYear(),heldYear=(rows||[]).filter(r=>r.status==='held'&&r.meeting_date>=ry.from&&r.meeting_date<=ry.to)
   const next=(rows||[]).filter(r=>r.status==='scheduled'&&r.meeting_date>=todayIso()).sort((a,b)=>a.meeting_date.localeCompare(b.meeting_date))[0]
-  const openActs=actions.filter(a=>!a.done),avg=sum?.members?.length?Math.round(sum.members.reduce((a,x)=>a+(x.held?x.present/x.held*100:0),0)/sum.members.length):null
-  const shown=(rows||[]).filter(r=>!kind||r.kind===kind)
-  const pct=x=>x.held?Math.round(x.present/x.held*100):0
+  const withHeld=(sum?.members||[]).filter(x=>x.held),openActs=actions.filter(a=>!a.done),avg=withHeld.length?Math.round(withHeld.reduce((a,x)=>a+x.present/x.held*100,0)/withHeld.length):null
+  const shown=(rows||[]).filter(r=>!kind||r.kind===kind||(kind==='Board'&&r.audience==='board'))
+  const pct=x=>attPct(x)??0
 
   return <div>
     <PageHeader title="Meetings" description="Weekly, monthly and board meetings with attendance, minutes and action items."
@@ -92,7 +111,8 @@ export default function Meetings(){
         return <motion.button key={r.id} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:Math.min(i,10)*.03}} onClick={()=>open(r)} className="card group flex items-stretch gap-4 p-4 text-left transition hover:border-brand/40">
           <div className={`grid w-16 shrink-0 place-items-center rounded-xl py-2 text-center ${r.status==='held'?'bg-ok/10':r.status==='cancelled'?'bg-ink-750':'bg-brand/10'}`}>
             <div><div className="text-[11px] font-semibold uppercase text-fog-muted">{d.toLocaleDateString('en-IN',{month:'short'})}</div><div className="font-display text-2xl font-semibold leading-none text-fg">{d.getDate()}</div><div className="text-[11px] text-fog-faint">{d.toLocaleDateString('en-IN',{weekday:'short'})}</div></div></div>
-          <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="code">{code('MT',r.meeting_no,3)}</span><Badge tone="blue">{r.kind}</Badge><Badge tone={statusTone[r.status]}>{r.status}</Badge></div>
+          <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="code">{code('MT',r.meeting_no,3)}</span><Badge tone="blue">{kindName(r)}</Badge>{r.audience==='board'&&<Badge tone="amber"><Crown size={11}/>Board only</Badge>}<Badge tone={statusTone[r.status]}>{r.status}</Badge>
+              {r.reschedules>0&&<Badge tone="neutral"><CalendarClock size={11}/>Moved</Badge>}{r.series_id&&<Repeat size={13} className="text-fog-faint" aria-label="Repeats monthly"/>}</div>
             <div className="mt-1 truncate font-semibold text-fg">{r.title}</div>
             <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-fog-muted">{r.start_time&&<span className="inline-flex items-center gap-1"><Clock size={12}/>{r.start_time.slice(0,5)}</span>}
               <span className="inline-flex items-center gap-1">{r.mode==='Online'?<Video size={12}/>:<MapPin size={12}/>}{r.mode==='Online'?'Online':r.venue||'Venue not set'}</span>
@@ -101,16 +121,24 @@ export default function Meetings(){
         </motion.button>})}</div>}</>}
 
     {view==='register'&&<div className="card overflow-hidden p-0">
-      <div className="flex flex-wrap items-center gap-2 border-b border-ink-700 p-3"><select className="input w-auto" aria-label="Period" value={period} onChange={e=>setPeriod(e.target.value)}>{Object.entries(periods()).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}</select>
-        <span className="text-sm text-fog-muted">{sum?`${sum.meetings.length} meetings held`:''}</span><div className="flex-1"/>
-        <button className="btn-quiet" disabled={!sum} onClick={()=>csv(sum.members.map(x=>({id:code('M',x.no,3),member:x.name,position:x.position,held:x.held,present:x.present,leave:x.leave,attendance:pct(x)+'%'})),`attendance-${P.from}.csv`)}><Download size={15}/>CSV</button>
+      <div className="flex flex-wrap items-center gap-2 border-b border-ink-700 p-3"><select className="input w-auto" aria-label="Period" value={period} onChange={e=>setPeriod(e.target.value)}>{Object.entries(periods()).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}<option value="custom">Choose dates</option></select>
+        {period==='custom'&&<><input type="date" className="input w-auto" aria-label="From" value={custom.from} onChange={e=>setCustom({...custom,from:e.target.value})}/><input type="date" className="input w-auto" aria-label="To" value={custom.to} onChange={e=>setCustom({...custom,to:e.target.value})}/></>}
+        <span className="text-sm text-fog-muted">{sum?`${sum.meetings.length} meetings held · ${sum.camps?.length||0} camps`:''}</span><div className="flex-1"/>
+        <button className="btn-quiet" disabled={!sum} onClick={()=>csv(sum.members.map(x=>({id:code('M',x.no,3),member:x.name,position:x.position,meetings:x.held,present:x.present,late:x.late||0,late_minutes:x.late_minutes||0,leave:x.leave,absent:x.absent??Math.max(0,x.held-x.present-x.leave),attendance:x.held?pct(x)+'%':'',camps_attended:x.camps_present||0,camps:x.camps||0})),`attendance-${P.from}.csv`)}><Download size={15}/>CSV</button>
         <button className="btn-quiet" disabled={!!pdf} onClick={()=>run('att',()=>attendancePdf(brand,P))}><FileText size={15}/>PDF</button></div>
+      <p className="border-b border-ink-700 px-3 py-2 text-xs text-fog-faint">Meetings = the meetings each member was expected at (board meetings count only for that year's board). Late counts as present. Absent = expected but not marked present or on leave.</p>
       {!sum?<div className="p-4"><div className="skeleton h-24"/></div>:!sum.members.length?<Empty icon={Users} title="No active members">Add members on the Members page first.</Empty>:
-      <div className="overflow-x-auto"><table className="table table-fixed"><colgroup><col className="w-[84px]"/><col/><col className="w-[22%]"/><col className="w-[70px]"/><col className="w-[70px]"/><col className="w-[70px]"/><col className="w-[180px]"/></colgroup>
-        <thead><tr><th>ID</th><th>Member</th><th>Position</th><th className="text-center">Held</th><th className="text-center">Present</th><th className="text-center">Leave</th><th>Attendance</th></tr></thead>
-        <tbody>{[...sum.members].sort((a,b)=>pct(b)-pct(a)).map(x=><tr key={x.id}><td><span className="code">{code('M',x.no,3)}</span></td><td className="truncate font-medium text-fg">{x.name}</td><td className="truncate text-fog-muted">{x.position}</td>
-          <td className="text-center tabular-nums">{x.held}</td><td className="text-center tabular-nums">{x.present}</td><td className="text-center tabular-nums">{x.leave}</td>
-          <td><div className="flex items-center gap-2"><div className="h-2 flex-1 overflow-hidden rounded-full bg-ink-700"><motion.div initial={{width:0}} animate={{width:pct(x)+'%'}} transition={{duration:.6}} className={`h-full rounded-full ${pct(x)>=75?'bg-ok':pct(x)>=50?'bg-warn':'bg-blood'}`}/></div><span className="w-10 text-right text-xs font-semibold tabular-nums text-fg">{pct(x)}%</span></div></td></tr>)}</tbody></table></div>}</div>}
+      <div className="overflow-x-auto"><table className="table min-w-[920px]">
+        <thead><tr><th>ID</th><th>Member</th><th>Position</th><th className="text-center">Meetings</th><th className="text-center">Present</th><th className="text-center">Late</th><th className="text-center">Late min</th><th className="text-center">Leave</th><th className="text-center">Absent</th><th className="w-44">Attendance</th><th className="text-center">Camps</th></tr></thead>
+        <tbody>{[...sum.members].sort((a,b)=>pct(b)-pct(a)||a.name.localeCompare(b.name)).map(x=><tr key={x.id}><td><span className="code">{code('M',x.no,3)}</span></td><td className="truncate font-medium text-fg">{x.name}</td><td className="truncate text-fog-muted">{x.position}</td>
+          <td className="text-center tabular-nums">{x.held}</td><td className="text-center tabular-nums">{x.present}</td><td className="text-center tabular-nums">{x.late||0}</td><td className="text-center tabular-nums text-fog-muted">{x.late_minutes||0}</td>
+          <td className="text-center tabular-nums">{x.leave}</td><td className="text-center tabular-nums">{x.absent??Math.max(0,x.held-x.present-x.leave)}</td>
+          <td>{x.held?<div className="flex items-center gap-2"><div className="h-2 flex-1 overflow-hidden rounded-full bg-ink-700"><motion.div initial={{width:0}} animate={{width:pct(x)+'%'}} transition={{duration:.6}} className={`h-full rounded-full ${pct(x)>=75?'bg-ok':pct(x)>=50?'bg-warn':'bg-blood'}`}/></div><span className="w-10 text-right text-xs font-semibold tabular-nums text-fg">{pct(x)}%</span></div>:<span className="text-xs text-fog-faint">No meetings</span>}</td>
+          <td className="text-center tabular-nums">{x.camps_present||0}<span className="text-fog-faint"> / {x.camps||0}</span></td></tr>)}</tbody></table></div>}
+      {sum?.camps?.length>0&&<div className="border-t border-ink-700 p-3"><div className="mb-2 text-sm font-semibold text-fg">Camps in this period</div>
+        <ul className="grid gap-2 sm:grid-cols-2">{sum.camps.map(c=><li key={c.id} className="tile flex items-center gap-3 p-2.5 text-sm"><span className="min-w-0 flex-1"><span className="block truncate font-medium text-fg">{c.name}</span><span className="text-xs text-fog-faint">{fmt(c.date)} · {c.type}</span></span>
+          <span className="text-right text-xs text-fog-muted"><b className="text-fg">{c.present}</b> members{c.late?` · ${c.late} late`:''}</span></li>)}</ul></div>}
+    </div>}
 
     {view==='actions'&&<div className="card p-0">{!actions.length?<Empty icon={CheckCircle2} title="No action items">Add action items inside a meeting.</Empty>:
       <ul className="divide-y divide-ink-700/80">{[...actions].sort((a,b)=>a.done-b.done||(a.due||'9').localeCompare(b.due||'9')).map(a=>{const mt=(rows||[]).find(r=>r.id===a.meeting_id),late=!a.done&&a.due&&a.due<todayIso()
@@ -118,13 +146,17 @@ export default function Meetings(){
           <div className="min-w-0 flex-1"><div className={`text-sm ${a.done?'text-fog-faint line-through':'text-fg'}`}>{a.task}</div><div className="text-xs text-fog-faint">{byMember[a.owner_member]?.full_name||'No owner'} · {mt?`${code('MT',mt.meeting_no,3)} ${mt.title}`:''}</div></div>
           {a.due&&<Badge tone={late?'red':a.done?'neutral':'amber'}>{late?'Overdue ':'Due '}{fmt(a.due)}</Badge>}</li>})}</ul>}</div>}
 
-    <Drawer open={!!form} onClose={()=>setForm(null)} width="max-w-2xl" title={form?.id?`${code('MT',form.meeting_no,3)} · ${form.title}`:'New meeting'} description={form?.id?`${form.kind} · ${fmt(form.meeting_date)} · ${form.status}`:'Fields marked * are required.'}
+    <Drawer open={!!form} onClose={()=>setForm(null)} width="max-w-2xl" title={form?.id?`${code('MT',form.meeting_no,3)} · ${form.title}`:'New meeting'} description={form?.id?`${kindName(form)}${form.audience==='board'?' (board)':''} · ${fmt(form.meeting_date)} · ${form.status}`:'Fields marked * are required.'}
       footer={form&&<>{form.id&&<button className="btn-quiet mr-auto text-blood" onClick={remove}><Trash2 size={15}/>Recycle bin</button>}
-        {form.id&&<button className="btn-quiet" disabled={!!pdf} onClick={()=>run('min',()=>minutesPdf(brand,form,att,eligible(form),acts))}><FileText size={15}/>{pdf==='min'?'Preparing…':'Minutes PDF'}</button>}
+        {form.id&&form.status==='scheduled'&&tab==='details'&&<button className="btn-quiet" onClick={()=>setMoving({date:form.meeting_date,start:form.start_time,end:form.end_time,reason:'',notify:true})}><CalendarClock size={15}/>Prepone / postpone</button>}
+        {form.id&&<button className="btn-quiet" disabled={!!pdf} onClick={()=>run('min',()=>minutesPdf(brand,{...form,_lateMin:mins},att,eligible(form),acts))}><FileText size={15}/>{pdf==='min'?'Preparing…':'Minutes PDF'}</button>}
         {(tab==='details'||tab==='minutes')&&<button className="btn" form="meet-form" disabled={busy}>{busy?'Saving…':form.id?'Save':'Create meeting'}</button>}</>}>
       {form&&<>{form.id&&<Tabs id="mt-tabs" value={tab} onChange={setTab} tabs={[['details','Details'],['attendance','Attendance'],['minutes','Minutes'],['actions','Actions']]}/>}
       <form id="meet-form" onSubmit={save} className={tab==='details'?'grid gap-4 sm:grid-cols-2':'hidden'}>
-        <Field label="Type" required><select className="input" value={form.kind} onChange={e=>setForm({...form,kind:e.target.value,title:form.title===`${form.kind} meeting`||!form.title?`${e.target.value} meeting`:form.title})}>{KINDS.map(k=><option key={k}>{k}</option>)}</select></Field>
+        <Field label="Type" required><select className="input" value={form.kind} onChange={e=>{const k=e.target.value;setForm({...form,kind:k,audience:k==='Board'?'board':form.kind==='Board'?'all':form.audience,title:form.title===`${kindName(form)} meeting`||!form.title?`${k==='Others'?'':k+' meeting'}`:form.title})}}>{KINDS.map(k=><option key={k}>{k}</option>)}</select></Field>
+        {form.kind==='Others'&&<Field label="Name of this type" required hint="For example: Orientation, Fellowship, Project review"><input className="input" required value={form.kind_other} onChange={e=>setForm({...form,kind_other:e.target.value,title:form.title||`${e.target.value} meeting`})}/></Field>}
+        <Field label="Who is it for" required hint={form.audience==='board'?`Only the board of ${YEAR_NAME} ${clubYearOf(form.meeting_date)}: their attendance, reminders and report`:'All active members'}>
+          <select className="input" value={form.audience} onChange={set('audience')}><option value="all">All members</option><option value="board">Board members only</option></select></Field>
         <Field label="Status" required><select className="input" value={form.status} onChange={set('status')}><option value="scheduled">Scheduled</option><option value="held">Held</option><option value="cancelled">Cancelled</option></select></Field>
         <Field label="Title" required className="sm:col-span-2"><input className="input" required minLength={3} value={form.title} onChange={set('title')}/></Field>
         <Field label="Date" required><input type="date" className="input" required value={form.meeting_date} onChange={set('meeting_date')}/></Field>
@@ -138,6 +170,12 @@ export default function Meetings(){
         <Field label="Guest names" className="sm:col-span-2"><input className="input" value={form.guest_names} onChange={set('guest_names')}/></Field>
         <Field label="Agenda" className="sm:col-span-2"><textarea className="input min-h-[90px]" value={form.agenda} onChange={set('agenda')} placeholder={'1. Welcome\n2. Last meeting minutes\n3. Blood donation camp update'}/></Field>
         <Field label="Next meeting"><input type="date" className="input" value={form.next_meeting} onChange={set('next_meeting')}/></Field>
+        {!form.id&&<div className="tile sm:col-span-2 p-3"><label className="flex items-center gap-2 text-sm font-medium text-fg"><input type="checkbox" checked={form.repeat} onChange={e=>setForm({...form,repeat:e.target.checked,repeat_day:form.repeat_day||String(new Date(form.meeting_date).getDate())})}/><Repeat size={15} className="text-brand"/>Repeat every month for a year</label>
+          {form.repeat&&<div className="mt-3 flex flex-wrap items-end gap-3"><Field label="Day of the month"><input className="input w-28" type="number" min="1" max="31" required value={form.repeat_day} onChange={set('repeat_day')}/></Field>
+            <p className="flex-1 text-xs text-fog-muted">Creates 12 meetings, one on day {form.repeat_day||'?'} of each month from {fmt(form.meeting_date)} (the last day in shorter months). Each can be moved or cancelled on its own.</p></div>}</div>}
+        {form.id&&changes.length>0&&<div className="sm:col-span-2"><div className="label flex items-center gap-1.5"><History size={13}/>Date changes</div><ul className="space-y-1.5">{changes.map(c=><li key={c.id} className="tile p-2.5 text-sm text-fog">
+          <Badge tone={c.kind==='postpone'?'amber':c.kind==='prepone'?'blue':'neutral'}>{c.kind==='prepone'?'Preponed':c.kind==='postpone'?'Postponed':'Time changed'}</Badge> {fmt(c.from_date)}{c.from_start?` ${c.from_start.slice(0,5)}`:''} → <b className="text-fg">{fmt(c.to_date)}{c.to_start?` ${c.to_start.slice(0,5)}`:''}</b>
+          {c.reason&&<span className="text-fog-muted"> · {c.reason}</span>}<span className="text-xs text-fog-faint"> · {c.notified} told</span></li>)}</ul></div>}
         <datalist id="mem-names">{members.map(m=><option key={m.id} value={m.full_name}/>)}</datalist>
       </form>
       {tab==='minutes'&&<div className="grid gap-4">
@@ -153,7 +191,10 @@ export default function Meetings(){
         <ul className="divide-y divide-ink-700 rounded-xl border border-ink-700">{eligible(form).map(m=><li key={m.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
           <span className="code">{code('M',m.member_no,3)}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-fg">{m.full_name}</span><span className="block truncate text-xs text-fog-faint">{m.position}{meta[m.id]?.self_marked&&<span className="ml-1.5 text-brand">· {att[m.id]==='leave'?'applied leave':'checked in self'}</span>}{meta[m.id]?.note&&<span className="ml-1 text-warn">· {meta[m.id].note}</span>}</span></span>
           <div className="flex gap-1" role="radiogroup" aria-label={`Attendance for ${m.full_name}`}>{Object.entries(ST).map(([k,[l,c]])=><button key={k} role="radio" aria-checked={att[m.id]===k} onClick={()=>mark(m.id,k)}
-            className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${att[m.id]===k?c:'bg-ink-750 text-fog-muted hover:text-fg'}`}>{l}</button>)}</div></li>)}</ul>}</div>}
+            className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${att[m.id]===k?c:'bg-ink-750 text-fog-muted hover:text-fg'}`}>{l}</button>)}</div>
+          {att[m.id]==='late'&&<label className="flex items-center gap-1 text-xs text-fog-muted"><input className="input w-16 px-2 py-1 text-xs" type="number" min="0" max="600" aria-label={`Minutes late, ${m.full_name}`} value={mins[m.id]??''}
+            onChange={e=>setMins(o=>({...o,[m.id]:e.target.value}))} onBlur={e=>mark(m.id,'late',e.target.value===''?null:Number(e.target.value))}/>min late</label>}</li>)}</ul>}
+        <p className="mt-2 text-xs text-fog-faint">Late counts as present. Members who check in with the code more than 15 minutes after the start are marked late with the minutes filled in.</p></div>}
       {tab==='actions'&&<div>
         <form onSubmit={addAct} className="tile mb-4 grid gap-3 p-3 sm:grid-cols-[1fr_160px_140px_auto]">
           <input className="input" required minLength={2} placeholder="Action item" aria-label="Action item" value={newAct.task} onChange={e=>setNewAct({...newAct,task:e.target.value})}/>
@@ -166,6 +207,16 @@ export default function Meetings(){
           {!acts.length&&<li className="text-sm text-fog-faint">No action items yet.</li>}</ul></div>}
       </>}
     </Drawer>
+    {moving&&form&&createPortal(<div className="fixed inset-0 z-[70] grid place-items-center bg-ink-950/70 p-4 backdrop-blur-sm" onClick={()=>setMoving(null)}>
+      <motion.form initial={{scale:.97,opacity:0}} animate={{scale:1,opacity:1}} onClick={e=>e.stopPropagation()} onSubmit={move} role="dialog" aria-label="Prepone or postpone" className="card w-full max-w-md space-y-4">
+        <div className="flex items-center gap-2"><CalendarClock size={18} className="text-brand"/><div className="flex-1 font-semibold text-fg">Prepone / postpone</div><button type="button" className="btn-ghost" aria-label="Close" onClick={()=>setMoving(null)}><X size={18}/></button></div>
+        <p className="text-sm text-fog-muted">{form.title}: now {fmt(form.meeting_date)}{form.start_time?`, ${form.start_time}`:''}</p>
+        <div className="grid grid-cols-3 gap-3"><Field label="New date" required className="col-span-3 sm:col-span-1"><input type="date" className="input" required min={todayIso()} value={moving.date} onChange={e=>setMoving({...moving,date:e.target.value})}/></Field>
+          <Field label="Start"><input type="time" className="input" value={moving.start||''} onChange={e=>setMoving({...moving,start:e.target.value})}/></Field><Field label="End"><input type="time" className="input" value={moving.end||''} onChange={e=>setMoving({...moving,end:e.target.value})}/></Field></div>
+        <Field label="Reason"><input className="input" placeholder="For example: Diwali week, venue not available" value={moving.reason} onChange={e=>setMoving({...moving,reason:e.target.value})}/></Field>
+        <label className="flex items-center gap-2 text-sm text-fog"><input type="checkbox" checked={moving.notify} onChange={e=>setMoving({...moving,notify:e.target.checked})}/>Tell the {form.audience==='board'?'board members':'members'} on WhatsApp (and email)</label>
+        {moving.date&&<div className="text-sm"><Badge tone={moving.date<form.meeting_date||(moving.date===form.meeting_date&&(moving.start||'')<(form.start_time||''))?'blue':'amber'}>{moving.date<form.meeting_date||(moving.date===form.meeting_date&&(moving.start||'')<(form.start_time||''))?'Prepone: earlier':'Postpone: later'}</Badge></div>}
+        <div className="flex justify-end gap-2"><button type="button" className="btn-quiet" onClick={()=>setMoving(null)}>Cancel</button><button className="btn">Move meeting</button></div></motion.form></div>,document.body)}
     {qr&&form&&<QrScreen meeting={form} present={Object.values(att).filter(s=>['present','late'].includes(s)).length} total={eligible(form).length} onClose={()=>setQr(false)}/>}
   </div>
 }
