@@ -38,6 +38,7 @@ h1,h2,h3{@apply font-display tracking-tight}
 .btn-ghost{@apply inline-flex items-center justify-center rounded-[10px] p-2 text-fog-muted transition duration-150 hover:bg-ink-700 hover:text-fg active:scale-95}
 .input{@apply w-full rounded-[10px] border border-ink-600 bg-ink-900/80 px-3 py-2 text-sm text-fg transition duration-150 placeholder:text-fog-faint hover:border-ink-500 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15 disabled:opacity-60}
 .input:user-invalid{@apply border-blood/70 ring-4 ring-blood/10}
+select.input{max-width:100%;text-overflow:ellipsis}
 .label{@apply mb-1.5 block text-[13px] font-medium text-fog-muted}
 .skeleton{@apply rounded-md bg-ink-700;background-image:linear-gradient(90deg,transparent,rgb(var(--fg) / .06),transparent);background-size:400px 100%;background-repeat:no-repeat;animation:shimmer 1.3s linear infinite}
 .tile{@apply rounded-xl border border-ink-600/80 bg-ink-900/50}
@@ -56,3 +57,5 @@ h1,h2,h3{@apply font-display tracking-tight}
 @keyframes flash{0%{background:rgb(var(--brand) / .18)}100%{background:transparent}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-delay:0s!important;transition-duration:.001ms!important;scroll-behavior:auto!important}}
 @media (max-width:767px){[data-sonner-toaster][data-y-position=bottom]{bottom:calc(84px + env(safe-area-inset-bottom))!important}}
+/* a grid with no base column count (e.g. only md:grid-cols-2) gets one shrinkable column on phones, so long text can't push the page sideways */
+:where(.grid:not([class*=" grid-cols-"]):not([class*="grid-flow-col"]):not([class*="auto-cols"])){grid-template-columns:minmax(0,1fr)}

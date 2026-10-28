@@ -83,7 +83,7 @@ export default function ModernLayout(){
     <div className="hero hero-bg relative text-fog">
       <div aria-hidden className="hero-grid pointer-events-none absolute inset-0"/><Pulse/>
       <header className="relative z-30 mx-auto flex h-16 max-w-[1240px] items-center gap-2 px-4 md:px-8">
-        <Link to="/" className="mr-2 min-w-0 shrink-0 lg:max-w-[190px]" aria-label="Home"><BrandMark size={36}/></Link>
+        <Link to="/" className="mr-2 min-w-0 shrink lg:max-w-[190px] lg:shrink-0" aria-label="Home"><BrandMark size={36}/></Link>
         {flat.length>1&&<nav aria-label="Main" className="ml-4 hidden items-center gap-0.5 rounded-full bg-white/[.06] p-1 ring-1 ring-white/10 lg:flex">
           {overview?.items.map(({to,label})=><NavLink key={to} to={to} end={to==='/'} className="navpill">{({isActive})=><>
             {isActive&&<motion.span layoutId="mnav" transition={spring} className="absolute inset-0 rounded-full bg-white/[.13] ring-1 ring-white/15"/>}

@@ -92,9 +92,9 @@ export default function Camps(){
       actions={<button className="btn" onClick={()=>setForm(blank)}><Plus size={16}/>New camp</button>}/>
     <div className="flex flex-wrap items-start gap-3"><div className="flex-1"><Tabs id="camp-filter" value={filter} onChange={setFilter} tabs={[['active','Upcoming and live'],['past','Past'],['all','All']]}/></div>
       <select aria-label="Camp type" className="input w-auto py-1.5 text-sm" value={type} onChange={e=>setType(e.target.value)}><option value="">All camp types</option>{CAMP_TYPES.map(t=><option key={t}>{t}</option>)}</select></div>
-    {rows===null?<div className="grid gap-4 md:grid-cols-2">{[0,1].map(i=><div key={i} className="card"><div className="skeleton h-24"/></div>)}</div>
+    {rows===null?<div className="grid grid-cols-1 gap-4 md:grid-cols-2">{[0,1].map(i=><div key={i} className="card"><div className="skeleton h-24"/></div>)}</div>
     :!list.length?<div className="card"><Empty icon={Tent} title="No camps here" action={<button className="btn" onClick={()=>setForm(blank)}><Plus size={16}/>New camp</button>}>Create a camp, then set it to Registration open to share the QR.</Empty></div>
-    :<div className="grid gap-4 md:grid-cols-2">{list.map(c=>{const n=c.registrations?.[0]?.count??0
+    :<div className="grid grid-cols-1 gap-4 md:grid-cols-2">{list.map(c=>{const n=c.registrations?.[0]?.count??0
       return <article key={c.id} className="card flex flex-col">
         <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="mb-1 flex flex-wrap items-center gap-2"><span className="code">{code('C',c.camp_no,3)}</span><Badge tone={TYPE_TONE[c.camp_type]||'neutral'}>{campTypeName(c)}</Badge></div><h2 className="truncate font-display text-lg font-semibold text-fg">{c.name}</h2>
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-fog-muted"><span className="flex items-center gap-1.5"><Clock size={14}/>{fmt(c.camp_date)}{c.start_time&&`, ${c.start_time.slice(0,5)}`}</span>

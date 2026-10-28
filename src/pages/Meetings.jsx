@@ -107,7 +107,7 @@ export default function Meetings(){
       <div className="mb-3 flex flex-wrap gap-2">{['',...KINDS].map(k=><button key={k} onClick={()=>setKind(k)} className={`chip transition ${kind===k?'border-brand/50 bg-brand/15 text-fg':''}`}>{k||'All'}</button>)}</div>
       {rows===null?<div className="space-y-3">{[0,1,2].map(i=><div key={i} className="skeleton h-20"/>)}</div>
       :!shown.length?<div className="card"><Empty icon={Presentation} title="No meetings yet" action={<button className="btn" onClick={()=>open(null)}><Plus size={16}/>New meeting</button>}>Create a meeting, mark who came, and write the minutes.</Empty></div>
-      :<div className="grid gap-3 lg:grid-cols-2">{shown.map((r,i)=>{const total=eligible(r).length,pres=counts[r.id]||0,d=new Date(r.meeting_date)
+      :<div className="grid grid-cols-1 gap-3 lg:grid-cols-2">{shown.map((r,i)=>{const total=eligible(r).length,pres=counts[r.id]||0,d=new Date(r.meeting_date)
         return <motion.button key={r.id} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:Math.min(i,10)*.03}} onClick={()=>open(r)} className="card group flex items-stretch gap-4 p-4 text-left transition hover:border-brand/40">
           <div className={`grid w-16 shrink-0 place-items-center rounded-xl py-2 text-center ${r.status==='held'?'bg-ok/10':r.status==='cancelled'?'bg-ink-750':'bg-brand/10'}`}>
             <div><div className="text-[11px] font-semibold uppercase text-fog-muted">{d.toLocaleDateString('en-IN',{month:'short'})}</div><div className="font-display text-2xl font-semibold leading-none text-fg">{d.getDate()}</div><div className="text-[11px] text-fog-faint">{d.toLocaleDateString('en-IN',{weekday:'short'})}</div></div></div>

@@ -33,7 +33,7 @@ export default function SettingsPage(){
     for(const [k,l,min] of [['min_hb','Lowest Hb',5],['min_weight','Lowest weight',30],['gap_male','Gap for men',1],['gap_female','Gap for women',1],['expiry_days','Days until expiry',1]])
       if(num(f[k])===null||num(f[k])<min)return toast.error(`${l} must be at least ${min}`)
     setBusy(true)
-    const row={club_name:f.club_name?.trim(),brand_name:f.brand_name.trim(),tagline:f.tagline?.trim()||null,logo_url:f.logo_url||null,intl_logo_url:f.intl_logo_url||null,intl_logo_label:f.intl_logo_label?.trim()||null,brand_color:f.brand_color,
+    const row={club_name:f.club_name?.trim(),brand_name:f.brand_name.trim(),tagline:f.tagline?.trim()||null,logo_url:f.logo_url||null,intl_logo_url:f.intl_logo_url||null,intl_logo_label:f.intl_logo_label?.trim()||null,website:f.website?.trim()||null,instagram:f.instagram?.trim().replace(/^@/,'')||null,facebook:f.facebook?.trim()||null,brand_color:f.brand_color,
       address:f.address||null,contact_phone:f.contact_phone||null,contact_email:f.contact_email||null,signatory_name:f.signatory_name||null,signatory_title:f.signatory_title||null,signatory2_name:f.signatory2_name||null,signatory2_title:f.signatory2_title||null,reg_no:f.reg_no||null,default_theme:f.default_theme||'dark',
       min_hb:num(f.min_hb),min_weight:num(f.min_weight),gap_male:num(f.gap_male),gap_female:num(f.gap_female),expiry_days:num(f.expiry_days),default_slot_capacity:num(f.default_slot_capacity),year_label:f.year_label?.trim()||'Lionism year',member_subscription:num(f.member_subscription)??0,updated_at:new Date().toISOString()}
     const {data,error}=await supabase.from('settings').update(row).eq('id',1).select().single()
@@ -66,6 +66,9 @@ export default function SettingsPage(){
             <Field label="Second signature (name)" hint="For example the Secretary."><input className="input" value={f.signatory2_name||''} onChange={set('signatory2_name')}/></Field>
             <Field label="Second signature (title)"><input className="input" value={f.signatory2_title||''} onChange={set('signatory2_title')}/></Field>
             <Field label="International logo caption" hint="Optional, printed under the right-side logo, e.g. Lions Clubs International."><input className="input" maxLength={60} value={f.intl_logo_label||''} onChange={set('intl_logo_label')}/></Field>
+            <Field label="Website" hint="Printed on posts."><input className="input" placeholder="www.yourclub.org" value={f.website||''} onChange={set('website')}/></Field>
+            <Field label="Instagram" hint="Handle, printed on posts."><input className="input" placeholder="@yourclub" value={f.instagram||''} onChange={set('instagram')}/></Field>
+            <Field label="Facebook page" hint="Printed on posts."><input className="input" placeholder="facebook.com/yourclub" value={f.facebook||''} onChange={set('facebook')}/></Field>
             <Field label="Club registration no." hint="Printed on reports and certificates."><input className="input" value={f.reg_no||''} onChange={set('reg_no')}/></Field>
           </div></div></section>
       <section className="card md:col-span-2"><h2 className="mb-1 font-semibold text-fg">Look</h2><p className="mb-4 text-sm text-fog-muted">Accent colour is for everyone. Day or night is your own choice on this device.</p>
