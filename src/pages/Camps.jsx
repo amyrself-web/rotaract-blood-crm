@@ -64,7 +64,7 @@ function CampMembers({camp}){
     setMembers((m.data||[]).filter(x=>x.status!=='inactive'||(a.data||[]).some(r=>r.member_id===x.id)));setAtt(Object.fromEntries((a.data||[]).map(r=>[r.member_id,r])))}
   useEffect(()=>{load()},[camp.id])
   useLive(['camp_attendance'],load)
-  const lateGuess=()=>{if(!camp.start_time||camp.camp_date!==todayIso())return null;const [h,m]=camp.start_time.split(':').map(Number),n=new Date();return Math.max(0,n.getHours()*60+n.getMinutes()-(h*60+m))}
+  const lateGuess=()=>{if(!camp.start_time||camp.camp_date!==todayIso())return null;const [h,m]=camp.start_time.split(':').map(Number),n=new Date();const g=Math.max(0,n.getHours()*60+n.getMinutes()-(h*60+m));return g>240?null:g}
   const save=async(mid,patch)=>{const cur=att[mid]||{camp_id:camp.id,member_id:mid,status:'present',late_minutes:null,duty:null}
     const row={...cur,...patch};if(row.status!=='late')row.late_minutes=null;else if(patch.status==='late'&&row.late_minutes==null)row.late_minutes=lateGuess()
     setAtt(a=>({...a,[mid]:row}));const {noted_at,...up}=row

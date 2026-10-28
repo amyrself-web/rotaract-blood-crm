@@ -61,7 +61,7 @@ export default function Meetings(){
     else{toast.success(`Meeting ${code('MT',r.data.meeting_no,3)} created. Mark attendance next.`);open(r.data);setTab('attendance')}
     load()}
   // late: how many minutes after the start (today: worked out from the clock; can be changed)
-  const lateGuess=()=>{if(!form.start_time||form.meeting_date!==todayIso())return null;const [h,m]=form.start_time.split(':').map(Number),n=new Date();return Math.max(0,n.getHours()*60+n.getMinutes()-(h*60+m))}
+  const lateGuess=()=>{if(!form.start_time||form.meeting_date!==todayIso())return null;const [h,m]=form.start_time.split(':').map(Number),n=new Date();const g=Math.max(0,n.getHours()*60+n.getMinutes()-(h*60+m));return g>240?null:g}
   const mark=async(mid,s,minutes)=>{const prev=att[mid];setAtt(a=>({...a,[mid]:s}))
     const lm=s==='late'?(minutes!==undefined?minutes:(mins[mid]??lateGuess())):null;if(s==='late')setMins(o=>({...o,[mid]:lm}))
     const r=await supabase.from('meeting_attendance').upsert({meeting_id:form.id,member_id:mid,status:s,late_minutes:lm===''||lm==null?null:Number(lm),noted_at:new Date().toISOString()});if(r.error){setAtt(a=>({...a,[mid]:prev}));toast.error(r.error.message)}}

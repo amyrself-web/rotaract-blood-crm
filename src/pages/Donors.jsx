@@ -10,7 +10,7 @@ import {PageHeader,Drawer,Field,Badge,Empty,useConfirm,errText,useLive,undoToast
 import DonorHistory from '../components/DonorHistory'
 import WaSend from '../components/wa/WaSend'
 
-const empty={full_name:'',phone:'',email:'',blood_group:'',gender:'',dob:'',area:'',last_donation:'',consent:false}
+const empty={full_name:'',phone:'',email:'',blood_group:'',gender:'',dob:'',area:'',address:'',last_donation:'',consent:false}
 const PAGE=25
 async function all(){let out=[],from=0;for(;;){const {data,error}=await supabase.from('donors').select('*').is('deleted_at',null).order('donor_no').range(from,from+999);if(error)throw error;out=out.concat(data);if(data.length<1000)return out;from+=1000}}
 
@@ -105,7 +105,8 @@ export default function Donors(){
         <Field label="Gender" required><select required className="input" value={form.gender} onChange={set('gender')}><option value="">Choose</option><option>Male</option><option>Female</option><option>Other</option></select></Field>
         <Field label="Date of birth" hint="Donors must be 18 to 65" required><input required type="date" className="input" min={adultMin()} max={adultMax()} value={form.dob} onChange={set('dob')}/></Field>
         <Field label="Last donation"><input type="date" className="input" max={todayIso()} value={form.last_donation} onChange={set('last_donation')}/></Field>
-        <Field label="Area or town" className="sm:col-span-2" required><input required className="input" value={form.area} onChange={set('area')}/></Field>
+        <Field label="Area or town" required><input required className="input" value={form.area} onChange={set('area')}/></Field>
+        <Field label="Address"><input className="input" value={form.address??''} onChange={set('address')}/></Field>
         <label className="flex items-start gap-3 rounded-xl border border-ink-600 p-3 text-sm sm:col-span-2"><input type="checkbox" className="mt-0.5" checked={!!form.consent} onChange={set('consent')}/>
           <span><span className="font-medium text-fg">Agreed to be contacted</span><span className="block text-fog-muted">Only donors who agreed get WhatsApp reminders and invites.</span></span></label>
       </form>}

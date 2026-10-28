@@ -1,6 +1,6 @@
 import {useEffect,useState} from 'react'
 import {toast} from 'sonner'
-import {Smartphone,Cloud,QrCode,CheckCircle2,LogOut,RefreshCw,Copy,Send,Gauge,Moon,Laptop,ExternalLink} from 'lucide-react'
+import {AlertTriangle,Smartphone,Cloud,QrCode,CheckCircle2,LogOut,RefreshCw,Copy,Send,Gauge,Moon,Laptop,ExternalLink} from 'lucide-react'
 import QRCode from 'qrcode'
 import {supabase} from '../../lib/supabase'
 import {Field,Badge,useConfirm,errText} from '../ui'
@@ -42,7 +42,12 @@ export default function Connect(){
       {st?.status==='connected'?<div className="flex items-center gap-4 rounded-2xl bg-ok/10 p-4"><CheckCircle2 size={32} className="text-ok"/><div><div className="font-display text-lg font-semibold text-fg">+{st.phone}</div><div className="text-sm text-fog-muted">{st.name||'WhatsApp'} · {st.sent_today} sent today · {st.queued} waiting</div></div></div>
       :st?.status==='qr'&&qrImg?<div className="flex flex-wrap items-center gap-6"><img src={qrImg} alt="WhatsApp link QR code" className="h-60 w-60 rounded-2xl bg-white p-2"/>
         <ol className="space-y-2 text-sm text-fog"><li>1. Open WhatsApp on the club phone</li><li>2. Tap ⋮ (Android) or Settings (iPhone) → <b>Linked devices</b></li><li>3. Tap <b>Link a device</b> and point the phone at this code</li><li className="text-xs text-fog-faint">The code changes every 20 seconds; this page updates by itself.</li></ol></div>
-      :<div><p className="mb-3 text-sm text-fog-muted">The sender is a small program. Run it on any computer or old Android phone that stays switched on and connected to the internet. When it starts, the QR code shows here.</p>
+      :<div>{st?.status==='offline'&&st.last_seen&&<div className="mb-4 rounded-2xl border border-blood/40 bg-blood/10 p-4 text-sm">
+          <div className="flex items-center gap-2 font-semibold text-[#FF8796]"><AlertTriangle size={17}/>The sender has stopped. Last seen {new Date(st.last_seen).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit'})}{st.worker_version?` (version ${st.worker_version})`:''}</div>
+          <p className="mt-1.5 text-fog">{st.phone?`The phone +${st.phone} is still linked. `:''}Messages wait in the Outbox until the sender runs again. On the server, open PowerShell as Administrator in the whatsapp-worker folder and run:</p>
+          <Cmd>{`Set-ExecutionPolicy -Scope Process Bypass -Force\n.\\check-sender.ps1`}</Cmd>
+          <p className="text-xs text-fog-muted">It shows why it stopped, starts it again and, from now on, restarts it by itself every 5 minutes if it ever stops. If the computer was switched off, switching it on is enough.</p></div>}
+        <p className="mb-3 text-sm text-fog-muted">The sender is a small program. Run it on any computer or old Android phone that stays switched on and connected to the internet. When it starts, the QR code shows here.</p>
         <ol className="space-y-4">
           <Step n="W"><b>Windows Server or Windows PC (easiest):</b> download the project, open <b>PowerShell as Administrator</b> in the <code className="code">whatsapp-worker</code> folder and run:<Cmd>{`Set-ExecutionPolicy -Scope Process Bypass -Force\n.\\install-windows.ps1 -Engine openwa`}</Cmd>It installs everything, asks for the Supabase key and starts with Windows. Use <code className="code">.\\install-windows.ps1</code> without <code className="code">-Engine openwa</code> on a server with less than 2 GB RAM.</Step>
           <Step n="1"><b>Windows or Mac laptop:</b> install Node.js 20 from nodejs.org, then in a terminal:<Cmd>{`git clone https://github.com/amyrself-web/rotaract-blood-crm.git\ncd rotaract-blood-crm/whatsapp-worker\nnpm install\ncopy .env.example .env      (Mac: cp .env.example .env)\nnpm start`}</Cmd></Step>

@@ -8,7 +8,7 @@ import path from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {createClient} from '@supabase/supabase-js'
 
-const VERSION='1.2.0'
+const VERSION='1.3.0'
 const ENGINE=(process.env.ENGINE||'baileys').toLowerCase()   // 'baileys' (built in) or 'openwa' (an OpenWA gateway on this machine)
 const here=path.dirname(fileURLToPath(import.meta.url))   // works on Windows too
 for(const f of [path.join(here,'.env'),'.env'])if(fs.existsSync(f))for(const line of fs.readFileSync(f,'utf8').split('\n')){const m=line.match(/^\s*([A-Z_]+)\s*=\s*(.*)\s*$/);if(m&&!process.env[m[1]])process.env[m[1]]=m[2].replace(/^["']|["']$/g,'')}
@@ -122,10 +122,15 @@ async function dailyRules(){
   rulesDay=day;log('daily messages queued',JSON.stringify(r.data))
 }
 
+// never die silently: log unexpected errors and keep going; after many in a row, exit so Windows / systemd starts a fresh copy
+let crashes=[]
+process.on('unhandledRejection',e=>log('unexpected error (still running):',e?.message||e))
+process.on('uncaughtException',e=>{log('unexpected crash:',e?.stack||e);crashes=crashes.filter(t=>Date.now()-t<60000);crashes.push(Date.now())
+  if(crashes.length>5){log('too many errors in a minute, restarting');process.exit(1)}})
 log(`CRM WhatsApp worker ${VERSION} · engine ${ENGINE}${DRY?' (dry run)':''}`)
 await start()
-setInterval(beat,20000)
-setInterval(dailyRules,10*60000);dailyRules()
-sendLoop()
+setInterval(()=>beat().catch(e=>log('heartbeat error:',e?.message||e)),20000)
+setInterval(()=>dailyRules().catch(e=>log('daily tick error:',e?.message||e)),10*60000);dailyRules().catch(e=>log('daily tick error:',e?.message||e))
+sendLoop().catch(e=>{log("send loop stopped, restarting:",e?.message||e);process.exit(1)})
 process.on('SIGTERM',async()=>{state='offline';await beat();process.exit(0)})
 process.on('SIGINT',async()=>{state='offline';await beat();process.exit(0)})

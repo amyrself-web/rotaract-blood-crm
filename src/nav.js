@@ -14,7 +14,7 @@ export const NAV=[
   {to:'/stock',label:'Blood stock',desc:'Units, issues, emergencies',icon:Droplets,perm:['stock','emergency']}]},
  {group:'People',items:[
   {to:'/donors',label:'Donors',desc:'Everyone in the CRM',icon:Users,perm:['donors']},
-  {to:'/import',label:'Import Excel',desc:'Bring donors from a sheet',icon:Upload,perm:['import']},
+  {to:'/import',label:'Bulk import',desc:'Excel / CSV for every module, with undo',icon:Upload,perm:['import','donors','members','camps','meetings']},
   {to:'/messages',label:'WhatsApp and alerts',desc:'Invites, birthdays, reminders',icon:MessageCircle,perm:['messages']},
   {to:'/posts',label:'Post maker',desc:'Images for WhatsApp and Instagram',icon:ImagePlus,perm:['messages','camps']},
   {to:'/afterlife',label:'Eye and body donation',desc:'Pledges and donations after death',icon:Eye,perm:['afterlife']}]},

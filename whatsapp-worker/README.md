@@ -26,6 +26,15 @@ It installs Node.js and Git (with winget, or tells you where to download them), 
 role key, and adds a scheduled task that starts with Windows and restarts the sender if it stops.
 Remove it with `.\install-windows.ps1 -Uninstall`. Logs are in `worker.log`.
 
+**Sender stopped, or the CRM says "Sender not running"?** Open PowerShell as Administrator in this folder and run:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass -Force
+.\check-sender.ps1
+```
+
+It shows the last lines of the logs (why it stopped), copies the newest sender files, makes Windows restart it every 5 minutes if it ever stops, and starts it.
+
 ## With OpenWA (recommended if you have Docker)
 
 [OpenWA](https://github.com/rmyndharis/OpenWA) is an open-source WhatsApp gateway with its own dashboard. Its
