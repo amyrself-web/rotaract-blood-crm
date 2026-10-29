@@ -21,9 +21,9 @@ function Pw({label,value,onChange,auto='current-password'}){const [show,setShow]
 
 export default function DataReset(){
   const [st,setSt]=useState(null),[err,setErr]=useState(''),[mode,setMode]=useState('sample'),[groups,setGroups]=useState([]),[pw,setPw]=useState(''),[word,setWord]=useState(''),[busy,setBusy]=useState(false)
-  const [setp,setSetp]=useState(null),[done,setDone]=useState(null)
+  const [setp,setSetp]=useState(null),[done,setDone]=useState(null),[master,setMaster]=useState(null)
   const load=()=>supabase.rpc('data_reset_status').then(({data,error})=>{if(error)setErr(errText(error));else{setSt(data);setErr('')}})
-  useEffect(()=>{load()},[])
+  useEffect(()=>{load();supabase.rpc('master_admin_info').then(({data})=>setMaster(data||null))},[])
   if(err)return null   // not an admin, or the database is not on v27 yet
   if(!st)return <section className="card mt-5"><div className="skeleton h-24"/></section>
   const sampleTotal=Object.values(st.sample).reduce((a,b)=>a+b,0)
@@ -39,6 +39,7 @@ export default function DataReset(){
     <div className="mb-1 flex items-center gap-2"><ShieldAlert size={18} className="text-blood"/><h2 className="font-semibold text-fg">Test data and a fresh start</h2></div>
     <p className="mb-4 text-sm text-fog-muted">Remove the sample and test records before you start with real data. Settings, logins, message templates and the WhatsApp link stay.
       Numbering (D-0001, C-001, M-001 …) starts again from 1 for every list that becomes empty, so your real data and imports get clean numbers.</p>
+    {master&&<p className="mb-4 flex items-center gap-2 rounded-xl bg-ok/10 px-3 py-2 text-sm text-ok"><KeyRound size={15}/>Master admin <b>{master.email}</b> is always kept. It can never be removed, demoted or switched off.</p>}
 
     <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl bg-ink-800/60 p-3 text-sm"><KeyRound size={16} className="text-brand"/>
       <span className="flex-1 text-fog">{st.has_password?'Reset password is set.':'Set a reset password first. Nothing can be removed without it.'}</span>

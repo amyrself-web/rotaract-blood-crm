@@ -85,6 +85,7 @@ Run each file **once, in this order**. Skip any you have already run. Every file
 26. `v25-camp-numbers-dashboard.sql`: the numbers for every camp type, and the dashboard's numbers for the whole club
 27. `v26-trips-photos-public.sql`: club trips with collections and expenses, camp photos from Google Drive, and public pages for every camp type
 28. `v27-data-reset.sql`: remove the sample data, or start fresh, from Settings with a separate reset password (numbering restarts from 1)
+29. `v28-master-admin.sql`: the master admin (the first admin account) can never be removed, demoted or switched off
 
 Make yourself admin (after you have signed up):
 

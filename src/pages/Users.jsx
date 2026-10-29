@@ -72,6 +72,9 @@ export default function UsersPage(){
   const counts=Object.fromEntries(ROLES.map(r=>[r,(rows||[]).filter(x=>x.role===r).length]))
   const set=k=>e=>setEdit({...edit,[k]:e.target.value})
   const open=r=>{setTab('profile');setPw('');setEdit(r?{...r,permissions:r.permissions||{},_orig:r}:{...blank,password:genPw(),_new:true})}
+  const [master,setMaster]=useState(null)
+  useEffect(()=>{supabase.rpc('master_admin_info').then(({data})=>setMaster(data?.id||null))},[])
+  const isMaster=edit&&edit.id===master
   const locked=edit&&!edit._new&&edit._orig?.role==='admin'&&!isAdmin
 
   const save=async()=>{
@@ -159,11 +162,12 @@ setBusy(true)
               <button className="btn-quiet" title="Generate" onClick={()=>setPw(genPw())} disabled={locked}><Wand2 size={15}/></button></div>
             <button className="btn mt-3" disabled={busy||locked||pw.length<8} onClick={resetPw}>Change password</button></div>
           <div className="flex items-center justify-between rounded-xl border border-ink-600 p-4"><div><div className="font-semibold text-fg">Can sign in</div><div className="text-sm text-fog-muted">Switch off to block access without deleting.</div></div>
-            <Toggle label="Can sign in" checked={edit.active} disabled={edit.id===user.id||locked} onChange={v=>setEdit({...edit,active:v})}/></div>
+            <Toggle label="Can sign in" checked={edit.active} disabled={edit.id===user.id||locked||isMaster} onChange={v=>setEdit({...edit,active:v})}/></div>
           {edit.active!==edit._orig.active&&<button className="btn" onClick={save} disabled={busy}>Save</button>}
           <div className="rounded-xl border border-blood/35 bg-blood/5 p-4"><div className="flex items-center gap-2 font-semibold text-fg"><Trash2 size={16} className="text-blood"/>Delete user</div>
             <p className="mt-1 text-sm text-fog-muted">Removes their login. Donor records and history stay.</p>
-            <button className="btn-danger mt-3" disabled={busy||edit.id===user.id||locked} onClick={remove}>Delete user</button></div>
+            <button className="btn-danger mt-3" disabled={busy||edit.id===user.id||locked||isMaster} onClick={remove}>Delete user</button></div>
+          {isMaster&&<p className="flex items-center gap-2 text-xs text-ok"><ShieldCheck size={13}/>This is the master admin. It always stays an active admin and can never be deleted.</p>}
           {edit.id===user.id&&<p className="flex items-center gap-2 text-xs text-fog-faint"><ShieldCheck size={13}/>You cannot block or delete your own account.</p>}
         </div>}
       </>}
