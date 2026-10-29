@@ -78,6 +78,7 @@ Run each file **once, in this order**. Skip any you have already run. Every file
 23. `v22-post-social.sql`: website, Instagram and Facebook printed on posts
 24. `v23-club-timezone.sql`: the database works in Indian time, so "today" is the club's today
 25. `v24-wa-urgent-status.sql`: the outbox shows why each message is waiting, plus "send now, even in quiet hours"
+26. `v25-camp-numbers-dashboard.sql`: the numbers for every camp type, and the dashboard's numbers for the whole club
 
 Make yourself admin (after you have signed up):
 
