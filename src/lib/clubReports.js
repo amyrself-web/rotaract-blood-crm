@@ -2,6 +2,7 @@ import Papa from 'papaparse'
 import {supabase} from './supabase'
 import {buildPdf,pad,rs,BLOOD} from './docpdf'
 import {fmt} from './util'
+import {clubYearOf} from './year'
 
 // The club year (Lionism year) runs 1 July to 30 June; its name comes from Settings
 export {YEAR_NAME,setYearName,clubYearOf} from './year'
@@ -40,8 +41,22 @@ export async function duesPdf(brand,{from,to,label}){
 }
 
 export const attPct=x=>x.held?Math.round(x.present/x.held*100):null
+// every held meeting in the period, with each member's mark: P present, L late, LV leave, A absent, · not expected (board meeting)
+export async function attendanceMatrix({from,to}){
+  const [mt,mem,att]=await Promise.all([supabase.from('meetings').select('id,meeting_no,meeting_date,kind,kind_other,title,audience').is('deleted_at',null).eq('status','held').gte('meeting_date',from).lte('meeting_date',to).order('meeting_date').order('meeting_no'),
+    supabase.from('members').select('id,member_no,full_name,position,joined_on,status').is('deleted_at',null).order('member_no'),
+    supabase.from('meeting_attendance').select('meeting_id,member_id,status,late_minutes')]).then(x=>x.map(must))
+  const ids=new Set(mt.map(m=>m.id)),A={};att.filter(a=>ids.has(a.meeting_id)).forEach(a=>{A[a.meeting_id+'|'+a.member_id]=a})
+  const years=[...new Set(mt.filter(m=>m.audience==='board').map(m=>clubYearOf(m.meeting_date)))],board={}
+  for(const y of years){const r=await supabase.rpc('board_of_year',{p_year:y});board[y]=new Set((r.data||[]).map(x=>x.member_id).filter(Boolean))}
+  const expected=(m,x)=>(!x.joined_on||x.joined_on<=m.meeting_date)&&(m.audience!=='board'||board[clubYearOf(m.meeting_date)]?.has(x.id))
+  const who=mem.filter(x=>x.status==='active'||mt.some(m=>A[m.id+'|'+x.id]))
+  const mark=(m,x)=>{const a=A[m.id+'|'+x.id];if(a)return {present:'P',late:'L',leave:'LV',absent:'A'}[a.status]||'A';return expected(m,x)?'A':'·'}
+  return {meetings:mt,members:who,mark,expected}}
+
 export async function attendancePdf(brand,{from,to,label}){
   const s=must(await supabase.rpc('attendance_summary',{p_from:from,p_to:to}))
+  const X=await attendanceMatrix({from,to}),per=12,chunks=[];for(let i=0;i<X.meetings.length;i+=per)chunks.push(X.meetings.slice(i,i+per))
   const pct=x=>attPct(x)??0,withM=s.members.filter(x=>x.held),avg=withM.length?Math.round(withM.reduce((a,x)=>a+pct(x),0)/withM.length):0
   return buildPdf({title:'Attendance register',heading:`Attendance, ${label}`,subtitle:`${s.meetings.length} meetings held and ${s.camps.length} camps from ${fmt(from)} to ${fmt(to)}. Late counts as present.`,docNo:`AT-${stamp()}`,brand,footer:`Attendance ${label}`,filename:`attendance-${slug(label)}.pdf`,landscape:true,blocks:[
     {type:'stats',items:[['Meetings held',s.meetings.length],['Camps',s.camps.length],['Active members',s.members.length],['Average attendance',avg+'%'],['Late arrivals',s.members.reduce((a,x)=>a+(x.late||0),0)]]},
@@ -51,7 +66,37 @@ export async function attendancePdf(brand,{from,to,label}){
     {type:'table',heading:'Meetings',columns:['No.','Date','Type','For','Title','Expected','Present','Late','Leave','Absent','Guests'],
       rows:s.meetings.map(x=>[pad('MT',x.no),fmt(x.date),x.kind,x.audience==='board'?'Board':'All',x.title,x.expected,x.present,x.late||0,x.leave||0,Math.max(0,(x.expected||0)-x.present-(x.leave||0)),x.guests||0])},
     {type:'table',heading:'Camps',columns:['Date','Type','Camp','Members present','Late','Leave'],rows:s.camps.map(x=>[fmt(x.date),x.type,x.name,x.present,x.late||0,x.leave||0]),empty:'No camps in this period.'},
+    ...chunks.map((c,ci)=>({type:'table',heading:`Meeting by meeting${chunks.length>1?` (part ${ci+1} of ${chunks.length})`:''}: P present, L late, LV leave, A absent, · not expected`,
+      columns:['Member',...c.map(m=>`${pad('MT',m.meeting_no)} ${new Date(m.meeting_date).toLocaleDateString('en-IN',{day:'2-digit',month:'short'})}${m.audience==='board'?' B':''}`),'P','%'],
+      rows:X.members.map(x=>{const marks=c.map(m=>X.mark(m,x)),exp=marks.filter(v=>v!=='·').length,pr=marks.filter(v=>v==='P'||v==='L').length
+        return [x.full_name,...marks,`${pr}/${exp}`,exp?Math.round(pr/exp*100)+'%':'-']}),
+      opts:{styles:{fontSize:7.2,halign:'center',cellPadding:{top:1.6,bottom:1.6,left:1,right:1}},headStyles:{fontSize:5.6,halign:'center'},columnStyles:{0:{halign:'left',cellWidth:38}},
+        didParseCell:d=>{if(d.section!=='body')return;const v=d.cell.raw;if(v==='A')d.cell.styles.textColor=BLOOD;if(v==='L')d.cell.styles.textColor=[180,110,0];if(v==='LV')d.cell.styles.textColor=[90,100,130]}}})),
     {type:'signatures',items:[[brand.signatory2_name,brand.signatory2_title||'Secretary'],[brand.signatory_name,brand.signatory_title||'President']]}]})
+}
+export async function attendanceMatrixCsv({from,to,label}){
+  const X=await attendanceMatrix({from,to})
+  csv([['Member ID','Member','Position',...X.meetings.map(m=>`${pad('MT',m.meeting_no)} ${m.meeting_date} ${m.title}`),'Present','Expected'],
+    ...X.members.map(x=>{const marks=X.meetings.map(m=>X.mark(m,x));return [pad('M',x.member_no),x.full_name,x.position,...marks,marks.filter(v=>v==='P'||v==='L').length,marks.filter(v=>v!=='·').length]})],`attendance-by-meeting-${slug(label)}.csv`)}
+
+// one meeting: who came (with check-in time), who was late and by how much, who was on leave, who was absent, and the guests
+export async function meetingAttendancePdf(brand,mt,members,meta){
+  const st=m=>meta[m.id]?.status||'absent',grp=k=>members.filter(m=>st(m)===k)
+  const time=m=>meta[m.id]?.noted_at?new Date(meta[m.id].noted_at).toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit'}):'-'
+  const P=grp('present'),L=grp('late'),LV=grp('leave'),A=grp('absent'),came=P.length+L.length,exp=members.length
+  const row=(m,extra)=>[pad('M',m.member_no),m.full_name,m.position||'',...extra]
+  const kind=mt.kind==='Others'?mt.kind_other||'Other':mt.kind
+  return buildPdf({title:'Meeting attendance',heading:mt.title,subtitle:`${kind} meeting${mt.audience==='board'?' (board)':''}  ·  ${fmt(mt.meeting_date)}${mt.start_time?`, ${String(mt.start_time).slice(0,5)}`:''}  ·  ${mt.mode==='Online'?'Online':mt.venue||''}`,
+    docNo:pad('MT',mt.meeting_no),meta:[['Ref. no.',pad('MT',mt.meeting_no)],['Meeting date',fmt(mt.meeting_date)],['Printed',fmt(new Date())]],brand,footer:`Attendance · ${mt.title}, ${fmt(mt.meeting_date)}`,filename:`attendance-${pad('MT',mt.meeting_no)}.pdf`,blocks:[
+    {type:'stats',items:[['Expected',exp],['Came',`${came} (${exp?Math.round(came/exp*100):0}%)`],['Late',L.length],['On leave',LV.length],['Absent',A.length,'blood'],['Guests',mt.guests||0]]},
+    {type:'boxes',boxes:[{title:'MEETING',rows:[['Type',`${kind}${mt.audience==='board'?' · board':''}`],['Date',fmt(mt.meeting_date)],['Time',[mt.start_time,mt.end_time].filter(Boolean).map(t=>String(t).slice(0,5)).join(' - ')||'-'],['Venue',mt.mode==='Online'?'Online':mt.venue||'-']]},
+      {title:'PEOPLE',rows:[['Chaired by',mt.chaired_by||'-'],['Minutes by',mt.minutes_by||'-'],['Chief guest',mt.chief_guest||'-'],['Status',mt.status==='held'?'Held':mt.status||'-']]}]},
+    {type:'table',heading:`Present (${P.length})`,columns:['ID','Member','Position','Marked','Time'],rows:P.map(m=>row(m,[meta[m.id]?.self_marked?'Self check-in':'By secretary',time(m)])),empty:'No one.'},
+    {type:'table',heading:`Late (${L.length})`,columns:['ID','Member','Position','Late by','Time'],rows:L.map(m=>row(m,[meta[m.id]?.late_minutes!=null?`${meta[m.id].late_minutes} min`:'-',time(m)])),empty:'No one was late.'},
+    {type:'table',heading:`On leave (${LV.length})`,columns:['ID','Member','Position','Reason'],rows:LV.map(m=>row(m,[meta[m.id]?.note||'-'])),empty:'No one was on leave.'},
+    {type:'table',heading:`Absent (${A.length})`,columns:['ID','Member','Position'],rows:A.map(m=>row(m,[])),empty:'No one was absent.'},
+    mt.guest_names?{type:'text',heading:'Guests',text:mt.guest_names}:{type:'text'},
+    {type:'signatures',items:[[mt.minutes_by||brand.signatory2_name,brand.signatory2_title||'Secretary'],[mt.chaired_by||brand.signatory_name,'Chairperson']]}]})
 }
 
 export async function minutesPdf(brand,mt,attendance,members,actions){

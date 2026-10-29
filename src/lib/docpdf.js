@@ -159,7 +159,10 @@ export async function buildPdf({title,heading,subtitle,docNo,meta,prepared,brand
         styles:{font:F,fontSize:8.4,cellPadding:{top:2.3,bottom:2.3,left:2.2,right:2.2},textColor:INK,overflow:'linebreak',lineColor:LINE,lineWidth:{bottom:.15}},
         headStyles:{font:F,fontStyle:'bold',fontSize:6.8,textColor:MUTED,fillColor:SOFT,lineColor:NAVY,lineWidth:{bottom:.45},cellPadding:{top:2.6,bottom:2.6,left:2.2,right:2.2}},
         footStyles:{font:F,fontStyle:'bold',fontSize:8.8,textColor:NAVY,fillColor:[255,255,255],lineColor:NAVY,lineWidth:{top:.45}},
-        ...(b.opts||{}),didParseCell:d=>{const cs=(b.opts?.columnStyles||{})[d.column.index];if(d.section!=='body'&&cs?.halign)d.cell.styles.halign=cs.halign}});y=doc.lastAutoTable.finalY+9}
+        ...(b.opts||{}),
+        ...(b.opts?.styles?{styles:{font:F,fontSize:8.4,cellPadding:{top:2.3,bottom:2.3,left:2.2,right:2.2},textColor:INK,overflow:'linebreak',lineColor:LINE,lineWidth:{bottom:.15},...b.opts.styles}}:{}),
+        ...(b.opts?.headStyles?{headStyles:{font:F,fontStyle:'bold',fontSize:6.8,textColor:MUTED,fillColor:SOFT,lineColor:NAVY,lineWidth:{bottom:.45},cellPadding:{top:2.6,bottom:2.6,left:2.2,right:2.2},...b.opts.headStyles}}:{}),
+        didParseCell:d=>{const cs=(b.opts?.columnStyles||{})[d.column.index];if(d.section!=='body'&&cs?.halign)d.cell.styles.halign=cs.halign;b.opts?.didParseCell?.(d)}});y=doc.lastAutoTable.finalY+9}
     else if(b.type==='text'){if(!b.text)continue;head(b.heading);doc.setFont(F,'normal').setFontSize(9.4).setTextColor(...INK)
       for(const line of doc.splitTextToSize(String(b.text),W-2*M)){room(6);doc.text(line,M,y+3);y+=4.9}y+=6}
     else if(b.type==='totals'){const bw=82,X=W-M-bw,rows=b.rows||[],bh=6+rows.length*5.8+10;room(bh+4)

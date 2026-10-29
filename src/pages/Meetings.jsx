@@ -7,7 +7,7 @@ import {supabase} from '../lib/supabase'
 import {useBrand} from '../context/Brand'
 import {fmt} from '../lib/util'
 import {PageHeader,Drawer,Field,Badge,Empty,Tabs,useLive,undoToast,code,errText,todayIso,useConfirm} from '../components/ui'
-import {rotaryYear,attendancePdf,minutesPdf,csv,iso,attPct} from '../lib/clubReports'
+import {rotaryYear,attendancePdf,minutesPdf,meetingAttendancePdf,attendanceMatrixCsv,csv,iso,attPct} from '../lib/clubReports'
 import {YEAR_NAME,clubYearOf} from '../lib/year'
 import CountUp from '../components/CountUp'
 
@@ -44,7 +44,7 @@ export default function Meetings(){
     setForm({...empty(),...Object.fromEntries(Object.entries(r).map(([k,v])=>[k,v??''])),start_time:r.start_time?.slice(0,5)||'',end_time:r.end_time?.slice(0,5)||'',_orig:r})
     const yr=clubYearOf(r.meeting_date);if(r.audience==='board'&&!boards[yr])supabase.rpc('board_of_year',{p_year:yr}).then(b=>setBoards(o=>({...o,[yr]:new Set((b.data||[]).map(x=>x.member_id).filter(Boolean))})))
     const [a,x,c]=await Promise.all([loadAtt(r.id),supabase.from('meeting_actions').select('*').eq('meeting_id',r.id).order('action_no'),supabase.from('meeting_changes').select('*').eq('meeting_id',r.id).order('changed_at',{ascending:false})]);setActs(x.data||[]);setChanges(c.data||[])}
-  const loadAtt=async id=>{const a=await supabase.from('meeting_attendance').select('member_id,status,note,self_marked,late_minutes').eq('meeting_id',id)
+  const loadAtt=async id=>{const a=await supabase.from('meeting_attendance').select('member_id,status,note,self_marked,late_minutes,noted_at').eq('meeting_id',id)
     setAtt(Object.fromEntries((a.data||[]).map(z=>[z.member_id,z.status])));setMeta(Object.fromEntries((a.data||[]).map(z=>[z.member_id,z])));setMins(Object.fromEntries((a.data||[]).filter(z=>z.late_minutes!=null).map(z=>[z.member_id,z.late_minutes])))}
   const newCode=async()=>{const c=String(Math.floor(Math.random()*1e6)).padStart(6,'0');const r=await supabase.from('meetings').update({checkin_code:c}).eq('id',form.id);if(r.error)return toast.error(r.error.message);setForm({...form,checkin_code:c});toast.success('New check-in code made')}
   const set=k=>e=>setForm({...form,[k]:e.target.value})
@@ -125,6 +125,7 @@ export default function Meetings(){
         {period==='custom'&&<><input type="date" className="input w-auto" aria-label="From" value={custom.from} onChange={e=>setCustom({...custom,from:e.target.value})}/><input type="date" className="input w-auto" aria-label="To" value={custom.to} onChange={e=>setCustom({...custom,to:e.target.value})}/></>}
         <span className="text-sm text-fog-muted">{sum?`${sum.meetings.length} meetings held · ${sum.camps?.length||0} camps`:''}</span><div className="flex-1"/>
         <button className="btn-quiet" disabled={!sum} onClick={()=>csv(sum.members.map(x=>({id:code('M',x.no,3),member:x.name,position:x.position,meetings:x.held,present:x.present,late:x.late||0,late_minutes:x.late_minutes||0,leave:x.leave,absent:x.absent??Math.max(0,x.held-x.present-x.leave),attendance:x.held?pct(x)+'%':'',camps_attended:x.camps_present||0,camps:x.camps||0})),`attendance-${P.from}.csv`)}><Download size={15}/>CSV</button>
+        <button className="btn-quiet" disabled={!!pdf} onClick={()=>run('mcsv',()=>attendanceMatrixCsv(P))} title="Every meeting as a column, every member as a row"><FileText size={15}/>Meeting-wise CSV</button>
         <button className="btn-quiet" disabled={!!pdf} onClick={()=>run('att',()=>attendancePdf(brand,P))}><FileText size={15}/>PDF</button></div>
       <p className="border-b border-ink-700 px-3 py-2 text-xs text-fog-faint">Meetings = the meetings each member was expected at (board meetings count only for that year's board). Late counts as present. Absent = expected but not marked present or on leave.</p>
       {!sum?<div className="p-4"><div className="skeleton h-24"/></div>:!sum.members.length?<Empty icon={Users} title="No active members">Add members on the Members page first.</Empty>:
@@ -186,7 +187,7 @@ export default function Meetings(){
           <div className="flex-1"><div className="text-xs text-fog-muted">Members check in themselves with this code</div><div className="font-mono text-2xl font-bold tracking-[.3em] text-fg">{form.checkin_code||'------'}</div></div>
           <button className="btn-quiet" onClick={newCode}><RefreshCw size={14}/>New code</button><button className="btn" onClick={()=>setQr(true)}><Maximize2 size={15}/>Show QR on screen</button></div>}
         <div className="mb-3 flex flex-wrap items-center gap-2"><span className="text-sm text-fog-muted">{Object.values(att).filter(s=>['present','late'].includes(s)).length} of {eligible(form).length} present</span><div className="flex-1"/>
-          <button className="btn-quiet" onClick={()=>markAll('present')}>Mark the rest present</button><button className="btn-quiet" onClick={()=>markAll('absent')}>Mark the rest absent</button>{form.status!=='held'&&<button className="btn" onClick={held}>Mark meeting as held</button>}</div>
+          <button className="btn-quiet" disabled={!!pdf} onClick={()=>run('matt',()=>meetingAttendancePdf(brand,form,eligible(form),Object.fromEntries(eligible(form).map(m=>[m.id,{...(meta[m.id]||{}),status:att[m.id]||'absent',late_minutes:mins[m.id]??meta[m.id]?.late_minutes}]))))}><FileText size={15}/>{pdf==='matt'?'Preparing…':'Attendance PDF'}</button><button className="btn-quiet" onClick={()=>markAll('present')}>Mark the rest present</button><button className="btn-quiet" onClick={()=>markAll('absent')}>Mark the rest absent</button>{form.status!=='held'&&<button className="btn" onClick={held}>Mark meeting as held</button>}</div>
         {!eligible(form).length?<Empty icon={Users} title="No active members">Add members on the Members page.</Empty>:
         <ul className="divide-y divide-ink-700 rounded-xl border border-ink-700">{eligible(form).map(m=><li key={m.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
           <span className="code">{code('M',m.member_no,3)}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-fg">{m.full_name}</span><span className="block truncate text-xs text-fog-faint">{m.position}{meta[m.id]?.self_marked&&<span className="ml-1.5 text-brand">· {att[m.id]==='leave'?'applied leave':'checked in self'}</span>}{meta[m.id]?.note&&<span className="ml-1 text-warn">· {meta[m.id].note}</span>}</span></span>
