@@ -43,6 +43,8 @@ iwr https://raw.githubusercontent.com/amyrself-web/rotaract-blood-crm/main/whats
 ```
 
 From version 1.4 the sender updates itself every 6 hours from GitHub and restarts on the new version (set `AUTO_UPDATE=0` in `.env` to turn this off).
+From 1.4.1 a stuck sender restarts itself: no contact with the CRM for 6 minutes, or not connected for 15 minutes (while not waiting for a QR scan).
+`check-sender.ps1` also makes the Windows task run as SYSTEM, so the sender keeps running after you log out of Remote Desktop.
 
 ## With OpenWA (recommended if you have Docker)
 
