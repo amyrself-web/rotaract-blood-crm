@@ -1,6 +1,6 @@
 // Letter of gratitude to the family of an eye / body / organ / skin donor, in English and Tamil.
 // Designed in HTML so the browser shapes Tamil script correctly, then turned into an A4 PDF.
-import {withBrand,logoImage} from './docpdf'
+import {withBrand,logoImage,watermarkImages,watermarkHtml} from './docpdf'
 
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
 const ref=n=>`ED-${String(n??0).padStart(4,'0')}`
@@ -53,7 +53,7 @@ function seal(club,accent){const t=`${club}  ·  WITH GRATITUDE  ·  `.toUpperCa
     <g transform="translate(46 46) scale(.36)"><path d="M50 6C50 6 18 46 18 66a32 32 0 0 0 64 0C82 46 50 6 50 6z" fill="#C81E3A"/></g>
 </svg>`}
 
-function page(c,brand,lang,lg,il){
+function page(c,brand,lang,lg,il,wm){
   const intl=il?`<div style="width:72px;height:72px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:14px"><img src="${il.data}" style="max-width:66px;max-height:66px"/></div>`:''
   const T=TXT[lang],ta=lang==='ta',accent=brand.brand_color||'#4C8DFF',club=brand.club_name||''
   const fmtD=d=>d?new Date(d).toLocaleDateString(ta?'ta-IN':'en-IN',{day:'numeric',month:'long',year:'numeric'}):'-'
@@ -68,6 +68,7 @@ function page(c,brand,lang,lg,il){
   const contact=[brand.contact_phone,brand.contact_email].filter(Boolean).map(esc).join('<br/>')
   return `<div style="position:relative;width:${W}px;height:${H}px;background:#fff;overflow:hidden;font-family:${body}">
     <div style="position:absolute;inset:0;background:radial-gradient(600px 420px at 100% 0,${accent}12,transparent 70%),radial-gradient(520px 380px at 0 100%,#C81E3A0d,transparent 70%)"></div>
+    ${wm||''}
     <div style="position:absolute;inset:22px;border:1.5px solid #0B1324;border-radius:6px"></div><div style="position:absolute;inset:28px;border:1px solid ${accent};border-radius:4px;opacity:.6"></div>
     <div style="position:absolute;left:56px;right:56px;top:50px;bottom:44px;display:flex;flex-direction:column">
       <div style="display:flex;align-items:center;gap:16px">
@@ -111,7 +112,7 @@ export async function gratitudeLetterHtml(c,brand={},lang='en'){
   const pdf=new jsPDF({orientation:'portrait',unit:'px',format:[W,H],hotfixes:['px_scaling']})
   for(let i=0;i<langs.length;i++){
     const el=document.createElement('div');el.style.cssText=`position:fixed;left:-13000px;top:0;width:${W}px;height:${H}px`
-    el.innerHTML=page(c,brand,langs[i],lg,il);el.setAttribute('translate','no');document.body.appendChild(el)
+    el.innerHTML=page(c,brand,langs[i],lg,il,watermarkHtml(await watermarkImages(brand),W,H));el.setAttribute('translate','no');document.body.appendChild(el)
     try{await document.fonts?.ready
       // long letters (for example eyes and body together) get slightly smaller text so nothing is cut off
       const b=el.querySelector('[data-body]');let fs=parseFloat(getComputedStyle(b).fontSize)

@@ -13,6 +13,8 @@ import {supabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
 import {BLOOD,normPhone,fmt} from '../lib/util'
 import CountUp from '../components/CountUp'
+import TokenPrint,{PrintOne,autoPrint} from '../components/camp/TokenPrint'
+import {useBrand} from '../context/Brand'
 const LABEL={registered:'Registered',checked_in:'Checked in',screened:'Cleared to donate',donated:'Donated',deferred:'Deferred',no_show:'No-show'}
 const TONE={registered:'text-fog-muted',checked_in:'text-brand',screened:'text-brand',donated:'text-fg font-semibold',deferred:'text-blood',no_show:'text-fog-faint'}
 const Field=({label,children})=><label className="text-sm text-fog-muted">{label}{children}</label>
@@ -52,9 +54,9 @@ function Donate({row,run,close}){
       <Field label="Reaction (if any)"><input className="input mt-1" value={v.reaction} onChange={set('reaction')}/></Field></div>
     <div className="mt-3 flex gap-2"><button className="btn" disabled={!v.bag} onClick={()=>run('record_donation',{p_reg:row.reg_id,p_bag:v.bag,p_vol:Number(v.vol),p_reaction:v.reaction||null})}>Record donation</button><button className="btn-ghost text-sm" onClick={close}>Cancel</button></div></div>
 }
-function Walk({camp,run,close}){
+function Walk({camp,run,close,onAdded}){
   const [v,setV]=useState({name:'',phone:'',dob:'',group:'',area:'',consent:false}),set=k=>e=>setV({...v,[k]:e.target.type==='checkbox'?e.target.checked:e.target.value})
-  return <form className="card mb-5 grid gap-3 sm:grid-cols-2" onSubmit={e=>{e.preventDefault();run('walk_in',{p_camp:camp,p_name:v.name,p_phone:normPhone(v.phone),p_group:v.group||null,p_dob:v.dob||null,p_area:v.area||null,p_consent:v.consent})}}>
+  return <form className="card mb-5 grid gap-3 sm:grid-cols-2" onSubmit={async e=>{e.preventDefault();const ok=await run('walk_in',{p_camp:camp,p_name:v.name,p_phone:normPhone(v.phone),p_group:v.group||null,p_dob:v.dob||null,p_area:v.area||null,p_consent:v.consent});if(ok&&onAdded)onAdded(normPhone(v.phone))}}>
     <input className="input" placeholder="Full name" required minLength={2} value={v.name} onChange={set('name')}/><input className="input" placeholder="Mobile (10 digits)" required inputMode="numeric" value={v.phone} onChange={set('phone')}/>
     <Field label="Date of birth"><input className="input mt-1" type="date" required min={adultMin()} max={adultMax()} value={v.dob} onChange={set('dob')}/></Field>
     <select className="input self-end" value={v.group} onChange={set('group')}><option value="">Blood group</option>{BLOOD.map(b=><option key={b}>{b}</option>)}</select>
@@ -74,8 +76,9 @@ function overlay(rows,queue,cid){
     if(a.fn==='record_donation'){row.status='donated';row.bag_number=a.args.p_bag;row.volume_ml=a.args.p_vol}}
   return out
 }
+const tokenItem=r=>({token:r.token_no,name:r.full_name,line:[r.blood_group,r.slot?`Slot ${String(r.slot).slice(0,5)}`:null].filter(Boolean).join(' · '),arrived:!['registered','no_show'].includes(r.status)})
 export default function CampDay(){
-  const {can}=useAuth(),medic=can('screening'),confirm=useConfirm()
+  const {can}=useAuth(),medic=can('screening'),confirm=useConfirm(),{brand}=useBrand()
   const [camps,setCamps]=useState([]),[cid,setCid]=useState(''),[rows,setRows]=useState([]),[q,setQ]=useState(''),[f,setF]=useState(''),[act,setAct]=useState(null),[err,setErr]=useState('')
   const [dtab,setDtab]=useState('main')
   const [queue,setQueue]=useState(readQueue()),[offline,setOffline]=useState(!navigator.onLine),[syncing,setSyncing]=useState(false)
@@ -108,7 +111,8 @@ export default function CampDay(){
   const arrived=shown.filter(r=>!['registered','no_show'].includes(r.status)).length
   const list=shown.filter(r=>(!f||r.status===f)&&(!q||(r.full_name+' '+r.phone+' '+code('T',r.token_no,3)).toLowerCase().includes(q.toLowerCase())))
   const actions=r=>r.tmp?<span className="text-xs text-warn">Waiting to sync</span>:<>
-    {['registered','no_show'].includes(r.status)&&<button className="btn px-3 py-1.5" onClick={()=>run('set_reg_status',{p_reg:r.reg_id,p_status:'checked_in'})}>Check in</button>}
+    {['registered','no_show'].includes(r.status)&&<button className="btn px-3 py-1.5" onClick={async()=>{if(await run('set_reg_status',{p_reg:r.reg_id,p_status:'checked_in'}))autoPrint(tokenItem(r),camp,brand)}}>Check in</button>}
+    {r.token_no!=null&&<PrintOne item={tokenItem(r)} camp={camp} brand={brand}/>}
     {r.status==='registered'&&<button className="btn-ghost hidden text-xs sm:inline-flex" onClick={()=>run('set_reg_status',{p_reg:r.reg_id,p_status:'no_show'})}>No-show</button>}
     {can('campday')&&r.status==='checked_in'&&<button className="btn-ghost text-xs" title="Undo check-in" aria-label="Undo check-in" onClick={()=>run('set_reg_status',{p_reg:r.reg_id,p_status:'registered'})}><Undo2 size={14}/></button>}
     {medic&&r.status==='checked_in'&&<button className="btn px-3 py-1.5" onClick={()=>setAct({type:'screen',row:r})}>Screen</button>}
@@ -119,10 +123,11 @@ export default function CampDay(){
   if(camp&&!isBlood(camp)){const k=kindOf(camp),main={people:'People',food:'Food served',plants:'Saplings'}[k]
     return <div><PageHeader eyebrow="Camp work" title="Camp day" description={`${typeName(camp)} · ${camp.name}${camp.venue?' · '+camp.venue:''}`} actions={pick}/>
       <Tabs id="day-tabs" value={dtab} onChange={setDtab} tabs={[['main',main],...(camp.camp_type==='Cancer awareness'?[['talks','Talks']]:[]),['team','Team'],['summary','Summary']]}/>
-      <div className="card">{dtab==='main'?(k==='people'?<People camp={camp} day/>:k==='food'?<Food camp={camp}/>:<Saplings camp={camp}/>)
+      <div className="card">{dtab==='main'?(k==='people'?<People camp={camp} day brand={brand}/>:k==='food'?<Food camp={camp}/>:<Saplings camp={camp}/>)
         :dtab==='talks'?<Sessions camp={camp}/>:dtab==='team'?<Team camp={camp}/>:<Summary camp={camp} onClosed={()=>{const rest=camps.filter(c=>c.id!==camp.id);setCamps(rest);setCid(rest[0]?.id||'');setDtab('main')}}/>}</div></div>}
   return <div>
     <PageHeader eyebrow="Camp work" title="Camp day" description={camp?`${camp.name} · ${camp.venue||''}`:''} actions={<>{pick}
+        {camp&&<TokenPrint rows={shown.filter(r=>!r.tmp).map(tokenItem)} camp={camp} brand={brand}/>}
         {can('campday')&&<button className="btn" onClick={()=>setAct({type:'walk'})}><UserPlus size={16}/>Walk-in</button>}</>}/>
     {(offline||mine.length>0)&&<div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${offline?'border-warn/40 bg-warn/10':'border-brand/40 bg-brand/10'}`}>
       <div className="flex flex-wrap items-center gap-3">{offline?<WifiOff size={18} className="text-warn"/>:<CloudUpload size={18} className="text-brand"/>}
@@ -138,7 +143,7 @@ export default function CampDay(){
     {dtab==='team'&&camp&&<div className="card"><Team camp={camp}/></div>}
     {dtab==='summary'&&camp&&<div className="card"><Summary camp={camp} onClosed={()=>{const rest=camps.filter(c=>c.id!==camp.id);setCamps(rest);setCid(rest[0]?.id||'');setDtab('main')}}/></div>}
     {dtab==='main'&&<>
-    {act?.type==='walk'&&<Walk camp={cid} run={run} close={()=>setAct(null)}/>}
+    {act?.type==='walk'&&<Walk camp={cid} run={run} close={()=>setAct(null)} onAdded={async ph=>{const {data}=await supabase.from('registrations').select('token_no,slot,status,donors!inner(full_name,blood_group,phone)').eq('camp_id',cid).eq('donors.phone',ph).maybeSingle();if(data)autoPrint(tokenItem({...data,...data.donors}),camp,brand)}}/>}
     {act?.type==='screen'&&<Screen row={act.row} run={run} close={()=>setAct(null)}/>}
     {act?.type==='donate'&&<Donate row={act.row} run={run} close={()=>setAct(null)}/>}
     <div className="mb-3 grid grid-cols-[1fr_auto] gap-2"><div className="relative"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-fog-faint"/><input className="input pl-9" aria-label="Search" placeholder="Search name, phone or token" value={q} onChange={e=>setQ(e.target.value)}/></div>

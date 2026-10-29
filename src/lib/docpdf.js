@@ -50,6 +50,24 @@ function drop(color){
     return dropMark=c.toDataURL('image/png')}catch{return null}
 }
 
+// Watermark: the club logo (and the international logo, if set) faintly in the middle of every page. Always on.
+export async function watermarkImages(brand={}){
+  const [lg,il]=await Promise.all([logoImage(brand.logo_url),brand.intl_logo_url?logoImage(brand.intl_logo_url):null])
+  if(lg||il)return [lg,il].filter(Boolean)
+  const d=drop();return d?[{data:d,w:160,h:160}]:[]}
+export function drawWatermark(doc,imgs,W,H,{opacity=.06,size,x0=0,y0=0}={}){
+  if(!imgs?.length)return
+  try{const gs=doc.GState?new doc.GState({opacity}):null;if(gs)doc.setGState(gs)
+    const box=size||Math.min(W,H)*(imgs.length>1?.42:.6),gap=imgs.length>1?box*.12:0,tot=imgs.length*box+gap*(imgs.length-1)
+    imgs.forEach((im,i)=>placeLogo(doc,im,x0+(W-tot)/2+i*(box+gap),y0+(H-box)/2,box))
+    if(gs)doc.setGState(new doc.GState({opacity:1}))}catch(e){console.warn('watermark',e)}}
+// the same watermark for documents drawn as HTML (certificates, letters)
+export function watermarkHtml(imgs,W,H,opacity=.06){if(!imgs?.length)return ''
+  const box=Math.min(W,H)*(imgs.length>1?.4:.58)
+  return `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:${Math.round(box*.12)}px;opacity:${opacity};pointer-events:none">${imgs.map(im=>{const k=Math.min(box/im.w,box/im.h);return `<img src="${im.data}" style="width:${Math.round(im.w*k)}px;height:${Math.round(im.h*k)}px"/>`}).join('')}</div>`}
+export async function watermarkAll(doc,brand,W,H,opts){const imgs=await watermarkImages(brand),n=doc.getNumberOfPages()
+  for(let i=1;i<=n;i++){doc.setPage(i);drawWatermark(doc,imgs,W,H,opts)}}
+
 // Draws the letterhead (first page) and returns the y where content starts.
 export async function letterhead(doc,{brand={},label,heading,subtitle,meta=[],W,F}){
   const M=16,accent=hexRgb(brand.brand_color),club=brand.club_name||'Blood donation club'
@@ -89,11 +107,11 @@ function runningHeader(doc,{brand,label,W,F}){
   doc.setFont(F,'normal').setFontSize(8).setTextColor(...MUTED).text(String(label||''),W-M,13,{align:'right'})
   doc.setDrawColor(...LINE).setLineWidth(.3).line(M,16,W-M,16);doc.setFillColor(...BLOOD).rect(M,15.5,12,1,'F')
 }
-export function footers(doc,{brand={},label,W,H,F,first=true}){
+export function footers(doc,{brand={},label,W,H,F,first=true,fresh=[]}){
   const M=16,pages=doc.getNumberOfPages(),accent=hexRgb(brand.brand_color),club=brand.club_name||'Blood donation club'
   const stamp=new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})
   for(let i=1;i<=pages;i++){doc.setPage(i)
-    if(i>1||!first)runningHeader(doc,{brand,label,W,F})
+    if((i>1||!first)&&!fresh.includes(i))runningHeader(doc,{brand,label,W,F})
     doc.setDrawColor(...LINE).setLineWidth(.3).line(M,H-15,W-M,H-15)
     doc.setFont(F,'semibold').setFontSize(7.5).setTextColor(...NAVY).text(club,M,H-10.5)
     doc.setFont(F,'normal').setFontSize(7).setTextColor(...MUTED).text([brand.contact_phone,brand.contact_email].filter(Boolean).join('   ·   ')||'Computer-generated document',M+doc.getTextWidth(club)+4,H-10.5)
@@ -105,14 +123,21 @@ export function footers(doc,{brand={},label,W,H,F,first=true}){
 
 /* blocks: {type:'boxes',boxes:[{title,rows:[[k,v]]}]} | {type:'table',heading,columns,rows,opts,empty} | {type:'text',heading,text}
            | {type:'stats',items:[[label,value,tone]]} | {type:'totals',rows:[[k,v]],final:[k,v],negative} | {type:'signatures',items:[[name,title]]} */
-export async function buildPdf({title,heading,subtitle,docNo,meta,prepared,brand={},blocks=[],filename,footer,landscape=false,save=true}){
+// copies: e.g. ['Member copy','Office copy'] prints the same document once per copy, each marked with its name
+export async function buildPdf({title,heading,subtitle,docNo,meta,prepared,brand={},blocks=[],filename,footer,landscape=false,save=true,copies=null}){
   brand=withBrand(brand)
   const [{jsPDF},{default:autoTable}]=await Promise.all([import('jspdf'),import('jspdf-autotable')])
   const doc=new jsPDF({unit:'mm',format:'a4',orientation:landscape?'landscape':'portrait'})
   const F=await useFonts(doc),W=landscape?297:210,H=landscape?210:297,M=16,accent=hexRgb(brand.brand_color)
   const today=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})
-  let y=await letterhead(doc,{brand,label:title,heading:heading||title,subtitle,W,F,
+  const copyPages=[]
+  for(const [ci,copy] of (copies||[null]).entries()){
+  if(ci>0)doc.addPage()
+  const first=doc.getNumberOfPages();copyPages.push([first,copy])
+  let y=await letterhead(doc,{brand,label:copy?`${title} · ${copy}`:title,heading:heading||title,subtitle,W,F,
     meta:meta||[docNo&&['Ref. no.',docNo],['Date',today],prepared&&['Prepared by',prepared]].filter(Boolean)})
+  if(copy){doc.setFont(F,'bold').setFontSize(7.5);const tw=doc.getTextWidth(copy.toUpperCase())+8
+    doc.setFillColor(...(ci===0?accent:NAVY)).roundedRect(W-M-tw,36.2,tw,5.6,1.2,1.2,'F');doc.setTextColor(255,255,255).text(copy.toUpperCase(),W-M-tw/2,40,{align:'center',charSpace:.4})}
   const room=n=>{if(y+n>H-22){doc.addPage();y=26}}
   const head=t=>{if(!t)return;room(16);doc.setFillColor(...accent).roundedRect(M,y-3.2,2.2,4.2,.6,.6,'F')
     doc.setFont(F,'bold').setFontSize(10.5).setTextColor(...NAVY).text(t,M+4.5,y);y+=5}
@@ -147,7 +172,9 @@ export async function buildPdf({title,heading,subtitle,docNo,meta,prepared,brand
       b.items.forEach(([nm,t],i)=>{const X=M+i*step;doc.setDrawColor(...NAVY).setLineWidth(.3).line(X,y,X+sw,y)
         doc.setFont(F,'bold').setFontSize(9).setTextColor(...NAVY).text(nm||'',X,y+5);doc.setFont(F,'normal').setFontSize(7.8).setTextColor(...MUTED).text(t||'',X,y+9.5)});y+=16}
   }
-  footers(doc,{brand,label:footer||title,W,H,F})
+  }
+  footers(doc,{brand,label:footer||title,W,H,F,fresh:copyPages.map(x=>x[0])})
+  await watermarkAll(doc,brand,W,H)
   doc.setProperties({title:heading||title,creator:brand.club_name||'Blood donation club'})
   if(save)doc.save(filename||`${title.replace(/\W+/g,'-').toLowerCase()}.pdf`)
   return doc
@@ -171,6 +198,7 @@ export async function gratitudeLetter(c,brand={},fmt){
     doc.setDrawColor(...NAVY).setLineWidth(.3).line(x,y,x+58,y);doc.setFont(F,'bold').setFontSize(9.5).setTextColor(...NAVY).text(n||'',x,y+5.5);doc.setFont(F,'normal').setFontSize(8).setTextColor(...MUTED).text(t,x,y+10)})
   doc.setFont(F,'semibold').setFontSize(8.5).setTextColor(...BLOOD).text('"Donate your eyes, let someone see the world after you."',W/2,H-24,{align:'center'})
   footers(doc,{brand,label:'Letter of gratitude',W,H,F})
+  await watermarkAll(doc,brand,W,H)
   doc.setProperties({title:`Letter of gratitude ${pad('ED',c.case_no,4)}`,creator:brand.club_name||''})
   doc.save(`gratitude-${pad('ED',c.case_no,4)}.pdf`)
 }

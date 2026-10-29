@@ -12,7 +12,8 @@ const KINDS=[['donors','Donors','donors',r=>r.full_name,r=>`${code('D',r.donor_n
   ['members','Members','members',r=>r.full_name,r=>`${code('M',r.member_no,3)} · ${r.position}`],
   ['meetings','Meetings','meetings',r=>r.title,r=>`${code('MT',r.meeting_no,3)} · ${fmt(r.meeting_date)}`],
   ['afterlife_cases','Eye and body donations','afterlife',r=>r.deceased_name,r=>`${code('ED',r.case_no,4)} · ${fmt(r.died_on)}`],
-  ['pledges','Pledges','afterlife',r=>r.full_name,r=>`${code('PL',r.pledge_no,4)} · ${fmt(r.pledged_on)}`]]
+  ['pledges','Pledges','afterlife',r=>r.full_name,r=>`${code('PL',r.pledge_no,4)} · ${fmt(r.pledged_on)}`],
+  ['club_trips','Club trips','funds',r=>r.title,r=>`${code('TR',r.trip_no,3)} · ${fmt(r.start_date)}`]]
 
 export default function Trash(){
   const {can}=useAuth(),confirm=useConfirm(),kinds=KINDS.filter(k=>can(k[2]))

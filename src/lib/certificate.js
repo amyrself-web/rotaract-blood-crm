@@ -26,7 +26,7 @@ function pattern(){
 export async function makeCertificate({name,camp,date,venue,bloodGroup,volume,certificate,verifyCode,donorNo,brand={},v=null}){
   const [{default:html2canvas},{jsPDF}]=await Promise.all([import('html2canvas'),import('jspdf')])
   const check=verifyCode||certificate,qr=await brandQr(v?.qrUrl||verifyUrl(fmtCode(check)),brand,{size:520,quiet:0})
-  const {withBrand,logoImage}=await import('./docpdf');brand=withBrand(brand)
+  const {withBrand,logoImage,watermarkImages,watermarkHtml}=await import('./docpdf');brand=withBrand(brand)
   const accent=brand.brand_color||'#4C8DFF'
   const club=brand.club_name||'Blood donation club'
   const lg=await logoImage(brand.logo_url),fit=lg?Math.min(70/lg.w,70/lg.h):1
@@ -42,6 +42,7 @@ export async function makeCertificate({name,camp,date,venue,bloodGroup,volume,ce
   el.innerHTML=`
   <div style="position:absolute;inset:0;background:linear-gradient(135deg,#ffffff 0%,#FBFCFF 55%,#FFF4F6 100%)"></div>
   ${pattern()}
+  ${watermarkHtml(await watermarkImages(brand),1123,794,.05)}
   <div style="position:absolute;inset:0;width:150px;background:linear-gradient(180deg,#0B1324 0%,#16233F 100%)"></div>
   <div style="position:absolute;left:150px;top:0;bottom:0;width:7px;background:linear-gradient(180deg,#F0435A,#B4233A)"></div>
   <svg style="position:absolute;left:0;top:0" width="150" height="794" xmlns="http://www.w3.org/2000/svg">

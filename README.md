@@ -14,6 +14,8 @@ Live site: https://amyrself-web.github.io/rotaract-blood-crm/
 - Eye, cancer and other people camps: tokens, findings, actions, referrals and follow-up.
 - Food camps: places served, people fed and packets. Plantation camps: saplings, location, who waters them, and survival checks.
 - Planning: checklist, desks, materials kit, expenses and sponsors.
+- Token printing: one 80 mm slip the moment someone arrives (thermal printer), or many tokens on A4 sheets to cut.
+- Camp photos: paste a Google Drive folder link (shared as "Anyone with the link: Viewer"). The photos show on the public camp page, the impact page and the registration page.
 - Camp day: member attendance, volunteers, a summary, "Close the day", and a camp report PDF.
 
 **People**
@@ -26,7 +28,8 @@ Live site: https://amyrself-web.github.io/rotaract-blood-crm/
 - The Lionism year (July to June), with the board of each year.
 - Service projects and volunteer hours, events with passes, the notice board and polls.
 - Eye and body donation pledges, and club assets.
-- Money: donation receipts, club expenses and accounts.
+- Money: donation receipts (donor copy and office copy), club expenses and accounts.
+- Club trips: who is going, each person's share and payment, every expense, the balance, and a statement PDF.
 
 **Messages**
 - A WhatsApp outbox, with automatic sending from the club phone or "tap to send".
@@ -45,9 +48,10 @@ Live site: https://amyrself-web.github.io/rotaract-blood-crm/
 
 **Reports**
 - PDFs on the club letterhead, with the club logo on the left and the international logo on the right.
+- Every PDF carries the club's logos as a faint watermark.
 - Certificates, letters, CSV exports and a full backup.
 
-**Public pages** (no sign-in needed): camp page, camp and event registration, certificate and member card check, and impact numbers.
+**Public pages** (no sign-in needed): camp page (every camp type, upcoming and recent, with photos), camp and event registration, certificate and member card check, and impact numbers for every kind of camp.
 
 ## Database setup (Supabase SQL Editor)
 
@@ -79,6 +83,7 @@ Run each file **once, in this order**. Skip any you have already run. Every file
 24. `v23-club-timezone.sql`: the database works in Indian time, so "today" is the club's today
 25. `v24-wa-urgent-status.sql`: the outbox shows why each message is waiting, plus "send now, even in quiet hours"
 26. `v25-camp-numbers-dashboard.sql`: the numbers for every camp type, and the dashboard's numbers for the whole club
+27. `v26-trips-photos-public.sql`: club trips with collections and expenses, camp photos from Google Drive, and public pages for every camp type
 
 Make yourself admin (after you have signed up):
 

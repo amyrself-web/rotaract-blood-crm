@@ -5,6 +5,7 @@ import {CalendarDays,MapPin,CheckCircle2} from 'lucide-react'
 import {supabase,hasSupabase} from '../lib/supabase'
 import {BLOOD,normPhone,fmt,slots} from '../lib/util'
 import {Logo} from '../components/Brand'
+import CampPhotos from '../components/CampPhotos'
 import {useBrand} from '../context/Brand'
 import {Field,adultMax,adultMin,PHONE_PATTERN} from '../components/ui'
 import {useLang} from '../lib/i18n'
@@ -13,7 +14,8 @@ import {usePulse} from '../lib/pulse'
 import {isBlood,typeName,words} from '../lib/campTypes'
 
 export default function Register(){
-  const {campId}=useParams(),{brand}=useBrand()
+  const {campId}=useParams(),{brand}=useBrand(),[past,setPast]=useState([])
+  useEffect(()=>{if(hasSupabase)supabase.rpc('public_camps').then(({data})=>setPast((data?.recent||[]).filter(c=>c.photos&&c.id!==campId)))},[campId])
   const {t}=useLang();const [camp,setCamp]=useState(undefined),[g,setG]=useState({name:'',phone:'',age:'',gender:'',area:'',consent:false}),[taken,setTaken]=useState({}),[f,setF]=useState({name:'',phone:'',group:'',dob:'',area:'',slot:'',consent:false}),[msg,setMsg]=useState(''),[done,setDone]=useState(null),[busy,setBusy]=useState(false)
   const loadSlots=()=>supabase.rpc('camp_slots',{p_camp:campId}).then(({data})=>setTaken(Object.fromEntries((data||[]).map(x=>[x.slot,x]))))
   const loadCamp=()=>supabase.from('camps').select('*').eq('id',campId).maybeSingle().then(({data})=>setCamp(data))
@@ -74,5 +76,8 @@ export default function Register(){
         <label className="flex gap-2.5 text-sm text-fog"><input type="checkbox" className="mt-1" required checked={f.consent} onChange={set('consent')}/><span>{t('I agree to be contacted about this camp and future blood donation drives, and to my details being stored for this purpose.')}</span></label>
         {msg&&<p role="alert" className="rounded-lg border border-blood/40 bg-blood/10 px-3 py-2 text-sm text-blood">{msg}</p>}
         <button className="btn w-full py-2.5" disabled={busy||(list.length>0&&!f.slot)}>{busy?t('Registering…'):list.length>0&&!f.slot?t('Choose a time slot'):t('Register')}</button></form>}
+      {camp?.photo_links&&<div className="card mt-4"><CampPhotos links={camp.photo_links} title={t('Photos')} compact/></div>}
+      {past.length>0&&<div className="card mt-4 space-y-4"><div className="text-sm font-semibold text-fg">{t('From our past camps')}</div>
+        {past.slice(0,3).map(c=><div key={c.id}><div className="mb-1.5 text-xs text-fog-muted">{c.name} · {fmt(c.date)}</div><CampPhotos links={c.photos} compact max={6}/></div>)}</div>}
     </motion.div></div>
 }

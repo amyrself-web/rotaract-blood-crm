@@ -36,10 +36,10 @@ export function useWaStatus(ms=15000){
 // one shared, slow poll for the many send buttons on a page (null = cannot see the sender, e.g. no Messages permission)
 let shared=null,subs=new Set(),timer=null,last=0
 async function pollShared(){const {data,error}=await supabase.rpc('wa_status');shared=error?null:data;last=Date.now();subs.forEach(f=>f(shared))}
-export function useWaReady(){
+export function useWaReady(enabled=true){
   const [s,setS]=useState(shared)
-  useEffect(()=>{subs.add(setS);if(Date.now()-last>20000)pollShared();if(!timer)timer=setInterval(pollShared,60000)
-    return()=>{subs.delete(setS);if(!subs.size){clearInterval(timer);timer=null}}},[])
+  useEffect(()=>{if(!enabled)return;subs.add(setS);if(Date.now()-last>20000)pollShared();if(!timer)timer=setInterval(pollShared,60000)
+    return()=>{subs.delete(setS);if(!subs.size){clearInterval(timer);timer=null}}},[enabled])
   return s
 }
 export const refreshWaReady=()=>pollShared()

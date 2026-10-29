@@ -41,6 +41,7 @@ import Projects from './pages/Projects'
 import Notices from './pages/Notices'
 import Directory from './pages/Directory'
 import Assets from './pages/Assets'
+import Trips from './pages/Trips'
 import Events from './pages/Events'
 import EventRegister from './pages/EventRegister'
 import Impact from './pages/Impact'
@@ -68,7 +69,7 @@ function Guard(){const {user,profile,loading,recovery,signOut}=useAuth(),loc=use
   if(!(user&&profile)&&!loading&&loc.pathname!=='/'){try{sessionStorage.setItem('after-login',loc.pathname+loc.search)}catch{}}
   return user&&profile?<Layout/>:<Navigate to="/login" replace/>}
 const PAGES=[['/donors',Donors],['/camps',Camps],['/import',Import],['/camp-day',CampDay],['/messages',Messages],['/stock',Stock],['/planning',Planning],
-  ['/reports',Reports],['/users',UsersPage],['/calendar',Calendar],['/audit',Audit],['/settings',SettingsPage],['/trash',Trash],['/members',Members],['/meetings',Meetings],['/afterlife',Afterlife],['/certificates',Certificates],['/funds',Funds],['/privacy',Privacy],['/projects',Projects],['/notices',Notices],['/directory',Directory],['/assets',Assets],['/events',Events],['/posts',PostMaker]]
+  ['/reports',Reports],['/users',UsersPage],['/calendar',Calendar],['/audit',Audit],['/settings',SettingsPage],['/trash',Trash],['/members',Members],['/meetings',Meetings],['/afterlife',Afterlife],['/certificates',Certificates],['/funds',Funds],['/privacy',Privacy],['/projects',Projects],['/notices',Notices],['/directory',Directory],['/assets',Assets],['/events',Events],['/posts',PostMaker],['/trips',Trips]]
 function Toasts(){const {mode}=useBrand()
   return <><VoiceDock/><Toaster position="top-center" offset={14} theme={mode} toastOptions={{style:{background:'rgb(var(--ink-800))',border:'1px solid rgb(var(--ink-600))',color:'rgb(var(--fg))',fontFamily:'Manrope, system-ui, sans-serif'}}}/></>}
 export default function App(){return <BrandProvider><AuthProvider><ConfirmProvider><HashRouter><Routes>

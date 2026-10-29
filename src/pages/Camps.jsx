@@ -12,6 +12,7 @@ import Team from '../components/camp/Team'
 import People from '../components/camp/People'
 import Summary from '../components/camp/Summary'
 import {Food,Saplings,Sessions} from '../components/camp/Records'
+import CampPhotos,{hasPhotos} from '../components/CampPhotos'
 import {CAMP_TYPES,CANCERS,typeName as campTypeName,isBlood,kindOf,takesOnline,words,FORM} from '../lib/campTypes'
 const MAIN={blood:['people','Registrants'],people:['people','People'],food:['food','Food served'],plants:['plants','Saplings']}
 
@@ -75,7 +76,7 @@ export default function Camps(){
     supabase.rpc('camp_numbers').then(({data})=>data&&setNums(Object.fromEntries(data.map(x=>[x.camp_id,x]))))}
   useEffect(()=>{load()},[])
   useLive(['camps','registrations','camp_people','camp_food','camp_saplings','camp_sessions','donations'],load)
-  const blank={camp_type:'Blood donation',camp_type_other:'',cancer_types:[],about:'',beneficiaries:'',partner:'',partner_contact:'',doctors:'',target_people:'',details:{},name:'',camp_date:'',start_time:'09:00',end_time:'15:00',venue:'',target_donors:'',slot_capacity:settings.default_slot_capacity??'',budget:'',status:'planned'}
+  const blank={camp_type:'Blood donation',camp_type_other:'',cancer_types:[],about:'',photo_links:'',beneficiaries:'',partner:'',partner_contact:'',doctors:'',target_people:'',details:{},name:'',camp_date:'',start_time:'09:00',end_time:'15:00',venue:'',target_donors:'',slot_capacity:settings.default_slot_capacity??'',budget:'',status:'planned'}
   const set=k=>e=>setForm({...form,[k]:e.target.value})
   const save=async e=>{e.preventDefault()
     if(!form.name.trim())return toast.error('Enter the camp name');if(!form.camp_date)return toast.error('Choose the camp date')
@@ -118,7 +119,7 @@ export default function Camps(){
             {subNums(c,nums[c.id]).map(([v,l])=><span key={l} className="text-xs text-fog-faint">· <b className="tabular-nums text-fog">{v}</b> {l}</span>)}</div>
           {c.target_people>0&&<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink-700"><div className="h-full rounded-full bg-gradient-to-r from-brand-deep to-brand" style={{width:Math.min(100,mainNum(c,nums[c.id])/c.target_people*100)+'%'}}/></div>}
           {c.cancer_types?.length>0&&<div className="mt-2 flex flex-wrap gap-1">{c.cancer_types.map(t=><span key={t} className="rounded-full bg-ink-700 px-2 py-0.5 text-[11px] text-fog-muted">{t}</span>)}</div>}
-          {c.partner&&<p className="mt-1 text-xs text-fog-faint">With {c.partner}</p>}
+          {c.partner&&<p className="mt-1 text-xs text-fog-faint">With {c.partner}</p>}{hasPhotos(c.photo_links)&&<p className="mt-1 text-xs text-brand">Photos added</p>}
           {c.about&&<p className="mt-2 line-clamp-2 text-sm text-fog-muted">{c.about}</p>}</div>}
         {isBlood(c)&&c.target_donors&&<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink-700"><div className="h-full origin-left animate-grow rounded-full bg-gradient-to-r from-brand-deep to-brand" style={{width:Math.min(100,n/c.target_donors*100)+'%'}}/></div>}
         <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-ink-700 pt-4">
@@ -155,6 +156,9 @@ export default function Camps(){
         {FORM[form.camp_type]?.doctors&&<Field label={FORM[form.camp_type].doctors} className="sm:col-span-2"><input className="input" value={form.doctors} onChange={set('doctors')}/></Field>}
         <Field label="Budget (Rs.)"><input className="input" type="number" min="0" value={form.budget} onChange={set('budget')}/></Field>
         <Field label="About the camp" hint="Shown on the front page." className="sm:col-span-2"><textarea className="input" rows={3} maxLength={600} value={form.about} onChange={set('about')}/></Field>
+        <Field label="Camp photos (Google Drive link)" hint="In Google Drive: Share → General access → Anyone with the link (Viewer), then paste the folder link here. Or paste photo links, one per line. They show on the public camp page, impact page and registration page." className="sm:col-span-2">
+          <textarea className="input font-mono text-xs" rows={2} placeholder="https://drive.google.com/drive/folders/…" value={form.photo_links||''} onChange={set('photo_links')}/></Field>
+        {hasPhotos(form.photo_links)&&<div className="sm:col-span-2"><CampPhotos links={form.photo_links} compact/></div>}
       </form>}
     </Drawer>
 

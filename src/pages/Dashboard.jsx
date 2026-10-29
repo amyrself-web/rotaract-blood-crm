@@ -1,6 +1,6 @@
 import {useEffect,useState} from 'react'
 import {Link} from 'react-router-dom'
-import {Users,CalendarDays,Droplets,HeartPulse,AlertTriangle,UserPlus,Upload,MessageCircle,ClipboardCheck,QrCode,ArrowRight,HandHeart,TreePine,IdCard,Presentation,Wallet,Cake,PartyPopper,ImagePlus,Send,Clock} from 'lucide-react'
+import {Users,CalendarDays,Droplets,HeartPulse,AlertTriangle,UserPlus,Upload,MessageCircle,ClipboardCheck,QrCode,ArrowRight,HandHeart,TreePine,IdCard,Presentation,Wallet,Cake,PartyPopper,ImagePlus,Send,Clock,Bus,HandCoins} from 'lucide-react'
 import {supabase,hasSupabase} from '../lib/supabase'
 import {useAuth} from '../context/Auth'
 import {BLOOD,fmt} from '../lib/util'
@@ -49,18 +49,18 @@ export default function Dashboard(){
   const {profile,can}=useAuth(),{brand}=useBrand(),role=profile.role,staff=can('donors')||can('camps'),stockRole=can('stock')
   const [k,setK]=useState({}),[camp,setCamp]=useState(undefined),[stock,setStock]=useState(null),[reqs,setReqs]=useState(null),[now,setNow]=useState(Date.now())
   const today=new Date().toLocaleDateString('en-CA')
-  const [tick,setTick]=useState(0),[n,setN]=useState({}),[cn,setCn]=useState(null),wa=useWaReady()
+  const [tick,setTick]=useState(0),[n,setN]=useState({}),[cn,setCn]=useState(null),wa=useWaReady(can('messages'))
   useLive(['donors','camps','registrations','donations','blood_units','emergency_requests','camp_people','camp_food','camp_saplings','members','meetings','member_dues','wa_outbox'],()=>setTick(x=>x+1))
   useEffect(()=>{if(!hasSupabase)return
     (async()=>{
       const c=await supabase.from('camps').select('*, registrations(count)').gte('camp_date',today).not('status','in','(closed,completed)').order('camp_date').limit(1)
       setCamp(c.data?.[0]||null)
-      const d=await supabase.rpc('dashboard_numbers')
-      if(!d.error)setN(d.data||{})
+      const [d,tr]=await Promise.all([supabase.rpc('dashboard_numbers'),supabase.rpc('trip_numbers')])
+      if(!d.error)setN({...(d.data||{}),...(tr.error?{}:tr.data||{})})
       else if(staff||can('screening')){   // database not yet on v25
         const [donors,consent,donations,camps]=await Promise.all([count('donors',q=>q.is('deleted_at',null)),count('donors',q=>q.eq('consent',true).is('deleted_at',null)),count('donations'),count('camps',q=>q.is('deleted_at',null))])
         setK({donors,consent,donations,camps})}
-      if(c.data?.[0])supabase.rpc('camp_numbers').then(({data})=>setCn((data||[]).find(x=>x.camp_id===c.data[0].id)||null))
+      if(c.data?.[0]&&(staff||can('campday')||can('screening')||can('planning')||can('reports')))supabase.rpc('camp_numbers').then(({data})=>setCn((data||[]).find(x=>x.camp_id===c.data[0].id)||null))
       if(stockRole){
         const u=await supabase.from('blood_units').select('blood_group').eq('status','available')
         if(!u.error){const by=Object.fromEntries(BLOOD.map(g=>[g,0]));u.data.forEach(x=>{if(x.blood_group)by[x.blood_group]++});setStock(by)}
@@ -90,6 +90,9 @@ export default function Dashboard(){
         <Kpi icon={Presentation} label={`Meetings held this ${YEAR_NAME}`} value={n.meetings_year} sub={n.meetings_week?.length?`${n.meetings_week.length} in the next 7 days`:'None in the next 7 days'} to="/meetings"/></>}
       {n.dues_paid_year!==undefined&&<Kpi icon={Wallet} label={`Members paid this ${YEAR_NAME}`} value={n.dues_paid_year} sub={`Rs. ${Number(n.dues_amount_year||0).toLocaleString('en-IN')} collected`} tone="warn" to="/members"/>}
       {n.planted!==undefined&&<Kpi icon={TreePine} label="Saplings planted" value={n.planted} tone="green"/>}
+      {n.received_year!==undefined&&<Kpi icon={HandCoins} label={`Donations received this ${YEAR_NAME}`} value={Number(n.received_year)} sub="Money donations with receipts" tone="warn" to="/funds"/>}
+      {n.projects_active!==undefined&&<Kpi icon={HandHeart} label="Service projects running" value={n.projects_active} sub={n.hours_year?`${Math.round(n.hours_year)} volunteer hours this year`:undefined} to="/projects"/>}
+      {n.trips_year!==undefined&&<Kpi icon={Bus} label={`Club trips this ${YEAR_NAME}`} value={n.trips_year} sub={n.trips_next?.length?`${n.trips_next.length} coming up`:undefined} to="/trips"/>}
     </div>
     :(staff||can('screening'))&&<div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <Kpi icon={Users} label="Donors in the CRM" value={k.donors} to={staff?'/donors':undefined}/>
@@ -144,9 +147,11 @@ export default function Dashboard(){
             <span className="min-w-0 flex-1"><span className="block truncate text-fg">{m.title}</span><span className="text-xs text-fog-faint">{fmt(m.date)}{m.time?`, ${String(m.time).slice(0,5)}`:''}{m.venue?` · ${m.venue}`:''}{m.audience==='board'?' · board':''}</span></span></Link></li>)}
           {(n.events_next||[]).map(e=><li key={e.id}><Link to="/events" className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-ink-800"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-warn/10 text-warn"><PartyPopper size={16}/></span>
             <span className="min-w-0 flex-1"><span className="block truncate text-fg">{e.title}</span><span className="text-xs text-fog-faint">{fmt(e.date)}{e.venue?` · ${e.venue}`:''}</span></span></Link></li>)}
+          {(n.trips_next||[]).map(t=><li key={t.id}><Link to="/trips" className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-ink-800"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ok/10 text-ok"><Bus size={16}/></span>
+            <span className="min-w-0 flex-1"><span className="block truncate text-fg">{t.title}{t.destination?` · ${t.destination}`:''}</span><span className="text-xs text-fog-faint">{fmt(t.date)} · {t.people} going · Rs. {Number(t.collected).toLocaleString('en-IN')} collected · Rs. {Number(t.spent).toLocaleString('en-IN')} spent</span></span></Link></li>)}
           {(n.member_birthdays?.length>0||n.donor_birthdays>0)&&<li className="flex items-center gap-3 px-1 py-1"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-blood/10 text-blood"><Cake size={16}/></span>
             <span className="min-w-0 flex-1 text-fg">Birthdays today: {[...(n.member_birthdays||[]),...(n.donor_birthdays?[`${n.donor_birthdays} donor${n.donor_birthdays>1?'s':''}`]:[])].join(', ')}</span></li>}
-          {!(n.meetings_week?.length||n.events_next?.length||n.member_birthdays?.length||n.donor_birthdays)&&<li className="text-fog-faint">No meetings, events or birthdays in the next 7 days.</li>}
+          {!(n.meetings_week?.length||n.events_next?.length||n.trips_next?.length||n.member_birthdays?.length||n.donor_birthdays)&&<li className="text-fog-faint">No meetings, events or birthdays in the next 7 days.</li>}
         </ul></section>}
       {can('messages')&&wa&&<section className={`card ${wa.provider==='qr'&&wa.status!=='connected'?'border-blood/40':''}`}>
         <div className="mb-3 flex items-center justify-between"><div className="font-display text-sm font-semibold text-fg">WhatsApp</div><Link to="/messages" className="text-xs text-brand hover:underline">Open</Link></div>
@@ -170,6 +175,8 @@ export default function Dashboard(){
         {can('meetings')&&<Action to="/meetings" icon={Presentation} label="Meetings and attendance"/>}
         {(can('messages')||can('camps'))&&<Action to="/posts" icon={ImagePlus} label="Make a post for WhatsApp / Instagram"/>}
         {can('members')&&<Action to="/members" icon={IdCard} label="Members and dues"/>}
+        {(can('funds')||can('members'))&&<Action to="/trips" icon={Bus} label="Club trips and expenses"/>}
+        {can('funds')&&<Action to="/funds" icon={HandCoins} label="Receipts and accounts"/>}
       </div></section>
     {can('donors')&&<TopDonors/>}
   </div>

@@ -24,7 +24,7 @@ const emptyExp=()=>({spent_on:todayIso(),category:'Printing and stationery',paid
 export async function donationReceipt(g,brand,camps=[]){
   const camp=camps.find(c=>c.id===g.camp_id)
   return buildPdf({title:'Donation receipt',heading:`${rs(g.amount)} received with thanks`,subtitle:`From ${g.donor_name}  ·  ${fmt(g.received_on)}`,docNo:pad('DR',g.receipt_no,4),brand,
-    footer:`Donation receipt ${pad('DR',g.receipt_no,4)}`,filename:`receipt-${pad('DR',g.receipt_no,4)}.pdf`,
+    footer:`Donation receipt ${pad('DR',g.receipt_no,4)}`,copies:['Donor copy','Office copy'],filename:`receipt-${pad('DR',g.receipt_no,4)}.pdf`,
     meta:[['Receipt no.',pad('DR',g.receipt_no,4)],['Date',fmt(g.received_on)],['Status',g.status==='cancelled'?'CANCELLED':'Paid']],
     blocks:[
       {type:'boxes',boxes:[{title:'Received from',rows:[['Name',g.donor_name],['Mobile',g.phone||'-'],['Email',g.email||'-'],['Address',g.address||'-']]},

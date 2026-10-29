@@ -8,6 +8,8 @@ import {Badge,useLive,errText,useConfirm,code,undoToast} from '../ui'
 import WaSend from '../wa/WaSend'
 import {EYE_FINDINGS,EYE_ACTIONS,CANCER_SCREENS,RESULTS,FOLLOW,typeName} from '../../lib/campTypes'
 import {fmt} from '../../lib/util'
+import TokenPrint,{PrintOne,autoPrint} from './TokenPrint'
+import {useBrand} from '../../context/Brand'
 
 const RTONE={normal:'green',needs_care:'amber',suspicious:'red'}
 const Chips=({options,value,onChange,label})=><div role="group" aria-label={label} className="flex flex-wrap gap-1.5">{options.map(([k,l])=>{const on=value.includes(k)
@@ -43,7 +45,8 @@ function Editor({p,camp,save,remove}){
   </div>}
 
 export default function People({camp,day=false}){
-  const {can}=useAuth(),confirm=useConfirm()
+  const {can}=useAuth(),confirm=useConfirm(),{brand}=useBrand()
+  const item=r=>({token:r.token_no,name:r.full_name,line:[r.age!=null?`Age ${r.age}${r.gender?' · '+r.gender:''}`:r.gender,r.area].filter(Boolean).join(' · '),arrived:r.status!=='registered'&&r.status!=='no_show'})
   const [rows,setRows]=useState(null),[q,setQ]=useState(''),[f,setF]=useState(''),[open,setOpen]=useState(null),[add,setAdd]=useState({full_name:'',age:'',gender:'',phone:'',area:''}),[busy,setBusy]=useState(false)
   const load=()=>supabase.from('camp_people').select('*').eq('camp_id',camp.id).order('token_no').then(({data,error})=>error?toast.error(error.message):setRows(data))
   useEffect(()=>{load()},[camp.id]);useLive(['camp_people'],load)
@@ -56,7 +59,7 @@ export default function People({camp,day=false}){
     const ph=add.phone.replace(/\D/g,'').slice(-10);if(add.phone&&!/^[6-9]\d{9}$/.test(ph))return toast.error('Enter a valid 10-digit mobile number or leave it empty')
     setBusy(true);const {data,error}=await supabase.from('camp_people').insert({camp_id:camp.id,full_name:add.full_name.trim(),age:add.age===''?null:Number(add.age),gender:add.gender||null,phone:ph||null,area:add.area.trim()||null,status:day?'attended':'registered',source:'desk'}).select().single()
     setBusy(false);if(error)return toast.error(error.code==='23505'?'This mobile number is already registered for this camp':errText(error))
-    toast.success(`${data.full_name}: token ${code('T',data.token_no,3)}`);setAdd({full_name:'',age:'',gender:'',phone:'',area:''});load();if(day)setOpen(data.id)}
+    toast.success(`${data.full_name}: token ${code('T',data.token_no,3)}`);if(day)autoPrint(item(data),camp,brand);setAdd({full_name:'',age:'',gender:'',phone:'',area:''});load();if(day)setOpen(data.id)}
   const list=useMemo(()=>(rows||[]).filter(r=>(!q||`${r.full_name} ${r.phone||''} ${r.token_no} ${r.area||''}`.toLowerCase().includes(q.toLowerCase()))
     &&(!f||(f==='waiting'?r.status==='registered':f==='seen'?r.status==='attended':f==='referred'?!!r.referred_to:f==='follow'?r.follow_up==='pending':f==='no_show'?r.status==='no_show':r.result===f))),[rows,q,f])
   if(!rows)return <div className="skeleton h-40"/>
@@ -71,14 +74,16 @@ export default function People({camp,day=false}){
       <input className="input py-1.5" aria-label="Mobile" placeholder="Mobile (optional)" inputMode="tel" value={add.phone} onChange={e=>setAdd({...add,phone:e.target.value})}/>
       <input className="input py-1.5" aria-label="Area" placeholder="Area / village" value={add.area} onChange={e=>setAdd({...add,area:e.target.value})}/>
       <button className="btn py-1.5" disabled={busy}><UserPlus size={15}/>{day?'Add walk-in':'Add'}</button></form>}
-    <div className="flex flex-wrap gap-2"><label className="relative min-w-[200px] flex-1"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fog-faint"/><input className="input pl-8" aria-label="Search people" placeholder="Search name, mobile, token" value={q} onChange={e=>setQ(e.target.value)}/></label>
+    <div className="flex flex-wrap gap-2">{day&&<TokenPrint rows={rows.map(item)} camp={camp} brand={brand}/>}<label className="relative min-w-[200px] flex-1"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fog-faint"/><input className="input pl-8" aria-label="Search people" placeholder="Search name, mobile, token" value={q} onChange={e=>setQ(e.target.value)}/></label>
       <select className="input w-auto" aria-label="Show" value={f} onChange={e=>setF(e.target.value)}><option value="">Everyone</option><option value="waiting">Waiting</option><option value="seen">Seen</option><option value="normal">Normal</option><option value="needs_care">Needs care</option><option value="suspicious">Suspicious</option><option value="referred">Referred</option><option value="follow">Follow-up pending</option><option value="no_show">Did not come</option></select></div>
     <ul className="divide-y divide-ink-700 rounded-xl border border-ink-700">{list.map(r=><li key={r.id}>
       <button type="button" onClick={()=>setOpen(open===r.id?null:r.id)} aria-expanded={open===r.id} className="flex w-full flex-wrap items-center gap-2 p-3 text-left hover:bg-ink-750">
         <span className="grid h-9 w-11 shrink-0 place-items-center rounded-lg bg-ink-700 font-display text-sm font-semibold text-fg">{code('T',r.token_no,3)}</span>
         <span className="min-w-[140px] flex-1"><span className="block text-sm font-medium text-fg">{r.full_name}{r.age!=null&&<span className="text-fog-faint"> · {r.age}{r.gender?r.gender[0]:''}</span>}</span>
           <span className="block truncate text-xs text-fog-faint">{[r.phone,r.area,r.source==='online'?'online':null,...(r.findings||[]),...(r.screenings||[])].filter(Boolean).join(' · ')}</span></span>
-        {r.status==='registered'&&<Badge tone="neutral">Waiting</Badge>}{r.status==='no_show'&&<Badge tone="neutral">Did not come</Badge>}
+        {r.status==='registered'&&<Badge tone="neutral">Waiting</Badge>}
+        {day&&r.status==='registered'&&(can('camps')||can('campday'))&&<span role="button" tabIndex={0} className="rounded-lg bg-brand px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-deep" onClick={e=>{e.stopPropagation();save(r,{status:'attended'});autoPrint(item(r),camp,brand)}} onKeyDown={e=>{if(e.key==='Enter'){e.stopPropagation();save(r,{status:'attended'});autoPrint(item(r),camp,brand)}}}>Arrived</span>}
+        {r.token_no!=null&&<PrintOne item={item(r)} camp={camp} brand={brand} className="rounded-lg p-1.5 text-fog-faint hover:bg-ink-700 hover:text-fg"/>}{r.status==='no_show'&&<Badge tone="neutral">Did not come</Badge>}
         {r.result&&<Badge tone={RTONE[r.result]}>{RESULTS.find(x=>x[0]===r.result)?.[1]}</Badge>}
         {r.follow_up==='pending'&&<Badge tone="amber">Follow-up</Badge>}{r.follow_up==='done'&&<Badge tone="green">Followed up</Badge>}
         {open===r.id?<ChevronUp size={16} className="text-fog-faint"/>:<ChevronDown size={16} className="text-fog-faint"/>}</button>

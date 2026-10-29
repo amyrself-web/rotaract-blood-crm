@@ -56,5 +56,6 @@ export async function receiptPdf(r,fmt,brand={}){
   r.expense_list.forEach(e=>kv(`EX ${(e.category||'').slice(0,22)}`,rs(e.amount)))
   kv('Expenses',rs(r.expenses),true);rule('=');kv('BALANCE',rs(r.sponsors_received-r.expenses),true);rule('=')
   c('Thank you, donors and volunteers!',8,true);c(new Date().toLocaleString('en-IN'),7)
+  const {watermarkAll}=await import('./docpdf');await watermarkAll(doc,brand,W,doc.internal.pageSize.getHeight(),{opacity:.08,size:52})
   doc.autoPrint?.();window.open(doc.output('bloburl'),'_blank')||doc.save(`receipt-${pad('C',r.camp_no,3)}.pdf`)
 }
