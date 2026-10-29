@@ -143,6 +143,14 @@ iwr https://raw.githubusercontent.com/amyrself-web/rotaract-blood-crm/main/whats
 .\check-sender.ps1
 ```
 
+Computer going to sleep (the sender only works after you open Remote Desktop, or shows "Connection Closed")? Paste this once, the same way:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass -Force; cd $env:TEMP
+iwr https://raw.githubusercontent.com/amyrself-web/rotaract-blood-crm/main/whatsapp-worker/keep-awake.ps1 -OutFile keep-awake.ps1 -UseBasicParsing
+.\keep-awake.ps1
+```
+
 You only do this once. After that it looks after itself:
 - A Windows scheduled task runs the sender as SYSTEM. It keeps running after you log out of Remote Desktop.
 - The task starts the sender with Windows, checks it every 5 minutes, and restarts it within a minute if it crashes.

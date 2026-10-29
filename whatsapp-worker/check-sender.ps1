@@ -15,7 +15,7 @@ if(-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentit
 $raw='https://raw.githubusercontent.com/amyrself-web/rotaract-blood-crm/main/whatsapp-worker/'
 try{
   [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
-  foreach($f in 'worker.mjs','openwa.mjs'){ $tmp=Join-Path $env:TEMP "crm-$f"; Invoke-WebRequest ($raw+$f) -OutFile $tmp -UseBasicParsing; if((Get-Item $tmp).Length -gt 1000){ Copy-Item $tmp (Join-Path $PSScriptRoot $f) -Force } }
+  foreach($f in 'worker.mjs','openwa.mjs','keep-awake.ps1'){ $tmp=Join-Path $env:TEMP "crm-$f"; Invoke-WebRequest ($raw+$f) -OutFile $tmp -UseBasicParsing; if((Get-Item $tmp).Length -gt 1000){ Copy-Item $tmp (Join-Path $PSScriptRoot $f) -Force } }
   $v=(Select-String -Path (Join-Path $PSScriptRoot 'worker.mjs') -Pattern "const VERSION='([\d.]+)'").Matches[0].Groups[1].Value
   Say "Downloaded the newest sender (version $v)." Green
 }catch{ Say "Could not download the newest sender ($($_.Exception.Message)). Using the files in this folder." Yellow }
@@ -68,6 +68,8 @@ foreach($name in $tasks){
     Say '   Restarted with the newest files.' Green
   } else { Say '   Running.' Green }
 }
+# keep the computer awake (no sleep, network always on) so it works without Remote Desktop
+$ka=Join-Path $PSScriptRoot 'keep-awake.ps1'; if(Test-Path $ka){ Say ''; Say 'Keeping this computer awake...' White; & $ka }
 if($found){
   powercfg /change standby-timeout-ac 0 2>$null; powercfg /change hibernate-timeout-ac 0 2>$null
   Say ''

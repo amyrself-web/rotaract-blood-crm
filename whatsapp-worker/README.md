@@ -42,6 +42,16 @@ iwr https://raw.githubusercontent.com/amyrself-web/rotaract-blood-crm/main/whats
 .\check-sender.ps1
 ```
 
+**Computer sleeps, and the sender only works after you open Remote Desktop ("Connection Closed")?** Run once as Administrator:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass -Force; cd $env:TEMP
+iwr https://raw.githubusercontent.com/amyrself-web/rotaract-blood-crm/main/whatsapp-worker/keep-awake.ps1 -OutFile keep-awake.ps1 -UseBasicParsing
+.\keep-awake.ps1
+```
+
+It turns off sleep, hibernate and network power saving, adds a "CRM stay awake" task that tells Windows the computer is busy, and lets the sender task wake the computer. `check-sender.ps1` also runs it.
+
 From version 1.4 the sender updates itself every 6 hours from GitHub and restarts on the new version (set `AUTO_UPDATE=0` in `.env` to turn this off).
 From 1.4.1 a stuck sender restarts itself: no contact with the CRM for 6 minutes, or not connected for 15 minutes (while not waiting for a QR scan).
 `check-sender.ps1` also makes the Windows task run as SYSTEM, so the sender keeps running after you log out of Remote Desktop.
