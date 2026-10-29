@@ -1,12 +1,13 @@
 import {useEffect,useMemo,useState} from 'react'
 import {toast} from 'sonner'
 import {motion,AnimatePresence} from 'framer-motion'
-import {Send,X,RotateCcw,Search,Play,SkipForward,CheckCircle2,Smartphone,Inbox,Zap} from 'lucide-react'
+import {Send,X,RotateCcw,Search,Play,SkipForward,CheckCircle2,Smartphone,Inbox,Zap,Moon,AlertTriangle,Rocket} from 'lucide-react'
 import {supabase} from '../../lib/supabase'
 import {wa,fmt} from '../../lib/util'
 import {Badge,Empty,useLive,useConfirm,errText} from '../ui'
-import {KIND_LABEL,useWaStatus,PROVIDERS} from '../../lib/wa'
+import {KIND_LABEL,useWaStatus,PROVIDERS,waitReason,sinceText} from '../../lib/wa'
 
+const RTONE={red:'text-blood',amber:'text-warn',green:'text-[#25D366]',blue:'text-brand'}
 const ST={queued:['Waiting','amber'],sending:['Sending','blue'],sent:['Sent','green'],failed:['Failed','red'],cancelled:['Cancelled','neutral']}
 const when=t=>t?new Date(t).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit'}):''
 
@@ -34,7 +35,7 @@ function TapToSend({rows,onClose,onDone}){
     </motion.div></div>
 }
 
-export default function Outbox({tapId,onTapOpened}){
+export default function Outbox({tapId,onTapOpened,onConnect}){
   const confirm=useConfirm(),status=useWaStatus()
   const [rows,setRows]=useState(null),[casts,setCasts]=useState([]),[f,setF]=useState('queued'),[q,setQ]=useState(''),[cast,setCast]=useState(''),[tap,setTap]=useState(null)
   const load=async()=>{
@@ -54,6 +55,9 @@ export default function Outbox({tapId,onTapOpened}){
   const toManual=async ids=>{const {data,error}=await supabase.rpc('wa_set_manual',{p_ids:ids,p_manual:true});if(error)return toast.error(error.message);load();return data}
   const cancelAll=async()=>{if(!await confirm({title:`Cancel ${list.length} waiting messages?`,body:'They will not be sent. You can send them again from the Cancelled list.',action:'Cancel messages'}))return
     const {data,error}=await supabase.rpc('wa_cancel',{p_ids:list.map(r=>r.id)});error?toast.error(error.message):toast.success(`${data} cancelled`);load()}
+  const sendNow=async ids=>{const {data,error}=await supabase.rpc('wa_send_now',{p_ids:ids});if(error)return toast.error(errText(error));toast.success(`${data} will go out now, even in quiet hours`);load()}
+  const offline=status?.provider==='qr'&&['offline','qr','logged_out'].includes(status?.status)
+  const quietIds=status?.quiet_now&&!offline?(rows||[]).filter(r=>r.status==='queued'&&!r.manual&&!r.urgent&&r.kind!=='emergency'&&new Date(r.send_after)<=new Date(status.quiet_ends)).map(r=>r.id):[]
   const retry=async ids=>{const {data,error}=await supabase.rpc('wa_retry',{p_ids:ids});error?toast.error(error.message):toast.success(`${data} back in the queue`);load()}
   return <div className="space-y-5">
     {casts.length>0&&<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{casts.slice(0,6).map(b=>{const mine=(rows||[]).filter(r=>r.broadcast_id===b.id),sent=mine.filter(r=>r.status==='sent').length
@@ -63,10 +67,21 @@ export default function Outbox({tapId,onTapOpened}){
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink-700"><div className="h-full rounded-full bg-ok" style={{width:`${b.total?sent/b.total*100:0}%`}}/></div>
         <div className="mt-1 text-xs tabular-nums text-fog-muted">{cast||mine.length?`${sent} of ${b.total} sent`:`${b.total} messages`}</div></button>})}</div>}
 
+    {offline&&<div role="alert" className="card flex flex-wrap items-center gap-4 border-blood/50 bg-blood/[.07]">
+      <span className="grid h-11 w-11 place-items-center rounded-full bg-blood text-white"><AlertTriangle size={20}/></span>
+      <div className="min-w-0 flex-1"><div className="font-semibold text-fg">{status.status==='offline'?'The WhatsApp sender has stopped':'The club phone is logged out'}</div>
+        <div className="text-sm text-fog-muted">{status.status==='offline'?<>Last seen {sinceText(status.last_seen)}{status.worker_version?` (version ${status.worker_version})`:''}. Nothing goes out from the club number until it runs again. On the server computer, run <b className="text-fg">check-sender.ps1</b> as Administrator.</>:'Open Connect and scan the QR code with the club phone (WhatsApp → Linked devices).'}
+          {autoWaiting>0&&` ${autoWaiting} message${autoWaiting>1?'s are':' is'} waiting; you can also send them yourself now.`}</div></div>
+      {onConnect&&<button className="btn-quiet" onClick={onConnect}>Open Connect</button>}</div>}
+    {quietIds.length>0&&<div className="card flex flex-wrap items-center gap-4 border-warn/40 bg-warn/[.06]">
+      <span className="grid h-11 w-11 place-items-center rounded-full bg-warn text-white"><Moon size={20}/></span>
+      <div className="min-w-0 flex-1"><div className="font-semibold text-fg">Quiet hours: {quietIds.length} message{quietIds.length>1?'s':''} will go at {when(status.quiet_ends)}</div>
+        <div className="text-sm text-fog-muted">Nothing is sent between {String(status.quiet_from).slice(0,5)} and {String(status.quiet_to).slice(0,5)} so people are not disturbed at night. If it cannot wait, send them now.</div></div>
+      <button className="btn-quiet" onClick={async()=>{if(await confirm({title:`Send ${quietIds.length} now?`,body:'They go out from the club number now, even though it is quiet hours.',action:'Send now'}))sendNow(quietIds)}}><Rocket size={15}/>Send now anyway</button></div>}
     {autoWaiting>0&&<div className="card flex flex-wrap items-center gap-4 border-brand/40 bg-brand/[.06]">
       <span className="grid h-11 w-11 place-items-center rounded-full bg-brand text-white"><Zap size={20}/></span>
       <div className="min-w-0 flex-1"><div className="font-semibold text-fg">{autoWaiting} going out from the club number</div>
-        <div className="text-sm text-fog-muted">{status?.ready?`${PROVIDERS[provider]} sends these automatically${status?.next_at?`, next at ${when(status.next_at)}`:''}. Nothing to tap.`:'The club phone is not connected right now. They go out as soon as it is back, or send them yourself.'}</div></div>
+        <div className="text-sm text-fog-muted">{status?.ready?(status.quiet_now?`${PROVIDERS[provider]} sends these automatically after quiet hours, from ${when(status.quiet_ends)}. Nothing to tap.`:`${PROVIDERS[provider]} sends these automatically${status?.next_at?`, next at ${when(status.next_at)}`:''}. Nothing to tap.`):'The club phone is not sending right now. They go out as soon as it is back, or send them yourself.'}</div></div>
       <button className="btn-quiet" onClick={async()=>{const ids=(rows||[]).filter(r=>r.status==='queued'&&!r.manual).map(r=>r.id);const n=await toManual(ids);if(n){const {data}=await supabase.from('wa_outbox').select('id,kind,phone,name,body,status,send_after').in('id',ids).eq('status','queued');if(data?.length)setTap(data)}}}><Smartphone size={15}/>Send them myself</button></div>}
 
     {waiting.length>0&&<div className="card flex flex-wrap items-center gap-4 border-[#25D366]/40 bg-[#25D366]/[.06]">
@@ -85,7 +100,7 @@ export default function Outbox({tapId,onTapOpened}){
       <ul className="divide-y divide-ink-700/80">{(rows===null?[]:list.slice(0,300)).map(r=><li key={r.id} className="flex items-start gap-3 px-4 py-3 text-sm">
         <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="font-medium text-fg">{r.name||r.phone}</span><span className="text-xs text-fog-faint">{r.phone}</span><Badge tone="blue">{KIND_LABEL[r.kind]||r.kind}</Badge></div>
           <div className="mt-0.5 line-clamp-2 text-fog-muted">{r.body}</div>
-          <div className="mt-0.5 text-xs text-fog-faint">{r.status==='queued'&&auto&&<span className={r.manual?'text-[#25D366]':'text-brand'}>{r.manual?'You send · ':'Club number · '}</span>}{r.status==='sent'?`Sent ${when(r.sent_at)}${r.provider?` · ${PROVIDERS[r.provider]||r.provider}`:''}`:r.status==='queued'?`Sends after ${when(r.send_after)}`:when(r.created_at)}{r.error&&<span className="text-blood"> · {r.error.replace(/^retry: /,'')}</span>}</div></div>
+          <div className="mt-0.5 text-xs text-fog-faint">{r.status==='queued'&&auto&&<span className={r.manual?'text-[#25D366]':'text-brand'}>{r.manual?'You send · ':'Club number · '}</span>}{r.status==='sent'?`Sent ${when(r.sent_at)}${r.provider?` · ${PROVIDERS[r.provider]||r.provider}`:''}`:r.status==='queued'?(()=>{const w=waitReason(r,status);return w?<span className={RTONE[w[1]]}>{w[0]}</span>:`Sends after ${when(r.send_after)}`})():when(r.created_at)}{r.urgent&&r.status==='queued'&&<span className="ml-1 text-blood">· urgent</span>}{r.error&&<span className="text-blood"> · {r.error.replace(/^retry: /,'')}</span>}</div></div>
         <Badge tone={ST[r.status][1]}>{ST[r.status][0]}</Badge>
         {r.status==='queued'&&<button className="btn-ghost text-fog-faint hover:text-blood" aria-label={`Cancel message to ${r.name||r.phone}`} onClick={async()=>{await supabase.rpc('wa_cancel',{p_ids:[r.id]});load()}}><X size={15}/></button>}
         {['failed','cancelled'].includes(r.status)&&<button className="btn-ghost text-fog-faint hover:text-fg" aria-label={`Send again to ${r.name||r.phone}`} onClick={()=>retry([r.id])}><RotateCcw size={15}/></button>}</li>)}

@@ -3,12 +3,13 @@
 // 2. Takes queued messages one at a time, at the speed set in the CRM, never in quiet hours, and only up to the daily limit.
 // 3. Anyone who replies STOP is never messaged again (START undoes it).
 // 4. Queues the daily automatic messages at 8 am in case the database scheduler is not set up.
+// 5. Keeps itself up to date: every 6 hours it fetches the newest sender from the CRM's GitHub and restarts on it (AUTO_UPDATE=0 to turn off).
 import fs from 'node:fs'
 import path from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {createClient} from '@supabase/supabase-js'
 
-const VERSION='1.3.0'
+const VERSION='1.4.0'
 const ENGINE=(process.env.ENGINE||'baileys').toLowerCase()   // 'baileys' (built in) or 'openwa' (an OpenWA gateway on this machine)
 const here=path.dirname(fileURLToPath(import.meta.url))   // works on Windows too
 for(const f of [path.join(here,'.env'),'.env'])if(fs.existsSync(f))for(const line of fs.readFileSync(f,'utf8').split('\n')){const m=line.match(/^\s*([A-Z_]+)\s*=\s*(.*)\s*$/);if(m&&!process.env[m[1]])process.env[m[1]]=m[2].replace(/^["']|["']$/g,'')}
@@ -122,6 +123,20 @@ async function dailyRules(){
   rulesDay=day;log('daily messages queued',JSON.stringify(r.data))
 }
 
+// self-update: the newest sender files come from the CRM's own GitHub repository
+const REPO_RAW=process.env.UPDATE_URL||'https://raw.githubusercontent.com/amyrself-web/rotaract-blood-crm/main/whatsapp-worker/'
+const newer=(a,b)=>{const x=a.split('.').map(Number),y=b.split('.').map(Number);for(let i=0;i<3;i++){if((x[i]||0)!==(y[i]||0))return (x[i]||0)>(y[i]||0)}return false}
+async function selfUpdate(){
+  if(process.env.AUTO_UPDATE==='0'||DRY)return
+  try{const r=await fetch(REPO_RAW+'worker.mjs',{cache:'no-store'});if(!r.ok)return log('update check failed:',r.status)
+    const code=await r.text(),v=(code.match(/const VERSION='([\d.]+)'/)||[])[1]
+    if(!v||!newer(v,VERSION)||!code.includes('sendLoop')||code.length<4000)return
+    const ow=await fetch(REPO_RAW+'openwa.mjs',{cache:'no-store'}).then(x=>x.ok?x.text():null).catch(()=>null)
+    fs.writeFileSync(path.join(here,'worker.mjs.new'),code);fs.renameSync(path.join(here,'worker.mjs.new'),path.join(here,'worker.mjs'))
+    if(ow&&ow.length>1000)fs.writeFileSync(path.join(here,'openwa.mjs'),ow)
+    log(`updated the sender ${VERSION} -> ${v}, restarting on the new version`);state='starting';await beat().catch(()=>{});process.exit(1)
+  }catch(e){log('update check error:',e?.message||e)}}
+
 // never die silently: log unexpected errors and keep going; after many in a row, exit so Windows / systemd starts a fresh copy
 let crashes=[]
 process.on('unhandledRejection',e=>log('unexpected error (still running):',e?.message||e))
@@ -131,6 +146,7 @@ log(`CRM WhatsApp worker ${VERSION} · engine ${ENGINE}${DRY?' (dry run)':''}`)
 await start()
 setInterval(()=>beat().catch(e=>log('heartbeat error:',e?.message||e)),20000)
 setInterval(()=>dailyRules().catch(e=>log('daily tick error:',e?.message||e)),10*60000);dailyRules().catch(e=>log('daily tick error:',e?.message||e))
+setTimeout(()=>selfUpdate(),60000);setInterval(()=>selfUpdate(),6*3600e3)
 sendLoop().catch(e=>{log("send loop stopped, restarting:",e?.message||e);process.exit(1)})
 process.on('SIGTERM',async()=>{state='offline';await beat();process.exit(0)})
 process.on('SIGINT',async()=>{state='offline';await beat();process.exit(0)})

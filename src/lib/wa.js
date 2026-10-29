@@ -11,9 +11,9 @@ export const KIND_LABEL={broadcast:'Broadcast',direct:'Direct message',duty:'Dut
 
 // items: [{phone,name,body,donor_id?,member_id?,ref?,vars?}]
 // manual=true: you send them yourself ("Open WhatsApp"); the automatic sender leaves them alone
-export async function enqueue(title,kind,items,sendAfter=null,manual=false){
+export async function enqueue(title,kind,items,sendAfter=null,manual=false,urgent=false){
   const args={p_title:title,p_kind:kind,p_items:items,p_send_after:sendAfter}
-  let {data,error}=await supabase.rpc('wa_enqueue',{...args,p_manual:!!manual})
+  let {data,error}=await supabase.rpc('wa_enqueue',{...args,p_manual:!!manual,...(urgent?{p_urgent:true}:{})})
   // database not yet on v14: queue the old way (the Outbox "Tap to send" still works)
   if(error&&(error.code==='PGRST202'||/p_manual/.test(error.message||'')))({data,error}=await supabase.rpc('wa_enqueue',args))
   if(error)throw error
@@ -44,5 +44,21 @@ export function useWaReady(){
 }
 export const refreshWaReady=()=>pollShared()
 // how messages go out: 'auto' (club number) or 'manual' (open WhatsApp yourself); remembered on this device
+// why a queued message has not gone yet, in plain words (status = wa_status())
+const hm=t=>t?new Date(t).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit'}):''
+const ago=t=>{if(!t)return 'never';const m=Math.round((Date.now()-new Date(t))/60000);return m<60?`${m} min ago`:m<1440?`${Math.round(m/60)} h ago`:`${Math.round(m/1440)} days ago`}
+export function waitReason(r,s){if(r.status!=='queued')return null
+  if(r.manual)return ['You send this one: use Tap to send','green']
+  if(!s||s.provider==='manual')return ['Waiting for you to send it','green']
+  if(s.provider==='qr'&&s.status==='offline')return [`Sender is not running (last seen ${ago(s.last_seen)}). It goes when the sender is back`,'red']
+  if(s.provider==='qr'&&s.status==='qr')return ['Club phone is logged out: scan the QR in Connect','red']
+  if(s.provider==='qr'&&s.status!=='connected')return ['Club phone is not connected yet','amber']
+  const quiet=s.quiet_now&&!r.urgent&&r.kind!=='emergency'
+  if(quiet&&new Date(r.send_after)<=new Date(new Date(s.quiet_ends).getTime()+60000))return [`Quiet hours: goes at ${hm(s.quiet_ends)}`,'amber']
+  if(new Date(r.send_after)>new Date())return [`Scheduled for ${hm(r.send_after)}`,'blue']
+  if(s.cap_left===0)return ['Daily limit reached: goes tomorrow','amber']
+  return ['In line: going out now','blue']}
+export const sinceText=ago
+
 export const getSendMode=()=>{try{return localStorage.getItem('wa-send-mode')||''}catch{return ''}}
 export const setSendMode=m=>{try{localStorage.setItem('wa-send-mode',m)}catch{}}

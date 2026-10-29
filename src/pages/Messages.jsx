@@ -98,7 +98,7 @@ export default function Messages(){
   const tabs=[['outbox',`Outbox${st?.queued?` · ${st.queued}`:''}`],['broadcast','Broadcast'],['lists','Lists'],['auto','Automatic'],['email','Email'],...(can('settings')?[['connect','Connect']]:[])]
   return <div><PageHeader eyebrow="People" title="WhatsApp and alerts" description={st?`Sending by: ${PROVIDERS[st.provider]||st.provider}${st.provider==='qr'?` (${st.status==='connected'?'connected':'not connected'})`:''} · ${st.sent_today} sent today`:'Broadcasts, reminders, birthday wishes and certificates'}/>
     <Tabs id="wa-tabs" value={tab} onChange={setTab} tabs={tabs}/>
-    {tab==='outbox'&&<Outbox tapId={sp.get('tap')} onTapOpened={()=>setSp({},{replace:true})}/>}{tab==='broadcast'&&<Broadcast onQueued={queued}/>}{tab==='lists'&&<Lists onQueued={queued}/>}
+    {tab==='outbox'&&<Outbox tapId={sp.get('tap')} onTapOpened={()=>setSp({},{replace:true})} onConnect={can('settings')?()=>setTab('connect'):null}/>}{tab==='broadcast'&&<Broadcast onQueued={queued}/>}{tab==='lists'&&<Lists onQueued={queued}/>}
     {tab==='auto'&&<AutoRules/>}{tab==='email'&&<EmailPanel/>}{tab==='connect'&&<Connect/>}
   </div>
 }

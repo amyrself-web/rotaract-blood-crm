@@ -23,16 +23,23 @@ const STARTERS=[
   ['Thank you','Dear {name}, thank you for being a blood donor with {club}. Because of donors like you, patients in our town get blood on time.'],
   ['Club news','Hello {name}, news from {club}: ']]
 
+const STARTER_OF={'Blood donation':'Camp invite','Eye checking':'Eye camp invite','Cancer awareness':'Cancer camp invite','Environment (plantation)':'Plantation call','Food donation':'Food drive call'}
+const isStarter=b=>STARTERS.some(([,x])=>x===b)
+const hm=t=>t?new Date(t).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit'}):''
+
 export default function Broadcast({onQueued}){
   const {settings}=useAuth(),status=useWaStatus(30000),club=settings.club_name||''
   const [src,setSrc]=useState('donors'),[donors,setDonors]=useState(null),[members,setMembers]=useState(null),[camps,setCamps]=useState([]),[regs,setRegs]=useState([])
   const [f,setF]=useState({groups:[],area:'',gender:'',eligible:false,camp:'',campStatus:'',memberType:'',paste:''})
-  const [msg,setMsg]=useState({title:'',body:STARTERS[0][1],camp:'',when:''}),[busy,setBusy]=useState(false)
+  const [msg,setMsg]=useState({title:'',body:STARTERS[0][1],camp:'',when:''}),[busy,setBusy]=useState(false),[urgent,setUrgent]=useState(false)
   useEffect(()=>{all('donors','id,full_name,phone,blood_group,gender,area,last_donation,consent').then(setDonors).catch(e=>toast.error(errText(e)))
     all('members','id,full_name,phone,status,membership_type,blood_group,position').then(setMembers).catch(()=>setMembers([]))
-    supabase.from('camps').select('id,name,camp_date,venue,status').is('deleted_at',null).order('camp_date',{ascending:false}).then(({data})=>{setCamps(data||[]);const up=(data||[]).find(c=>c.status==='open');if(up)setMsg(m=>({...m,camp:up.id}))})},[])
+    supabase.from('camps').select('id,name,camp_date,venue,status,camp_type').is('deleted_at',null).order('camp_date',{ascending:false}).then(({data})=>{setCamps(data||[]);const up=(data||[]).find(c=>c.status==='open');if(up)setMsg(m=>({...m,camp:up.id}))})},[])
   useEffect(()=>{setRegs([]);if(f.camp)supabase.from('registrations').select('donor_id,status').eq('camp_id',f.camp).then(({data})=>setRegs(data||[]))},[f.camp])
   const camp=camps.find(c=>c.id===msg.camp)
+  // an untouched starter follows the camp: an eye camp gets the eye camp words, not the blood camp words
+  useEffect(()=>{if(!camp||!isStarter(msg.body))return;const l=STARTER_OF[camp.camp_type]||'Camp invite',st=STARTERS.find(x=>x[0]===l)
+    if(st&&/\{camp\}/.test(msg.body)&&st[1]!==msg.body)setMsg(m=>({...m,body:st[1],title:m.title&&STARTERS.some(x=>x[0]===m.title)?st[0]:m.title}))},[camp?.id])
   const people=useMemo(()=>{
     if(src==='paste')return [...new Set(f.paste.split(/[\n,;]+/).map(normPhone).filter(p=>/^[6-9]\d{9}$/.test(p)))].map(p=>({phone:p,name:''}))
     if(src==='members')return (members||[]).filter(m=>m.phone&&(f.memberType?m.membership_type===f.memberType:m.status==='active')).map(m=>({phone:m.phone,name:m.full_name,member_id:m.id,bloodgroup:m.blood_group||''}))
@@ -46,7 +53,7 @@ export default function Broadcast({onQueued}){
   const ready=!!status?.ready,[how,setHow]=useState(null),mode=how||(ready&&getSendMode()!=='manual'?'auto':'manual'),manual=mode==='manual'||!ready
   const per=!manual?Math.max(1,Number(status.per_minute)||6):null
   const send=async()=>{if(!people.length)return toast.error('Nobody matches. Change the filters.');if(msg.body.trim().length<5)return toast.error('Write the message first')
-    setBusy(true);try{const r=await enqueue(msg.title||msg.body.slice(0,40),'broadcast',people.map(p=>({phone:p.phone,name:p.name,donor_id:p.donor_id,member_id:p.member_id,body:fill(msg.body,vars(p)).trim(),vars:{...vars(p),message:fill(msg.body,vars(p)).trim()}})),msg.when?new Date(msg.when).toISOString():null,manual)
+    setBusy(true);try{const r=await enqueue(msg.title||msg.body.slice(0,40),'broadcast',people.map(p=>({phone:p.phone,name:p.name,donor_id:p.donor_id,member_id:p.member_id,body:fill(msg.body,vars(p)).trim(),vars:{...vars(p),message:fill(msg.body,vars(p)).trim()}})),msg.when?new Date(msg.when).toISOString():null,manual,!manual&&urgent&&!msg.when)
       setSendMode(manual?'manual':'auto');celebrate();toast.success(`${r.queued} messages ${manual?'ready to tap through':'going out from the club number'}${r.skipped?`, ${r.skipped} skipped (stopped or wrong number)`:''}`);onQueued?.(r)}catch(e){toast.error(errText(e))}setBusy(false)}
   // a spoken request becomes the message (and picks the blood group for urgent needs)
   const spoke=x=>{
@@ -98,6 +105,10 @@ export default function Broadcast({onQueued}){
               <I size={18} className={k==='auto'?'text-brand':'text-[#25D366]'}/><span className="text-sm font-medium">{l}</span><span className="text-[11px] text-fog-faint">{h}</span></button>)}</div>
         {!ready&&<div className="mt-2 text-xs text-fog-faint">Club number is off: the club phone is not connected (WhatsApp and alerts → Connect).</div>}
         {per?<div className="mt-3">The club phone sends them, about {Math.ceil(people.length/per)} minutes for all at {per} a minute. Nothing to tap.</div>:<div className="mt-3">WhatsApp opens for each person with the message typed. You press send, then the next one is ready.</div>}
+        {!manual&&status?.quiet_now&&!msg.when&&<div className="mt-3 rounded-xl border border-warn/30 bg-warn/10 p-3 text-xs text-warn">
+          It is quiet hours now ({String(status.quiet_from).slice(0,5)} to {String(status.quiet_to).slice(0,5)}). These will start going at {hm(status.quiet_ends)}.
+          <label className="mt-2 flex items-center gap-2 text-fog"><input type="checkbox" checked={urgent} onChange={e=>setUrgent(e.target.checked)}/>It is urgent: send now anyway</label></div>}
+        {status?.provider==='qr'&&status?.status==='offline'&&<div className="mt-3 rounded-xl border border-blood/30 bg-blood/10 p-3 text-xs text-blood">The WhatsApp sender on the server is not running, so the club number cannot send right now. Choose Open WhatsApp, or start the sender first.</div>}
         <button className="btn mt-4 w-full py-3" disabled={busy||!people.length} onClick={send}>{msg.when?<CalendarClock size={16}/>:<Send size={16}/>}{busy?'Queuing…':msg.when?`Schedule for ${people.length}`:`Send to ${people.length}`}</button></div>
     </aside>
   </div>

@@ -11,6 +11,15 @@ function Say($t,$c='Cyan'){Write-Host $t -ForegroundColor $c}
 if(-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)){
   Say 'Please run PowerShell as Administrator (right-click > Run as administrator).' Red; exit 1}
 
+# first get the newest sender files from the CRM's GitHub (so an old download is never used)
+$raw='https://raw.githubusercontent.com/amyrself-web/rotaract-blood-crm/main/whatsapp-worker/'
+try{
+  [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
+  foreach($f in 'worker.mjs','openwa.mjs'){ $tmp=Join-Path $env:TEMP "crm-$f"; Invoke-WebRequest ($raw+$f) -OutFile $tmp -UseBasicParsing; if((Get-Item $tmp).Length -gt 1000){ Copy-Item $tmp (Join-Path $PSScriptRoot $f) -Force } }
+  $v=(Select-String -Path (Join-Path $PSScriptRoot 'worker.mjs') -Pattern "const VERSION='([\d.]+)'").Matches[0].Groups[1].Value
+  Say "Downloaded the newest sender (version $v)." Green
+}catch{ Say "Could not download the newest sender ($($_.Exception.Message)). Using the files in this folder." Yellow }
+
 $tasks='CRM OpenWA','CRM WhatsApp sender'
 $found=$false
 foreach($name in $tasks){

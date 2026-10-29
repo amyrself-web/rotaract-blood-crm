@@ -33,7 +33,16 @@ Set-ExecutionPolicy -Scope Process Bypass -Force
 .\check-sender.ps1
 ```
 
-It shows the last lines of the logs (why it stopped), copies the newest sender files, makes Windows restart it every 5 minutes if it ever stops, and starts it.
+It downloads the newest sender from GitHub, shows the last lines of the logs (why it stopped), makes Windows restart it if it ever stops, and starts it.
+No copy of this folder on the server? Paste this in PowerShell (as Administrator) instead:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass -Force; cd $env:TEMP
+iwr https://raw.githubusercontent.com/amyrself-web/rotaract-blood-crm/main/whatsapp-worker/check-sender.ps1 -OutFile check-sender.ps1 -UseBasicParsing
+.\check-sender.ps1
+```
+
+From version 1.4 the sender updates itself every 6 hours from GitHub and restarts on the new version (set `AUTO_UPDATE=0` in `.env` to turn this off).
 
 ## With OpenWA (recommended if you have Docker)
 
