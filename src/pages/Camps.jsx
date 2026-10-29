@@ -57,12 +57,24 @@ function Registrants({camp,onChanged}){
   </div>
 }
 
+// the headline number of a camp, by type (never blank: 0 until something is recorded)
+const mainNum=(c,x)=>{const k=kindOf(c);if(!x)return c.beneficiaries??0
+  const none=!x.registered&&!x.fed&&!x.planted&&!x.heard
+  if(none)return c.beneficiaries??0   // nothing recorded on camp day: the number typed on the camp
+  return k==='food'?x.fed:k==='plants'?x.planted:c.camp_type==='Cancer awareness'?Math.max(x.seen,x.heard):x.seen}
+const subNums=(c,x)=>{if(!x)return [];const k=kindOf(c)
+  if(k==='food')return [[x.packets,'packets'],[x.food_points,'places']]
+  if(k==='plants')return x.alive?[[x.alive,'alive at last check']]:[]
+  return [[x.registered,'registered'],...(x.referred?[[x.referred,'referred']]:[]),...(x.follow_pending?[[x.follow_pending,'follow-up pending']]:[])]}
+
 export default function Camps(){
   const {settings,user}=useAuth(),confirm=useConfirm(),{brand}=useBrand()
   const [rows,setRows]=useState(null),[form,setForm]=useState(null),[view,setView]=useState(null),[tab,setTab]=useState('share'),[qr,setQr]=useState(''),[filter,setFilter]=useState('active'),[busy,setBusy]=useState(false),[type,setType]=useState('')
-  const load=()=>supabase.from('camps').select('*, registrations(count)').is('deleted_at',null).order('camp_date',{ascending:false}).then(({data,error})=>error?toast.error(error.message):setRows(data))
+  const [nums,setNums]=useState({})
+  const load=()=>{supabase.from('camps').select('*, registrations(count)').is('deleted_at',null).order('camp_date',{ascending:false}).then(({data,error})=>error?toast.error(error.message):setRows(data))
+    supabase.rpc('camp_numbers').then(({data})=>data&&setNums(Object.fromEntries(data.map(x=>[x.camp_id,x]))))}
   useEffect(()=>{load()},[])
-  useLive(['camps','registrations'],load)
+  useLive(['camps','registrations','camp_people','camp_food','camp_saplings','camp_sessions','donations'],load)
   const blank={camp_type:'Blood donation',camp_type_other:'',cancer_types:[],about:'',beneficiaries:'',partner:'',partner_contact:'',doctors:'',target_people:'',details:{},name:'',camp_date:'',start_time:'09:00',end_time:'15:00',venue:'',target_donors:'',slot_capacity:settings.default_slot_capacity??'',budget:'',status:'planned'}
   const set=k=>e=>setForm({...form,[k]:e.target.value})
   const save=async e=>{e.preventDefault()
@@ -100,9 +112,11 @@ export default function Camps(){
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-fog-muted"><span className="flex items-center gap-1.5"><Clock size={14}/>{fmt(c.camp_date)}{c.start_time&&`, ${c.start_time.slice(0,5)}`}</span>
             <span className="flex items-center gap-1.5"><MapPin size={14}/>{c.venue||'Venue not set'}</span></div></div>
           <Badge tone={TONE[c.status]}>{STATUS.find(s=>s[0]===c.status)?.[1]}</Badge></div>
-        {isBlood(c)?<div className="mt-4 flex items-baseline gap-2"><span className="font-display text-3xl font-semibold text-fg">{n}</span><span className="text-sm text-fog-muted">registered{c.target_donors?` of ${c.target_donors}`:''}</span>
+        {isBlood(c)?<div className="mt-4 flex items-baseline gap-2"><span className="font-display text-3xl font-semibold text-fg">{n}</span><span className="text-sm text-fog-muted">registered{c.target_donors?` of ${c.target_donors}`:''}</span>{nums[c.id]?.donated>0&&<span className="text-xs text-fog-faint">· <b className="tabular-nums text-fog">{nums[c.id].donated}</b> donated</span>}
           {c.slot_capacity&&<span className="ml-auto text-xs text-fog-faint">{c.slot_capacity} per slot</span>}</div>
-        :<div className="mt-4"><div className="flex items-baseline gap-2"><span className="font-display text-3xl font-semibold text-fg">{c.beneficiaries??'–'}</span><span className="text-sm text-fog-muted">{words(c).helped}{c.target_people?` of ${c.target_people}`:''}</span></div>
+        :<div className="mt-4"><div className="flex flex-wrap items-baseline gap-2"><span className="font-display text-3xl font-semibold text-fg">{mainNum(c,nums[c.id])}</span><span className="text-sm text-fog-muted">{words(c).helped}{c.target_people?` of ${c.target_people}`:''}</span>
+            {subNums(c,nums[c.id]).map(([v,l])=><span key={l} className="text-xs text-fog-faint">· <b className="tabular-nums text-fog">{v}</b> {l}</span>)}</div>
+          {c.target_people>0&&<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink-700"><div className="h-full rounded-full bg-gradient-to-r from-brand-deep to-brand" style={{width:Math.min(100,mainNum(c,nums[c.id])/c.target_people*100)+'%'}}/></div>}
           {c.cancer_types?.length>0&&<div className="mt-2 flex flex-wrap gap-1">{c.cancer_types.map(t=><span key={t} className="rounded-full bg-ink-700 px-2 py-0.5 text-[11px] text-fog-muted">{t}</span>)}</div>}
           {c.partner&&<p className="mt-1 text-xs text-fog-faint">With {c.partner}</p>}
           {c.about&&<p className="mt-2 line-clamp-2 text-sm text-fog-muted">{c.about}</p>}</div>}
