@@ -84,6 +84,7 @@ Run each file **once, in this order**. Skip any you have already run. Every file
 25. `v24-wa-urgent-status.sql`: the outbox shows why each message is waiting, plus "send now, even in quiet hours"
 26. `v25-camp-numbers-dashboard.sql`: the numbers for every camp type, and the dashboard's numbers for the whole club
 27. `v26-trips-photos-public.sql`: club trips with collections and expenses, camp photos from Google Drive, and public pages for every camp type
+28. `v27-data-reset.sql`: remove the sample data, or start fresh, from Settings with a separate reset password (numbering restarts from 1)
 
 Make yourself admin (after you have signed up):
 
@@ -172,6 +173,18 @@ Push to `main`. GitHub Actions builds the site and publishes it to GitHub Pages.
 Repository secrets needed:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`: the publishable / anon key only. Never use the secret or service_role key here.
+
+## Going live: remove the test data
+
+In **Settings → Test data and a fresh start**:
+1. Set a **reset password**. It is separate from your login and stored only as a one-way hash.
+2. Choose either:
+   - **Sample data only**: removes what the sample scripts added, plus the demo logins.
+   - **Start fresh**: removes the record groups you tick.
+3. Type the reset password and the word `DELETE`.
+
+Settings, logins (except the demo ones) and templates always stay. Five wrong passwords lock it for 15 minutes.
+Every list that becomes empty starts numbering from 1 again, so imported real data gets D-0001, M-001 and so on.
 
 ## Settings to fill in once
 

@@ -1,3 +1,4 @@
+import DataReset from '../components/DataReset'
 import {useEffect,useRef,useState} from 'react'
 import {toast} from 'sonner'
 import {Upload,X,Check,Sun,Moon} from 'lucide-react'
@@ -39,7 +40,7 @@ export default function SettingsPage(){
     const {data,error}=await supabase.from('settings').update(row).eq('id',1).select().single()
     if(!error){const t=await supabase.from('stock_thresholds').upsert(BLOOD.map(g=>({blood_group:g,min_units:Number(th[g]??5)})));if(t.error){setBusy(false);return toast.error(t.error.message)}}
     setBusy(false);if(error)return toast.error(error.message);setSettings({...settings,...data});await refreshBrand();toast.success('Settings saved')}
-  return <form id="settings-form" onSubmit={save} className="max-w-4xl">
+  return <><form id="settings-form" onSubmit={save} className="max-w-4xl">
     <PageHeader title="Settings" description="Brand, look and the rules the CRM uses. Confirm medical values with your partner blood bank."
       actions={<button className="btn" form="settings-form" disabled={busy||missing}>{busy?'Saving…':'Save settings'}</button>}/>
     {missing&&<div className="card mb-5 border-warn/40 text-sm text-warn">Settings are not set up in the database yet. Run supabase/v2-permissions.sql and v3 first.</div>}
@@ -99,4 +100,5 @@ export default function SettingsPage(){
         <div className="grid grid-cols-4 gap-3 sm:grid-cols-8">{BLOOD.map(g=><label key={g} className="tile p-2 text-center"><span className="block text-sm font-semibold text-blood">{g}</span>
           <input className="mt-1 w-full bg-transparent text-center text-lg text-fg outline-none" type="number" min="0" aria-label={`Minimum ${g}`} value={th[g]??5} onChange={e=>setTh({...th,[g]:e.target.value})}/></label>)}</div></section>
     </div></form>
+    <div className="max-w-4xl"><DataReset/></div></>
 }

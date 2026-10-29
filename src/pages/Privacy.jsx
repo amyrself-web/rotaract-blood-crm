@@ -14,7 +14,8 @@ const saveBlob=(blob,name)=>{const a=document.createElement('a');a.href=URL.crea
 // every table worth keeping; tables this login cannot read are skipped and listed in the README
 const TABLES=['settings','profiles','donors','consent_log','camps','registrations','screenings','donations','blood_units','emergency_requests','donor_events','tasks','camp_volunteers','sponsors','expenses','camp_materials',
   'members','member_dues','meetings','meeting_attendance','meeting_actions','pledges','afterlife_cases','contributions','club_expenses','message_templates','message_log','wa_broadcasts','wa_outbox','wa_optout','privacy_requests',
-  'projects','project_hours','notices','polls','poll_votes','hospitals','club_assets','events','event_people','induction_steps','board_terms']
+  'projects','project_hours','notices','polls','poll_votes','hospitals','club_assets','events','event_people','induction_steps','board_terms',
+  'camp_attendance','camp_people','camp_food','camp_saplings','camp_sapling_checks','camp_sessions','meeting_changes','club_trips','trip_people','trip_expenses','email_templates','email_outbox','stock_thresholds','handovers']
 
 function Requests(){
   const confirm=useConfirm(),[rows,setRows]=useState(null),[f,setF]=useState('open'),[add,setAdd]=useState(null),[donors,setDonors]=useState([]),[q,setQ]=useState('')
