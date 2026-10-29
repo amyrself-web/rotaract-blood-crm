@@ -9,7 +9,7 @@ import path from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {createClient} from '@supabase/supabase-js'
 
-const VERSION='1.4.0'
+const VERSION='1.4.1'
 const ENGINE=(process.env.ENGINE||'baileys').toLowerCase()   // 'baileys' (built in) or 'openwa' (an OpenWA gateway on this machine)
 const here=path.dirname(fileURLToPath(import.meta.url))   // works on Windows too
 for(const f of [path.join(here,'.env'),'.env'])if(fs.existsSync(f))for(const line of fs.readFileSync(f,'utf8').split('\n')){const m=line.match(/^\s*([A-Z_]+)\s*=\s*(.*)\s*$/);if(m&&!process.env[m[1]])process.env[m[1]]=m[2].replace(/^["']|["']$/g,'')}
@@ -21,11 +21,13 @@ const log=(...a)=>console.log(new Date().toISOString(),...a)
 const sleep=ms=>new Promise(r=>setTimeout(r,ms))
 const istNow=()=>new Date(Date.now()+5.5*3600e3)   // read with getUTC* for Indian time
 
+let lastBeat=Date.now(),stateSince=Date.now(),lastState='starting'
 let B=null,sock=null,state='starting',qr=null,me={},starting=false,owa=null
 
 async function beat(){
   const {data,error}=await sb.rpc('wa_heartbeat',{p_status:state,p_qr:qr,p_phone:me.phone||null,p_name:me.name||null,p_version:VERSION})
   if(error)return log('heartbeat failed:',error.message)
+  lastBeat=Date.now()
   if(data==='logout')owa?await owa.logout():await logout()
   else if(data==='restart'){log('restart asked from the CRM');if(owa)await owa.restart();else{try{sock?.end?.()}catch{}setTimeout(start,1000)}}
 }
@@ -146,6 +148,11 @@ log(`CRM WhatsApp worker ${VERSION} · engine ${ENGINE}${DRY?' (dry run)':''}`)
 await start()
 setInterval(()=>beat().catch(e=>log('heartbeat error:',e?.message||e)),20000)
 setInterval(()=>dailyRules().catch(e=>log('daily tick error:',e?.message||e)),10*60000);dailyRules().catch(e=>log('daily tick error:',e?.message||e))
+// stuck guard: Windows only restarts a program that has stopped, so a hung one stops itself.
+// No good heartbeat for 6 minutes, or not connected for 15 minutes (and not waiting for a QR scan): exit, and the scheduled task starts a fresh copy.
+setInterval(()=>{if(state!==lastState){lastState=state;stateSince=Date.now()}
+  if(Date.now()-lastBeat>6*60000){log('no contact with the CRM for 6 minutes, restarting');process.exit(1)}
+  if(!['connected','qr','logged_out'].includes(state)&&Date.now()-stateSince>15*60000){log(`stuck in "${state}" for 15 minutes, restarting`);process.exit(1)}},60000)
 setTimeout(()=>selfUpdate(),60000);setInterval(()=>selfUpdate(),6*3600e3)
 sendLoop().catch(e=>{log("send loop stopped, restarting:",e?.message||e);process.exit(1)})
 process.on('SIGTERM',async()=>{state='offline';await beat();process.exit(0)})

@@ -52,6 +52,12 @@ foreach($name in $tasks){
   }
   $set=New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew
   Set-ScheduledTask -TaskName $name -Settings $set | Out-Null
+  # run as a Windows service account: keeps running after you log out of Remote Desktop, starts with Windows
+  if($t.Principal.UserId -notmatch 'SYSTEM'){
+    Set-ScheduledTask -TaskName $name -Principal (New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest) | Out-Null
+    Say '   Now runs as SYSTEM: keeps going after you log out' Green }
+  $t2=Get-ScheduledTask -TaskName $name
+  Say ("   Auto start: with Windows = {0}, check every 5 min = {1}, runs as {2}" -f [bool]($t2.Triggers | Where-Object {$_.CimClass.CimClassName -eq 'MSFT_TaskBootTrigger'}),[bool]($t2.Triggers | Where-Object { $_.Repetition.Interval }),$t2.Principal.UserId) White
 
   if((Get-ScheduledTask -TaskName $name).State -ne 'Running'){
     Start-ScheduledTask -TaskName $name; Start-Sleep -Seconds 8
